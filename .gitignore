@@ -44,3 +44,6 @@ fastlane/test_output
 # Environment
 .env
 .env.local
+
+# Xcode Build Server (contains local absolute paths)
+buildServer.json
