@@ -9,6 +9,8 @@ struct TimerView: View {
     @State private var viewModel: TimerViewModel?
     @State private var showConfirm = false
     @State private var showResult = false
+    @State private var showCancelConfirm = false
+    @State private var showStartSheet = false
 
     var body: some View {
         ZStack {
@@ -40,6 +42,12 @@ struct TimerView: View {
         } message: {
             Text(viewModel?.saveError ?? "")
         }
+        .alert("タイマーをキャンセルしますか？", isPresented: $showCancelConfirm) {
+            Button("キャンセルする", role: .destructive) { viewModel?.reset() }
+            Button("続ける", role: .cancel) {}
+        } message: {
+            Text("タイマーをリセットして最初の状態に戻ります。")
+        }
         .sheet(isPresented: $showConfirm) {
             if let vm = viewModel {
                 DepartureConfirmView(
@@ -57,6 +65,25 @@ struct TimerView: View {
                 .presentationDetents([.medium])
                 .presentationBackground(.clear)
                 .presentationDragIndicator(.hidden)
+            }
+        }
+        .sheet(isPresented: $showStartSheet) {
+            if let vm = viewModel {
+                StartSheet(
+                    scheduleName: vm.schedule.name,
+                    currentTime: vm.schedule.targetDepartureTime,
+                    onStart: { newTime in
+                        vm.updateDepartureTime(newTime)
+                        try? modelContext.save()
+                        vm.start()
+                        showStartSheet = false
+                    },
+                    onCancel: { showStartSheet = false }
+                )
+                .presentationDetents([.fraction(0.88)])
+                .presentationBackground(.clear)
+                .presentationDragIndicator(.hidden)
+                .presentationCornerRadius(32)
             }
         }
         .sheet(isPresented: $showResult) {
@@ -84,49 +111,115 @@ struct TimerView: View {
 
     @ViewBuilder
     private func mainContent(vm: TimerViewModel) -> some View {
-        VStack(spacing: 0) {
-            // 出発時刻ヘッダー
-            departureHeader(vm: vm)
-                .padding(.top, 12)
+        ZStack {
+            WaterTankView(
+                waterLevel: vm.waterLevel,
+                isOverdue: vm.isOverdue,
+                cornerRadius: 0,
+                showBorder: false,
+                showLevelText: false
+            )
+            .ignoresSafeArea()
 
-            // カウントダウン
-            countdownSection(vm: vm)
-                .padding(.top, 8)
+            VStack(spacing: 0) {
+                // トップ: 出発時刻カード or コンパクトヘッダー
+                Group {
+                    if !vm.isRunning && !vm.departed {
+                        departureCard(vm: vm)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 20)
+                    } else {
+                        compactDepartureHeader(vm: vm)
+                            .padding(.top, 16)
+                    }
+                }
 
-            // 水タンク
-            WaterTankView(waterLevel: vm.waterLevel, isOverdue: vm.isOverdue)
-                .frame(maxWidth: 180)
-                .aspectRatio(0.5, contentMode: .fit)
-                .shadow(color: .black.opacity(0.3), radius: 16, y: 8)
-                .padding(.top, 20)
+                Spacer()
 
-            // ステータスラベル
-            statusLabel(vm: vm)
-                .padding(.top, 16)
+                // センター: カウントダウン + %
+                centerInfoDisplay(vm: vm)
 
-            Spacer()
+                Spacer()
 
-            // ボタン
-            actionButton(vm: vm)
-                .padding(.horizontal, 28)
-                .padding(.bottom, 28)
+                // ボトム: ステータス + ボタン
+                statusLabel(vm: vm)
+                    .padding(.bottom, 12)
+
+                actionButton(vm: vm)
+                    .padding(.horizontal, 28)
+                    .padding(.bottom, 28)
+            }
+            .foregroundStyle(.white)
         }
-        .foregroundStyle(.white)
     }
 
     // MARK: - Sub views
 
-    private func departureHeader(vm: TimerViewModel) -> some View {
+    /// 未スタート時: 出発時刻を編集できる目立つカード
+    private func departureCard(vm: TimerViewModel) -> some View {
+        Button {
+            showStartSheet = true
+        } label: {
+            VStack(spacing: 12) {
+                HStack(alignment: .center) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("出発時刻")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .textCase(.uppercase)
+                            .tracking(1.0)
+                        Text(vm.schedule.name)
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.75))
+                    }
+                    Spacer()
+                    HStack(spacing: 5) {
+                        Image(systemName: "pencil")
+                            .font(.caption.weight(.bold))
+                        Text("変更")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .foregroundStyle(.white.opacity(0.9))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.white.opacity(0.15), in: Capsule())
+                    .overlay(Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 1))
+                }
+
+                HStack(alignment: .lastTextBaseline, spacing: 10) {
+                    Image(systemName: "figure.walk.departure")
+                        .font(.title2)
+                        .foregroundStyle(.white.opacity(0.85))
+                    Text(vm.schedule.targetDepartureTime, format: .dateTime.hour().minute())
+                        .font(AppFont.departureTime)
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                    Spacer()
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 18)
+            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(.white.opacity(0.18), lineWidth: 1)
+            )
+        }
+        .buttonStyle(DepartureCardButtonStyle())
+    }
+
+    /// 実行中 / 完了時: コンパクトな中央揃えヘッダー
+    private func compactDepartureHeader(vm: TimerViewModel) -> some View {
         VStack(spacing: 3) {
             Text(vm.schedule.name)
                 .font(.caption)
-                .foregroundStyle(.white.opacity(0.45))
+                .foregroundStyle(.white.opacity(0.8))
                 .textCase(.uppercase)
                 .tracking(1.2)
             HStack(alignment: .lastTextBaseline, spacing: 6) {
                 Image(systemName: "figure.walk.departure")
                     .font(.title3)
-                    .foregroundStyle(.white.opacity(0.55))
+                    .foregroundStyle(.white.opacity(0.8))
                 Text(vm.schedule.targetDepartureTime, format: .dateTime.hour().minute())
                     .font(AppFont.departureTime)
                     .monospacedDigit()
@@ -135,41 +228,56 @@ struct TimerView: View {
     }
 
     @ViewBuilder
-    private func countdownSection(vm: TimerViewModel) -> some View {
-        VStack(spacing: 4) {
-            if !vm.isRunning && !vm.departed {
-                Text("準備ができたらスタート")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.4))
-                Text(vm.countdownText)
-                    .font(AppFont.countdownSmall)
-                    .foregroundStyle(.white.opacity(0.55))
-                    .monospacedDigit()
-            } else if vm.departed {
+    private func centerInfoDisplay(vm: TimerViewModel) -> some View {
+        VStack(spacing: 0) {
+            if vm.departed {
+                // 出発完了
                 Text("出発完了 🎉")
-                    .font(.headline)
-                    .foregroundStyle(.white.opacity(0.7))
-            } else if vm.isOverdue {
-                Text("出発時刻を過ぎています")
-                    .font(.caption)
-                    .foregroundStyle(.orange.opacity(0.85))
-                Text(vm.countdownText)
-                    .font(AppFont.countdown)
-                    .foregroundStyle(.orange)
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                    .animation(.linear(duration: 1.0), value: vm.countdownText)
+                    .font(.system(.title3, design: .rounded).weight(.medium))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.bottom, 20)
             } else {
-                Text("出発まで")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.45))
+                // ラベル
+                Text(vm.isOverdue ? "遅刻中" : "出発まで")
+                    .font(.system(.caption, design: .rounded).weight(.semibold))
+                    .tracking(3)
+                    .textCase(.uppercase)
+                    .foregroundStyle(vm.isOverdue ? Color.orange.opacity(0.9) : Color.white.opacity(0.55))
+
+                // カウントダウン（ヒーロー数字）
                 Text(vm.countdownText)
-                    .font(AppFont.countdown)
+                    .font(.system(size: 88, weight: .ultraLight, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(vm.isOverdue ? Color.orange : Color.white.opacity(vm.isRunning ? 1.0 : 0.7))
+                    .contentTransition(vm.isOverdue ? .numericText() : .numericText(countsDown: true))
+                    .animation(.linear(duration: 1.0), value: vm.countdownText)
+                    .padding(.top, 8)
+
+                // ドット区切り
+                HStack(spacing: 5) {
+                    ForEach(0..<5, id: \.self) { _ in
+                        Circle()
+                            .fill(.white.opacity(0.25))
+                            .frame(width: 3.5, height: 3.5)
+                    }
+                }
+                .padding(.vertical, 18)
+            }
+
+            // % サブ表示
+            HStack(alignment: .lastTextBaseline, spacing: 2) {
+                Text("\(Int(vm.waterLevel * 100))")
+                    .font(.system(size: 44, weight: .thin, design: .rounded))
                     .monospacedDigit()
                     .contentTransition(.numericText(countsDown: true))
-                    .animation(.linear(duration: 1.0), value: vm.countdownText)
+                    .animation(.linear(duration: 1.0), value: vm.waterLevel)
+                Text("%")
+                    .font(.system(size: 22, weight: .thin, design: .rounded))
+                    .padding(.bottom, 4)
             }
+            .foregroundStyle(vm.isOverdue ? Color.orange.opacity(0.7) : Color.white.opacity(0.6))
         }
+        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
     }
 
     @ViewBuilder
@@ -204,7 +312,7 @@ struct TimerView: View {
         if vm.departed {
             EmptyView()
         } else if vm.startedAt == nil {
-            Button { vm.start() } label: {
+            Button { showStartSheet = true } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "play.fill")
                     Text("スタート")
@@ -212,34 +320,39 @@ struct TimerView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
-                .background(
-                    LinearGradient(
-                        colors: [.dewBlue, .dewNavy],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
+                .background(Color.dewBlue)
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .shadow(color: Color.dewBlue.opacity(0.4), radius: 12, y: 5)
             }
         } else {
-            Button { showConfirm = true } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "figure.walk.departure")
-                    Text("いってきます！")
-                        .font(AppFont.actionButton)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 20)
-                .background(
-                    LinearGradient(
-                        colors: departureBtnColors(vm.waterLevel),
-                        startPoint: .leading,
-                        endPoint: .trailing
+            VStack(spacing: 12) {
+                Button { showConfirm = true } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "figure.walk.departure")
+                        Text("いってきます！")
+                            .font(AppFont.actionButton)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+                    .background(
+                        LinearGradient(
+                            colors: departureBtnColors(vm.waterLevel),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
                     )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .shadow(color: departureBtnColors(vm.waterLevel).first!.opacity(0.4), radius: 12, y: 5)
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .shadow(color: departureBtnColors(vm.waterLevel).first!.opacity(0.4), radius: 12, y: 5)
+                }
+
+                Button { showCancelConfirm = true } label: {
+                    Text("キャンセル")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.65))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
             }
         }
     }
@@ -281,6 +394,17 @@ struct TimerView: View {
     private func ensureViewModel() {
         guard viewModel == nil, let schedule = activeSchedule else { return }
         viewModel = TimerViewModel(schedule: schedule)
+    }
+}
+
+// MARK: - ButtonStyle
+
+private struct DepartureCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .opacity(configuration.isPressed ? 0.85 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 
