@@ -118,6 +118,10 @@ final class TimerViewModel {
 
     func clearError() { saveError = nil }
 
+    func updateDepartureTime(_ newTime: Date) {
+        schedule.targetDepartureTime = newTime
+    }
+
     // MARK: - Background / Foreground
 
     /// フォアグラウンド復帰時に呼ぶ。now を即時更新してティッカーを再開する。
