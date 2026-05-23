@@ -114,6 +114,8 @@ struct TimerView: View {
         ZStack {
             WaterTankView(
                 waterLevel: vm.waterLevel,
+                routineItems: vm.schedule.orderedItems,
+                activeRoutineItemID: vm.currentRoutineItem?.id,
                 isOverdue: vm.isOverdue,
                 cornerRadius: 0,
                 showBorder: false,
@@ -142,6 +144,10 @@ struct TimerView: View {
                 Spacer()
 
                 // ボトム: ステータス + ボタン
+                currentTaskPanel(vm: vm)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 12)
+
                 statusLabel(vm: vm)
                     .padding(.bottom, 12)
 
@@ -278,6 +284,53 @@ struct TimerView: View {
             .foregroundStyle(vm.isOverdue ? Color.orange.opacity(0.7) : Color.white.opacity(0.6))
         }
         .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+    }
+
+    @ViewBuilder
+    private func currentTaskPanel(vm: TimerViewModel) -> some View {
+        if vm.isRunning, let currentItem = vm.currentRoutineItem {
+            VStack(spacing: 10) {
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(Color(hex: currentItem.colorHex))
+                        .frame(width: 10, height: 10)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(currentItem.name)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                        if let next = vm.nextRoutineItem {
+                            Text("次: \(next.name)")
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.55))
+                                .lineLimit(1)
+                        } else {
+                            Text("最後の準備")
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.55))
+                        }
+                    }
+
+                    Spacer()
+
+                    Text(vm.currentRoutineRemainingText)
+                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+
+                ProgressView(value: vm.currentRoutineProgress)
+                    .tint(Color(hex: currentItem.colorHex))
+                    .background(.white.opacity(0.16), in: Capsule())
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(.white.opacity(0.14), lineWidth: 1)
+            )
+        }
     }
 
     @ViewBuilder

@@ -46,6 +46,43 @@ final class TimerViewModel {
 
     var isRunning: Bool { startedAt != nil && !departed }
 
+    var elapsedSeconds: Int {
+        guard let startedAt else { return 0 }
+        return max(0, Int(now.timeIntervalSince(startedAt)))
+    }
+
+    var currentRoutineItem: RoutineItem? {
+        guard startedAt != nil, !departed, !schedule.orderedItems.isEmpty else { return nil }
+
+        var accumulated = 0
+        for item in schedule.orderedItems {
+            accumulated += item.durationSeconds
+            if elapsedSeconds < accumulated {
+                return item
+            }
+        }
+        return schedule.orderedItems.last
+    }
+
+    var nextRoutineItem: RoutineItem? {
+        guard let currentRoutineItem else { return nil }
+        let items = schedule.orderedItems
+        guard let index = items.firstIndex(where: { $0.id == currentRoutineItem.id }),
+              items.indices.contains(index + 1) else { return nil }
+        return items[index + 1]
+    }
+
+    var currentRoutineProgress: Double {
+        guard let currentRoutineItem else { return 0 }
+        var elapsedBeforeCurrent = 0
+        for item in schedule.orderedItems {
+            if item.id == currentRoutineItem.id { break }
+            elapsedBeforeCurrent += item.durationSeconds
+        }
+        let elapsedInCurrent = elapsedSeconds - elapsedBeforeCurrent
+        return min(1.0, max(0.0, Double(elapsedInCurrent) / Double(currentRoutineItem.durationSeconds)))
+    }
+
     // MARK: - Formatted strings
 
     var countdownText: String {
@@ -54,9 +91,13 @@ final class TimerViewModel {
     }
 
     var elapsedFormatted: String {
-        guard let startedAt else { return "00:00" }
-        let s = Int(now.timeIntervalSince(startedAt))
-        return formatSeconds(max(0, s))
+        formatSeconds(elapsedSeconds)
+    }
+
+    var currentRoutineRemainingText: String {
+        guard let currentRoutineItem else { return "00:00" }
+        let remaining = Int(Double(currentRoutineItem.durationSeconds) * (1 - currentRoutineProgress))
+        return formatSeconds(max(0, remaining))
     }
 
     private func formatSeconds(_ s: Int) -> String {
