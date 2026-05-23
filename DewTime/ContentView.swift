@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 enum AppTab: CaseIterable, Identifiable {
-    case timer, garden, settings
+    case timer, garden, collection, settings
 
     var id: Self { self }
 
@@ -10,6 +10,7 @@ enum AppTab: CaseIterable, Identifiable {
         switch self {
         case .timer:    return "タイマー"
         case .garden:   return "お庭"
+        case .collection: return "図鑑"
         case .settings: return "設定"
         }
     }
@@ -18,6 +19,7 @@ enum AppTab: CaseIterable, Identifiable {
         switch self {
         case .timer:    return "drop.fill"
         case .garden:   return "leaf.fill"
+        case .collection: return "book.closed.fill"
         case .settings: return "gear"
         }
     }
@@ -26,6 +28,7 @@ enum AppTab: CaseIterable, Identifiable {
         switch self {
         case .timer:    TimerView()
         case .garden:   GardenView()
+        case .collection: CollectionView()
         case .settings: SettingsView()
         }
     }
@@ -44,5 +47,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [UserSchedule.self, RoutineItem.self, PlantFlower.self], inMemory: true)
+        .modelContainer(for: [UserSchedule.self, RoutineItem.self, PlantFlower.self, ActivePlant.self, PlantWateringRecord.self], inMemory: true)
 }

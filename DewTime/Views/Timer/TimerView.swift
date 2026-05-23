@@ -5,12 +5,14 @@ struct TimerView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Query private var schedules: [UserSchedule]
+    @Query(sort: \ActivePlant.startedAt, order: .reverse) private var activePlants: [ActivePlant]
 
     @State private var viewModel: TimerViewModel?
     @State private var showConfirm = false
     @State private var showResult = false
     @State private var showCancelConfirm = false
     @State private var showStartSheet = false
+    @State private var showPlantPicker = false
 
     var body: some View {
         ZStack {
@@ -22,10 +24,17 @@ struct TimerView: View {
                 emptyState
             }
         }
-        .onAppear { ensureViewModel() }
+        .onAppear {
+            ensureViewModel()
+            viewModel?.syncActivePlant(activePlants)
+        }
         .onChange(of: activeSchedule?.id) { _, _ in
             viewModel = nil
             ensureViewModel()
+            viewModel?.syncActivePlant(activePlants)
+        }
+        .onChange(of: activePlants.map(\.id)) { _, _ in
+            viewModel?.syncActivePlant(activePlants)
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
@@ -53,6 +62,13 @@ struct TimerView: View {
                 DepartureConfirmView(
                     waterLevel: vm.waterLevel,
                     isOnTime: !vm.isOverdue,
+                    selectedSpecies: vm.selectedSpecies,
+                    waterAmount: vm.currentWaterAmount,
+                    totalWaterBefore: vm.currentReceivedWater,
+                    totalWaterAfter: vm.projectedTotalWater,
+                    requiredTotalWater: vm.currentRequiredTotalWater,
+                    growthStage: vm.projectedGrowthStage,
+                    completesGrowth: vm.meetsSelectedRequirement,
                     onConfirm: {
                         vm.depart(context: modelContext)
                         showConfirm = false
@@ -94,6 +110,12 @@ struct TimerView: View {
                     totalSeconds: max(1, Int(vm.schedule.targetDepartureTime.timeIntervalSince(vm.startedAt ?? .now))),
                     delaySeconds: vm.finalDelaySeconds,
                     scheduleName: vm.schedule.name,
+                    selectedSpecies: vm.selectedSpecies,
+                    waterAmount: vm.finalWaterAmount,
+                    totalWaterAfter: vm.finalTotalWaterAfter,
+                    requiredTotalWater: vm.finalRequiredTotalWater,
+                    growthStage: vm.finalGrowthStage,
+                    completedGrowth: vm.finalCompletedGrowth,
                     onDismiss: {
                         showResult = false
                         vm.reset()
@@ -105,6 +127,20 @@ struct TimerView: View {
                 .interactiveDismissDisabled()
             }
         }
+        .sheet(isPresented: $showPlantPicker) {
+            if let vm = viewModel {
+                PlantPickerSheet(
+                    selectedSpecies: vm.selectedSpecies,
+                    onSelect: { species in
+                        vm.selectSpecies(species, context: modelContext)
+                        showPlantPicker = false
+                    }
+                )
+                .presentationDetents([.fraction(0.72), .large])
+                .presentationBackground(.clear)
+                .presentationDragIndicator(.hidden)
+            }
+        }
     }
 
     // MARK: - Main layout
@@ -114,8 +150,6 @@ struct TimerView: View {
         ZStack {
             WaterTankView(
                 waterLevel: vm.waterLevel,
-                routineItems: vm.schedule.orderedItems,
-                activeRoutineItemID: vm.currentRoutineItem?.id,
                 isOverdue: vm.isOverdue,
                 cornerRadius: 0,
                 showBorder: false,
@@ -127,12 +161,19 @@ struct TimerView: View {
                 // トップ: 出発時刻カード or コンパクトヘッダー
                 Group {
                     if !vm.isRunning && !vm.departed {
-                        departureCard(vm: vm)
-                            .padding(.horizontal, 20)
-                            .padding(.top, 20)
+                        VStack(spacing: 12) {
+                            departureCard(vm: vm)
+                            plantSelectionCard(vm: vm, isEditable: true)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
                     } else {
-                        compactDepartureHeader(vm: vm)
-                            .padding(.top, 16)
+                        VStack(spacing: 10) {
+                            compactDepartureHeader(vm: vm)
+                            plantSelectionCard(vm: vm, isEditable: false)
+                                .padding(.horizontal, 24)
+                        }
+                        .padding(.top, 16)
                     }
                 }
 
@@ -212,6 +253,77 @@ struct TimerView: View {
             )
         }
         .buttonStyle(DepartureCardButtonStyle())
+    }
+
+    private func plantSelectionCard(vm: TimerViewModel, isEditable: Bool) -> some View {
+        Button {
+            if isEditable { showPlantPicker = true }
+        } label: {
+            VStack(spacing: 12) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(plantStatusColor(vm: vm).opacity(0.18))
+                        Image(systemName: vm.selectedSpecies.icon)
+                            .font(.system(size: isEditable ? 30 : 22, weight: .semibold))
+                            .foregroundStyle(plantStatusColor(vm: vm))
+                            .symbolRenderingMode(.hierarchical)
+                    }
+                    .frame(width: isEditable ? 54 : 42, height: isEditable ? 54 : 42)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("今日育てる植物")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.68))
+                        Text(vm.selectedSpecies.displayName)
+                            .font(isEditable ? .headline : .subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                        Text(vm.hasActivePlant ? vm.currentGrowthStage.message : "種を選んで育てましょう")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.54))
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 3) {
+                        Text("育成水量")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.52))
+                        Text("\(Int(vm.currentReceivedWater.rounded()))/\(Int(vm.currentRequiredTotalWater.rounded()))pt")
+                            .font(.subheadline.weight(.bold))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                    }
+
+                    if isEditable {
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
+                }
+
+                progressBar(value: vm.growthProgress, color: plantStatusColor(vm: vm), trackOpacity: 0.14)
+
+                HStack {
+                    Label(vm.currentGrowthStage.displayName, systemImage: vm.currentGrowthStage.icon)
+                    Spacer()
+                    Text(vm.meetsSelectedRequirement ? "今回で開花" : "今回 +\(Int(vm.currentWaterAmount.rounded()))pt")
+                        .monospacedDigit()
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(plantStatusColor(vm: vm).opacity(0.92))
+            }
+            .padding(.horizontal, isEditable ? 18 : 14)
+            .padding(.vertical, isEditable ? 16 : 12)
+            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: isEditable ? 20 : 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: isEditable ? 20 : 16, style: .continuous)
+                    .strokeBorder(.white.opacity(0.18), lineWidth: 1)
+            )
+        }
+        .buttonStyle(DepartureCardButtonStyle())
+        .disabled(!isEditable)
     }
 
     /// 実行中 / 完了時: コンパクトな中央揃えヘッダー
@@ -319,9 +431,7 @@ struct TimerView: View {
                         .foregroundStyle(.white.opacity(0.8))
                 }
 
-                ProgressView(value: vm.currentRoutineProgress)
-                    .tint(Color(hex: currentItem.colorHex))
-                    .background(.white.opacity(0.16), in: Capsule())
+                progressBar(value: vm.currentRoutineProgress, color: Color(hex: currentItem.colorHex), trackOpacity: 0.16)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
@@ -350,6 +460,19 @@ struct TimerView: View {
             .padding(.vertical, 8)
             .background(color.opacity(0.12), in: Capsule())
         }
+    }
+
+    private func progressBar(value: Double, color: Color, trackOpacity: Double) -> some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(.white.opacity(trackOpacity))
+                Capsule()
+                    .fill(color)
+                    .frame(width: proxy.size.width * max(0, min(1, value)))
+            }
+        }
+        .frame(height: 4)
     }
 
     private func statusInfo(level: Double, overdue: Bool) -> (String, Color) {
@@ -414,6 +537,10 @@ struct TimerView: View {
         WaterLevelTheme(waterRatio: level).gradientColors
     }
 
+    private func plantStatusColor(vm: TimerViewModel) -> Color {
+        vm.projectedGrowthStage == .bloom ? WaterLevelTheme(waterRatio: vm.waterLevel).tintColor : .orange
+    }
+
     // MARK: - Empty state
 
     private var emptyState: some View {
@@ -450,6 +577,94 @@ struct TimerView: View {
     }
 }
 
+private struct PlantPickerSheet: View {
+    let selectedSpecies: FlowerSpecies
+    let onSelect: (FlowerSpecies) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            DragHandle()
+                .padding(.top, 14)
+                .padding(.bottom, 12)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("今日育てる植物")
+                    .font(AppFont.sheetTitle)
+                Text("選んだ種ごとに、必要な総水量が範囲内でランダムに決まります。")
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.58))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 18)
+
+            ScrollView {
+                VStack(spacing: 10) {
+                    ForEach(FlowerSpecies.allCases.sorted { $0.requiredTotalWaterRange.lowerBound < $1.requiredTotalWaterRange.lowerBound }) { species in
+                        Button {
+                            onSelect(species)
+                        } label: {
+                            plantRow(species)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 26)
+            }
+        }
+        .foregroundStyle(.white)
+        .background(
+            RoundedRectangle(cornerRadius: 32, style: .continuous)
+                .fill(LinearGradient.dewTimeSheet)
+                .ignoresSafeArea()
+        )
+    }
+
+    private func plantRow(_ species: FlowerSpecies) -> some View {
+        let rowColor = selectedSpecies == species ? Color.dewBlue : Color.orange
+
+        return VStack(spacing: 10) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(rowColor.opacity(0.18))
+                    Image(systemName: species.icon)
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(rowColor)
+                        .symbolRenderingMode(.hierarchical)
+                }
+                .frame(width: 50, height: 50)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(species.displayName)
+                        .font(.headline)
+                    Text("\(species.difficultyLabel) / 必要総水量 \(species.requiredTotalWaterRangeText)")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.56))
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    Image(systemName: selectedSpecies == species ? "checkmark.circle.fill" : "circle")
+                        .font(.headline)
+                        .foregroundStyle(selectedSpecies == species ? rowColor : .white.opacity(0.3))
+                    Text(selectedSpecies == species ? "選択中" : "この種で育てる")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(rowColor)
+                }
+            }
+        }
+        .padding(14)
+        .background(.white.opacity(selectedSpecies == species ? 0.14 : 0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder((selectedSpecies == species ? rowColor : .white).opacity(selectedSpecies == species ? 0.45 : 0.12), lineWidth: 1)
+        )
+    }
+}
+
 // MARK: - ButtonStyle
 
 private struct DepartureCardButtonStyle: ButtonStyle {
@@ -463,5 +678,5 @@ private struct DepartureCardButtonStyle: ButtonStyle {
 
 #Preview {
     TimerView()
-        .modelContainer(for: [UserSchedule.self, RoutineItem.self, PlantFlower.self], inMemory: true)
+        .modelContainer(for: [UserSchedule.self, RoutineItem.self, PlantFlower.self, ActivePlant.self, PlantWateringRecord.self], inMemory: true)
 }

@@ -3,6 +3,7 @@ import SwiftData
 
 struct RoutineEditorView: View {
     @Environment(\.modelContext) private var modelContext
+    @Query(sort: \UserSchedule.name) private var schedules: [UserSchedule]
     @Bindable var schedule: UserSchedule
 
     @State private var showAddSheet = false
@@ -20,7 +21,7 @@ struct RoutineEditorView: View {
                     selection: $schedule.targetDepartureTime,
                     displayedComponents: .hourAndMinute
                 )
-                Toggle("このスケジュールを使用", isOn: $schedule.isActive)
+                Toggle("このスケジュールを使用", isOn: activeBinding)
             }
 
             Section {
@@ -100,6 +101,22 @@ struct RoutineEditorView: View {
                 }
             }
         }
+    }
+
+    private var activeBinding: Binding<Bool> {
+        Binding(
+            get: { schedule.isActive },
+            set: { isActive in
+                if isActive {
+                    UserSchedule.setActive(schedule, in: schedules)
+                } else if schedules.filter(\.isActive).count > 1 {
+                    schedule.isActive = false
+                } else {
+                    schedule.isActive = true
+                }
+                save()
+            }
+        )
     }
 
     private func moveItems(from source: IndexSet, to destination: Int) {

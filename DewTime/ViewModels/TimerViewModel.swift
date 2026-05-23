@@ -12,11 +12,19 @@ final class TimerViewModel {
     private(set) var finalWaterLevel: Double = 1.0
     private(set) var finalDelaySeconds: Int = 0
     private(set) var saveError: String?
+    private(set) var selectedSpecies: FlowerSpecies
+    private(set) var activePlant: ActivePlant?
+    private(set) var finalWaterAmount: Double = 0
+    private(set) var finalTotalWaterAfter: Double = 0
+    private(set) var finalRequiredTotalWater: Double = 1
+    private(set) var finalGrowthStage: GrowthStage = .seed
+    private(set) var finalCompletedGrowth: Bool = false
 
     private var timer: Timer?
 
     init(schedule: UserSchedule) {
         self.schedule = schedule
+        self.selectedSpecies = Self.restoreSelectedSpecies()
         restoreState()
     }
 
@@ -83,6 +91,52 @@ final class TimerViewModel {
         return min(1.0, max(0.0, Double(elapsedInCurrent) / Double(currentRoutineItem.durationSeconds)))
     }
 
+    var meetsSelectedRequirement: Bool {
+        projectedTotalWater >= currentRequiredTotalWater
+    }
+
+    var growthProgress: Double {
+        currentGrowthProgress
+    }
+
+    var currentWaterAmount: Double {
+        waterLevel * 100
+    }
+
+    var projectedTotalWater: Double {
+        min(currentRequiredTotalWater, currentReceivedWater + currentWaterAmount)
+    }
+
+    var currentReceivedWater: Double {
+        activePlant?.receivedWater ?? 0
+    }
+
+    var currentRequiredTotalWater: Double {
+        activePlant?.requiredTotalWater ?? Double(selectedSpecies.requiredTotalWaterRange.upperBound)
+    }
+
+    var currentGrowthProgress: Double {
+        guard currentRequiredTotalWater > 0 else { return 0 }
+        return min(1.0, max(0.0, currentReceivedWater / currentRequiredTotalWater))
+    }
+
+    var projectedGrowthProgress: Double {
+        guard currentRequiredTotalWater > 0 else { return 0 }
+        return min(1.0, max(0.0, projectedTotalWater / currentRequiredTotalWater))
+    }
+
+    var currentGrowthStage: GrowthStage {
+        GrowthStage.stage(for: currentGrowthProgress)
+    }
+
+    var projectedGrowthStage: GrowthStage {
+        GrowthStage.stage(for: projectedGrowthProgress)
+    }
+
+    var hasActivePlant: Bool {
+        activePlant != nil
+    }
+
     // MARK: - Formatted strings
 
     var countdownText: String {
@@ -122,26 +176,55 @@ final class TimerViewModel {
         guard !departed else { return }
         finalWaterLevel = waterLevel
         finalDelaySeconds = overdueSeconds
+        finalWaterAmount = currentWaterAmount
+        let plant = activePlant ?? createActivePlant(for: selectedSpecies, in: context)
+        let species = plant.species
+        let totalAfter = min(plant.requiredTotalWater, plant.receivedWater + finalWaterAmount)
+        let growthStage = GrowthStage.stage(for: totalAfter / plant.requiredTotalWater)
+        let completedGrowth = totalAfter >= plant.requiredTotalWater
+        finalTotalWaterAfter = totalAfter
+        finalRequiredTotalWater = plant.requiredTotalWater
+        finalGrowthStage = growthStage
+        finalCompletedGrowth = completedGrowth
+
         departed = true
         timer?.invalidate()
         timer = nil
         NotificationScheduler.cancelAll()
         saveState()
 
-        let species = FlowerSpecies.pick(for: finalWaterLevel)
-        let flower = PlantFlower(
-            name: "今日の花",
+        plant.receivedWater = totalAfter
+        plant.lastWateredAt = .now
+        plant.isCompleted = completedGrowth
+
+        let record = PlantWateringRecord(
             speciesId: species.rawValue,
             recordedAt: .now,
-            succeeded: finalWaterLevel > 0.1,
-            waterRatio: finalWaterLevel
+            waterAmount: finalWaterAmount,
+            totalWaterAfter: totalAfter,
+            requiredTotalWater: plant.requiredTotalWater,
+            growthStage: growthStage,
+            completedGrowth: completedGrowth
         )
-        context.insert(flower)
+        context.insert(record)
+
+        if completedGrowth {
+            let flower = PlantFlower(
+                name: species.displayName,
+                speciesId: species.rawValue,
+                recordedAt: .now,
+                succeeded: true,
+                waterRatio: 1.0
+            )
+            context.insert(flower)
+        }
+
         do {
             try context.save()
+            activePlant = completedGrowth ? nil : plant
         } catch {
             saveError = "記録の保存に失敗しました"
-            print("[DewTime] PlantFlower の保存に失敗しました: \(error)")
+            print("[DewTime] 水やり記録の保存に失敗しました: \(error)")
         }
     }
 
@@ -152,12 +235,42 @@ final class TimerViewModel {
         departed = false
         finalWaterLevel = 1.0
         finalDelaySeconds = 0
+        finalWaterAmount = 0
+        finalTotalWaterAfter = activePlant?.receivedWater ?? 0
+        finalRequiredTotalWater = activePlant?.requiredTotalWater ?? 1
+        finalGrowthStage = activePlant?.growthStage ?? .seed
+        finalCompletedGrowth = false
         now = .now
         clearState()
         NotificationScheduler.cancelAll()
     }
 
     func clearError() { saveError = nil }
+
+    func selectSpecies(_ species: FlowerSpecies, context: ModelContext) {
+        guard !isRunning, !departed else { return }
+        selectedSpecies = species
+        UserDefaults.standard.set(species.rawValue, forKey: PKey.selectedSpecies.rawValue)
+        activePlant = createActivePlant(for: species, in: context)
+        do {
+            try context.save()
+        } catch {
+            saveError = "植物の準備に失敗しました"
+            print("[DewTime] ActivePlant の保存に失敗しました: \(error)")
+        }
+    }
+
+    func syncActivePlant(_ plants: [ActivePlant]) {
+        if let plant = plants
+            .filter({ !$0.isCompleted })
+            .sorted(by: { $0.startedAt > $1.startedAt })
+            .first {
+            activePlant = plant
+            selectedSpecies = plant.species
+            return
+        }
+        activePlant = nil
+    }
 
     func updateDepartureTime(_ newTime: Date) {
         schedule.targetDepartureTime = newTime
@@ -186,6 +299,7 @@ final class TimerViewModel {
         case departed         = "dew.timer.departed"
         case finalWaterLevel  = "dew.timer.finalWaterLevel"
         case finalDelaySeconds = "dew.timer.finalDelaySeconds"
+        case selectedSpecies  = "dew.timer.selectedSpecies"
     }
 
     private func saveState() {
@@ -220,6 +334,30 @@ final class TimerViewModel {
     }
 
     // MARK: - Private helpers
+
+    private static func restoreSelectedSpecies() -> FlowerSpecies {
+        guard let rawValue = UserDefaults.standard.string(forKey: PKey.selectedSpecies.rawValue),
+              let species = FlowerSpecies(rawValue: rawValue) else {
+            return .cactus
+        }
+        return species
+    }
+
+    private func createActivePlant(for species: FlowerSpecies, in context: ModelContext) -> ActivePlant {
+        if let activePlant, !activePlant.isCompleted, activePlant.species == species {
+            return activePlant
+        }
+
+        activePlant?.isCompleted = true
+        let plant = ActivePlant(
+            speciesId: species.rawValue,
+            name: species.displayName,
+            requiredTotalWater: species.makeRequiredTotalWater()
+        )
+        context.insert(plant)
+        activePlant = plant
+        return plant
+    }
 
     private func startTicker() {
         timer?.invalidate()

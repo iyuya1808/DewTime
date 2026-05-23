@@ -3,6 +3,13 @@ import SwiftUI
 struct DepartureConfirmView: View {
     let waterLevel: Double
     let isOnTime: Bool
+    let selectedSpecies: FlowerSpecies
+    let waterAmount: Double
+    let totalWaterBefore: Double
+    let totalWaterAfter: Double
+    let requiredTotalWater: Double
+    let growthStage: GrowthStage
+    let completesGrowth: Bool
     let onConfirm: () -> Void
     let onCancel: () -> Void
 
@@ -15,8 +22,10 @@ struct DepartureConfirmView: View {
 
             // メインメッセージ
             VStack(spacing: 12) {
-                Text(headerEmoji)
-                    .font(.system(size: 60))
+                Image(systemName: selectedSpecies.icon)
+                    .font(.system(size: 58, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(stageColor)
                     .scaleEffect(emojiScale)
                     .animation(.spring(response: 0.4, dampingFraction: 0.5), value: emojiScale)
                     .onAppear {
@@ -48,6 +57,23 @@ struct DepartureConfirmView: View {
                     label: "スケジュール",
                     icon: isOnTime ? "checkmark.circle.fill" : "exclamationmark.circle.fill",
                     color: isOnTime ? .green : .orange
+                )
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 12)
+
+            HStack(spacing: 12) {
+                badgeView(
+                    value: "\(Int(totalWaterBefore.rounded()))/\(Int(requiredTotalWater.rounded()))pt",
+                    label: "現在の育成水量",
+                    icon: selectedSpecies.icon,
+                    color: stageColor
+                )
+                badgeView(
+                    value: "+\(Int(waterAmount.rounded()))pt",
+                    label: "今回の水やり",
+                    icon: "drop.fill",
+                    color: waterLevelColor
                 )
             }
             .padding(.horizontal, 24)
@@ -105,34 +131,41 @@ struct DepartureConfirmView: View {
         .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    private var headerEmoji: String {
-        if waterLevel > 0.7 { return "🌊" }
-        if waterLevel > 0.4 { return "💧" }
-        return "🪣"
-    }
-
     private var headline: String {
-        if waterLevel > 0.7 { return "準備バッチリ！\n出発しますか？" }
-        if waterLevel > 0.4 { return "まだ間に合います\n出発しますか？" }
-        return "急いで！\nもう出発しますか？"
+        if completesGrowth { return "\(selectedSpecies.displayName)が咲きそうです\n出発しますか？" }
+        return "\(growthStage.message)\n出発しますか？"
     }
 
     private var subtext: String {
-        if waterLevel > 0.7 { return "タンクに水がたっぷり残っています\n植物が大喜びしそうです 🌿" }
-        if waterLevel > 0.4 { return "そこそこ水が残っています\n植物はまあまあ育ちそうです" }
-        return "水がほとんどありません\n次回はもう少し早めに！"
+        "今回 +\(Int(waterAmount.rounded()))pt で、合計 \(Int(totalWaterAfter.rounded()))/\(Int(requiredTotalWater.rounded()))pt になります。"
     }
 
     private var theme: WaterLevelTheme { WaterLevelTheme(waterRatio: waterLevel) }
 
     private var waterLevelColor: Color { theme.tintColor }
     private var confirmColors: [Color] { theme.gradientColors }
+
+    private var stageColor: Color {
+        completesGrowth ? theme.tintColor : .orange
+    }
 }
 
 #Preview {
     Color.black.ignoresSafeArea()
         .sheet(isPresented: .constant(true)) {
-            DepartureConfirmView(waterLevel: 0.72, isOnTime: true, onConfirm: {}, onCancel: {})
+            DepartureConfirmView(
+                waterLevel: 0.72,
+                isOnTime: true,
+                selectedSpecies: .sunflower,
+                waterAmount: 72,
+                totalWaterBefore: 120,
+                totalWaterAfter: 192,
+                requiredTotalWater: 320,
+                growthStage: .leaves,
+                completesGrowth: false,
+                onConfirm: {},
+                onCancel: {}
+            )
                 .presentationDetents([.medium])
                 .presentationBackground(.clear)
         }

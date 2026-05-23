@@ -39,8 +39,21 @@ struct SettingsView: View {
                         Label("スケジュールを追加", systemImage: "plus.circle.fill")
                     }
                 }
+
+                Section {
+                    NavigationLink(destination: DataManagementView()) {
+                        Label("データ管理", systemImage: "externaldrive")
+                    }
+                }
             }
             .navigationTitle("設定")
+            .onAppear {
+                let activeCount = schedules.filter(\.isActive).count
+                if !schedules.isEmpty, activeCount != 1 {
+                    UserSchedule.ensureSingleActive(in: schedules)
+                    save()
+                }
+            }
             .sheet(isPresented: $showAddSheet) {
                 addSheet
                     .presentationDetents([.medium])
@@ -90,12 +103,19 @@ struct SettingsView: View {
     // MARK: - Actions
 
     private func activate(_ schedule: UserSchedule) {
-        for s in schedules { s.isActive = (s.id == schedule.id) }
+        UserSchedule.setActive(schedule, in: schedules)
         save()
     }
 
     private func delete(at offsets: IndexSet) {
-        offsets.map { schedules[$0] }.forEach { modelContext.delete($0) }
+        let deleting = offsets.map { schedules[$0] }
+        let deletingIDs = Set(deleting.map(\.id))
+        let shouldPickNextActive = deleting.contains(where: \.isActive)
+        deleting.forEach { modelContext.delete($0) }
+
+        if shouldPickNextActive, let next = schedules.first(where: { !deletingIDs.contains($0.id) }) {
+            UserSchedule.setActive(next, in: schedules)
+        }
         save()
     }
 
@@ -153,5 +173,5 @@ private struct ScheduleRow: View {
 
 #Preview {
     SettingsView()
-        .modelContainer(for: [UserSchedule.self, RoutineItem.self, PlantFlower.self], inMemory: true)
+        .modelContainer(for: [UserSchedule.self, RoutineItem.self, PlantFlower.self, ActivePlant.self, PlantWateringRecord.self], inMemory: true)
 }

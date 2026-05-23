@@ -1,49 +1,56 @@
 import SwiftUI
 import SwiftData
 
-struct GardenView: View {
+struct MonthlyGardenView: View {
     @Query(sort: \PlantWateringRecord.recordedAt, order: .reverse) private var records: [PlantWateringRecord]
 
+    @State private var displayedMonth = Date()
     @State private var selectedRecord: PlantWateringRecord?
 
     private let calendar = Calendar.current
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 7)
+    private let weekdaySymbols = Calendar.current.shortStandaloneWeekdaySymbols
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    weekHeader
-                        .padding(.horizontal)
-                        .padding(.top, 12)
+        ScrollView {
+            VStack(spacing: 18) {
+                monthHeader
+                    .padding(.horizontal)
+                    .padding(.top, 12)
 
-                    LazyVGrid(columns: columns, spacing: 8) {
-                        ForEach(recentWeekDays) { day in
-                            weekDayCell(day)
-                        }
-                    }
+                if !recordsInDisplayedMonth.isEmpty {
+                    monthlySummary
+                        .padding(.horizontal)
+                }
+
+                weekdayHeader
                     .padding(.horizontal)
 
-                    if weeklyRecords.isEmpty {
-                        emptyState
-                            .padding(.horizontal)
-                            .padding(.top, 8)
-                    } else {
-                        weeklySummary
-                            .padding(.horizontal)
-                        weekInsights
-                            .padding(.horizontal)
-                        recentRecords
+                LazyVGrid(columns: columns, spacing: 8) {
+                    ForEach(calendarDays) { day in
+                        dayCell(day)
                     }
                 }
-                .padding(.bottom, 24)
+                .padding(.horizontal)
+
+                if recordsInDisplayedMonth.isEmpty {
+                    monthEmptyState
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                } else {
+                    monthInsights
+                        .padding(.horizontal)
+                    monthlyRecords
+                }
             }
-            .navigationTitle("お庭")
-            .background(
-                LinearGradient(colors: [.gardenTop, .gardenBottom], startPoint: .top, endPoint: .bottom)
-                    .ignoresSafeArea()
-            )
+            .padding(.bottom, 24)
         }
+        .navigationTitle("月間カレンダー")
+        .navigationBarTitleDisplayMode(.inline)
+        .background(
+            LinearGradient(colors: [.gardenTop, .gardenBottom], startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+        )
         .sheet(item: $selectedRecord) { record in
             WateringRecordDetailSheet(record: record)
                 .presentationDetents([.medium])
@@ -52,64 +59,78 @@ struct GardenView: View {
         }
     }
 
-    private var weekHeader: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle().fill(.green.opacity(0.16))
-                Image(systemName: "leaf.fill")
-                    .font(.title2)
-                    .foregroundStyle(.green)
+    private var monthHeader: some View {
+        HStack {
+            Button {
+                moveMonth(by: -1)
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.headline)
+                    .frame(width: 36, height: 36)
             }
-            .frame(width: 48, height: 48)
+            .buttonStyle(.plain)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text("直近7日のお庭")
+            Spacer()
+
+            VStack(spacing: 2) {
+                Text(displayedMonth, format: .dateTime.year().month(.wide))
                     .font(.title3.weight(.bold))
-                Text(weekRangeText)
-                    .font(.caption)
+                Text("月単位で水やり記録を確認")
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
+            }
+            .onTapGesture {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    displayedMonth = Date()
+                }
             }
 
             Spacer()
 
-            NavigationLink {
-                MonthlyGardenView()
+            Button {
+                moveMonth(by: 1)
             } label: {
-                Image(systemName: "calendar")
+                Image(systemName: "chevron.right")
                     .font(.headline)
-                    .foregroundStyle(.green)
-                    .frame(width: 38, height: 38)
-                    .background(.white.opacity(0.56), in: Circle())
+                    .frame(width: 36, height: 36)
             }
             .buttonStyle(.plain)
         }
-        .padding(16)
-        .background(.white.opacity(0.64), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .foregroundStyle(.primary)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 8)
+        .background(.white.opacity(0.62), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    private func weekDayCell(_ day: GardenWeekDay) -> some View {
+    private var weekdayHeader: some View {
+        LazyVGrid(columns: columns, spacing: 8) {
+            ForEach(weekdaySymbols, id: \.self) { symbol in
+                Text(symbol)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private func dayCell(_ day: GardenCalendarDay) -> some View {
         Button {
             selectedRecord = day.record
         } label: {
-            VStack(spacing: 5) {
-                Text(day.weekday)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-
+            VStack(spacing: 4) {
                 Text("\(calendar.component(.day, from: day.date))")
-                    .font(.subheadline.weight(day.isToday ? .bold : .semibold))
-                    .monospacedDigit()
+                    .font(.caption.weight(day.isToday ? .bold : .medium))
+                    .foregroundStyle(day.isCurrentMonth ? Color.primary : Color.secondary.opacity(0.45))
+                    .frame(maxWidth: .infinity, alignment: .trailing)
 
                 Spacer(minLength: 0)
 
                 if let record = day.record {
                     Image(systemName: record.completedGrowth ? record.species.icon : record.growthStage.icon)
-                        .font(.system(size: 24, weight: .semibold))
+                        .font(.system(size: 23, weight: .semibold))
                         .foregroundStyle(recordColor(for: record))
                         .symbolRenderingMode(.hierarchical)
-                        .frame(height: 28)
+                        .frame(height: 26)
 
                     HStack(spacing: 2) {
                         Text("+\(Int(record.waterAmount.rounded()))")
@@ -127,19 +148,16 @@ struct GardenView: View {
                     .foregroundStyle(.secondary)
                 } else {
                     Circle()
-                        .fill(.secondary.opacity(0.12))
-                        .frame(width: 8, height: 8)
-                    Text("未記録")
-                        .font(.system(size: 9, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary.opacity(0.7))
+                        .fill(.secondary.opacity(day.isCurrentMonth ? 0.12 : 0.05))
+                        .frame(width: 6, height: 6)
                 }
 
                 Spacer(minLength: 0)
             }
             .padding(7)
             .frame(maxWidth: .infinity)
-            .aspectRatio(0.68, contentMode: .fit)
-            .background(day.record == nil ? .white.opacity(0.46) : .white.opacity(0.82), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .aspectRatio(0.82, contentMode: .fit)
+            .background(day.record == nil ? .white.opacity(day.isCurrentMonth ? 0.46 : 0.22) : .white.opacity(day.isCurrentMonth ? 0.82 : 0.42), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay {
                 if day.isToday {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -149,7 +167,7 @@ struct GardenView: View {
             .overlay(alignment: .bottom) {
                 if let record = day.record {
                     Capsule()
-                        .fill(recordColor(for: record).opacity(0.9))
+                        .fill(recordColor(for: record).opacity(day.isCurrentMonth ? 0.9 : 0.45))
                         .frame(height: 3)
                         .padding(.horizontal, 8)
                         .padding(.bottom, 5)
@@ -160,26 +178,28 @@ struct GardenView: View {
         .disabled(day.record == nil)
     }
 
-    private var weeklySummary: some View {
-        HStack(spacing: 8) {
-            summaryCard(icon: "drop.fill", value: "\(Int(weeklyRecords.reduce(0) { $0 + $1.waterAmount }.rounded()))", label: "水やり", tint: .cyan)
-            summaryCard(icon: "leaf.fill", value: "\(weeklyRecords.count)", label: "記録", tint: .green)
-            summaryCard(icon: "sparkles", value: "\(weeklyRecords.filter(\.completedGrowth).count)", label: "開花", tint: .orange)
+    private var monthlySummary: some View {
+        let records = recordsInDisplayedMonth
+        return HStack(spacing: 8) {
+            summaryCard(icon: "drop.fill", value: "\(Int(records.reduce(0) { $0 + $1.waterAmount }.rounded()))", label: "水やり", tint: .cyan)
+            summaryCard(icon: "leaf.fill", value: "\(records.count)", label: "記録", tint: .green)
+            summaryCard(icon: "sparkles", value: "\(records.filter(\.completedGrowth).count)", label: "開花", tint: .orange)
         }
     }
 
-    private var weekInsights: some View {
-        let best = weeklyRecords.max { $0.waterAmount < $1.waterAmount }
-        let streak = longestStreak(in: weeklyRecords)
+    private var monthInsights: some View {
+        let records = recordsInDisplayedMonth
+        let best = records.max { $0.waterAmount < $1.waterAmount }
+        let streak = longestStreak(in: records)
 
         return VStack(spacing: 10) {
             HStack {
-                insightRow(icon: "flame.fill", title: "連続記録", value: "\(streak)日", tint: .orange)
+                insightRow(icon: "flame.fill", title: "最長連続", value: "\(streak)日", tint: .orange)
                 Divider().frame(height: 34)
                 insightRow(
                     icon: "chart.line.uptrend.xyaxis",
                     title: "平均進捗",
-                    value: "\(Int((averageProgress(in: weeklyRecords) * 100).rounded()))%",
+                    value: "\(Int((averageProgress(in: records) * 100).rounded()))%",
                     tint: .green
                 )
             }
@@ -195,7 +215,7 @@ struct GardenView: View {
                             .symbolRenderingMode(.hierarchical)
                             .frame(width: 28)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("この1週間でいちばん水を残した日")
+                            Text("今月いちばん水を残した日")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Text("\(best.recordedAt.formatted(.dateTime.month().day())) / +\(Int(best.waterAmount.rounded()))pt")
@@ -217,15 +237,15 @@ struct GardenView: View {
         .background(.white.opacity(0.66), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
-    private var recentRecords: some View {
+    private var monthlyRecords: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("この1週間の水やり")
+            Text("今月の水やり")
                 .font(.headline)
                 .padding(.horizontal)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
-                    ForEach(weeklyRecords) { record in
+                    ForEach(recordsInDisplayedMonth) { record in
                         Button {
                             selectedRecord = record
                         } label: {
@@ -234,14 +254,14 @@ struct GardenView: View {
                                     .font(.system(size: 28, weight: .semibold))
                                     .foregroundStyle(recordColor(for: record))
                                     .symbolRenderingMode(.hierarchical)
-                                Text(record.recordedAt, format: .dateTime.month().day())
+                                Text(record.recordedAt, format: .dateTime.day())
                                     .font(.caption2.weight(.semibold))
                                 Text("+\(Int(record.waterAmount.rounded()))pt")
                                     .font(.caption2.bold())
                                     .monospacedDigit()
                                     .foregroundStyle(.secondary)
                             }
-                            .frame(width: 82, height: 88)
+                            .frame(width: 78, height: 86)
                             .background(.white.opacity(0.68), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                         .buttonStyle(.plain)
@@ -250,6 +270,37 @@ struct GardenView: View {
                 .padding(.horizontal)
             }
         }
+    }
+
+    private var monthEmptyState: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "calendar.badge.plus")
+                .font(.system(size: 38))
+                .foregroundStyle(.green)
+            Text("この月はまだ静かです")
+                .font(.headline)
+            Text("別の月へ移動するか、次の朝に水やり記録を残しましょう")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    displayedMonth = Date()
+                }
+            } label: {
+                Label("今月へ戻る", systemImage: "arrow.uturn.backward")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .background(.white.opacity(0.62), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .padding(.horizontal)
+        .background(.white.opacity(0.56), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func summaryCard(icon: String, value: String, label: String, tint: Color) -> some View {
@@ -288,37 +339,24 @@ struct GardenView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private var emptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "leaf")
-                .font(.system(size: 48))
-                .foregroundStyle(.green)
-            Text("この1週間はまだ静かです")
-                .font(.headline)
-            Text("タイマー画面で「いってきます！」を押すと、今日の植物に水やり記録が残ります")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
-        .padding(.horizontal)
-        .background(.white.opacity(0.56), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
+    private var calendarDays: [GardenCalendarDay] {
+        guard let monthInterval = calendar.dateInterval(of: .month, for: displayedMonth),
+              let firstWeek = calendar.dateInterval(of: .weekOfMonth, for: monthInterval.start),
+              let lastWeek = calendar.dateInterval(of: .weekOfMonth, for: monthInterval.end.addingTimeInterval(-1))
+        else { return [] }
 
-    private var recentWeekDays: [GardenWeekDay] {
         let recordsByDay = Dictionary(grouping: records) { record in
             calendar.startOfDay(for: record.recordedAt)
         }
-        return (0..<7).compactMap { offset in
-            guard let date = calendar.date(byAdding: .day, value: offset - 6, to: calendar.startOfDay(for: .now)) else {
-                return nil
-            }
+        let days = calendar.dateComponents([.day], from: firstWeek.start, to: lastWeek.end).day ?? 0
+
+        return (0..<days).compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: offset, to: firstWeek.start) else { return nil }
             let startOfDay = calendar.startOfDay(for: date)
             let dayRecords = recordsByDay[startOfDay] ?? []
-            return GardenWeekDay(
+            return GardenCalendarDay(
                 date: date,
-                weekday: date.formatted(.dateTime.weekday(.abbreviated)),
+                isCurrentMonth: calendar.isDate(date, equalTo: displayedMonth, toGranularity: .month),
                 isToday: calendar.isDateInToday(date),
                 record: dayRecords.first,
                 recordCount: dayRecords.count
@@ -326,18 +364,14 @@ struct GardenView: View {
         }
     }
 
-    private var weeklyRecords: [PlantWateringRecord] {
-        let start = recentWeekDays.first?.date ?? calendar.startOfDay(for: .now)
-        guard let end = calendar.date(byAdding: .day, value: 7, to: start) else { return [] }
-        return records
-            .filter { $0.recordedAt >= start && $0.recordedAt < end }
+    private var recordsInDisplayedMonth: [PlantWateringRecord] {
+        records
+            .filter { calendar.isDate($0.recordedAt, equalTo: displayedMonth, toGranularity: .month) }
             .sorted { $0.recordedAt > $1.recordedAt }
     }
 
-    private var weekRangeText: String {
-        guard let start = recentWeekDays.first?.date,
-              let end = recentWeekDays.last?.date else { return "" }
-        return "\(start.formatted(.dateTime.month().day())) - \(end.formatted(.dateTime.month().day()))"
+    private func moveMonth(by amount: Int) {
+        displayedMonth = calendar.date(byAdding: .month, value: amount, to: displayedMonth) ?? displayedMonth
     }
 
     private func recordColor(for record: PlantWateringRecord) -> Color {
@@ -369,9 +403,9 @@ struct GardenView: View {
     }
 }
 
-private struct GardenWeekDay: Identifiable {
+private struct GardenCalendarDay: Identifiable {
     var date: Date
-    var weekday: String
+    var isCurrentMonth: Bool
     var isToday: Bool
     var record: PlantWateringRecord?
     var recordCount: Int
@@ -379,85 +413,9 @@ private struct GardenWeekDay: Identifiable {
     var id: Date { date }
 }
 
-struct WateringRecordDetailSheet: View {
-    let record: PlantWateringRecord
-
-    var body: some View {
-        VStack(spacing: 18) {
-            DragHandle()
-
-            ZStack {
-                Circle()
-                    .fill(recordColor.opacity(0.16))
-                    .frame(width: 112, height: 112)
-                Image(systemName: record.completedGrowth ? record.species.icon : record.growthStage.icon)
-                    .font(.system(size: 58, weight: .semibold))
-                    .foregroundStyle(recordColor)
-                    .symbolRenderingMode(.hierarchical)
-            }
-
-            VStack(spacing: 6) {
-                Text(record.completedGrowth ? "\(record.species.displayName)が咲きました" : record.growthStage.message)
-                    .font(.title2.weight(.bold))
-                    .multilineTextAlignment(.center)
-                Text(record.recordedAt, format: .dateTime.year().month().day().hour().minute())
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            HStack(spacing: 10) {
-                metric(icon: "drop.fill", value: "+\(Int(record.waterAmount.rounded()))pt", label: "今回", tint: .cyan)
-                metric(
-                    icon: "chart.line.uptrend.xyaxis",
-                    value: "\(Int(record.totalWaterAfter.rounded()))/\(Int(record.requiredTotalWater.rounded()))pt",
-                    label: "合計",
-                    tint: recordColor
-                )
-            }
-
-            Text(record.completedGrowth ? "完成した花は図鑑に登録されています。" : "次の朝も水を残して、この植物を育てましょう。")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 24)
-        .padding(.top, 14)
-        .padding(.bottom, 24)
-        .background(
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(LinearGradient(colors: [.gardenTop, .gardenBottom], startPoint: .top, endPoint: .bottom))
-                .ignoresSafeArea()
-        )
-    }
-
-    private func metric(icon: String, value: String, label: String, tint: Color) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(tint)
-            Text(value)
-                .font(.headline)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .background(.white.opacity(0.62), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private var recordColor: Color {
-        record.completedGrowth ? WaterLevelTheme(waterRatio: 1).tintColor : .orange
-    }
-}
-
 #Preview {
-    GardenView()
-        .modelContainer(for: [UserSchedule.self, RoutineItem.self, PlantFlower.self, ActivePlant.self, PlantWateringRecord.self], inMemory: true)
+    NavigationStack {
+        MonthlyGardenView()
+            .modelContainer(for: [UserSchedule.self, RoutineItem.self, PlantFlower.self, ActivePlant.self, PlantWateringRecord.self], inMemory: true)
+    }
 }

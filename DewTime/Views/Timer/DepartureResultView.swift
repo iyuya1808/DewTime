@@ -6,6 +6,12 @@ struct DepartureResultView: View {
     let totalSeconds: Int
     let delaySeconds: Int
     let scheduleName: String
+    let selectedSpecies: FlowerSpecies
+    let waterAmount: Double
+    let totalWaterAfter: Double
+    let requiredTotalWater: Double
+    let growthStage: GrowthStage
+    let completedGrowth: Bool
     let onDismiss: () -> Void
 
     @State private var waterFill: Double = 0
@@ -39,8 +45,10 @@ struct DepartureResultView: View {
                             Circle()
                                 .fill(plantBgColor.opacity(0.18))
                                 .frame(width: 120, height: 120)
-                            Text(plantEmoji)
-                                .font(.system(size: 64))
+                            Image(systemName: selectedSpecies.icon)
+                                .font(.system(size: 62, weight: .semibold))
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundStyle(plantColor)
                                 .scaleEffect(plantScale)
                                 .animation(.spring(response: 0.5, dampingFraction: 0.5).delay(0.3), value: plantScale)
                         }
@@ -78,6 +86,21 @@ struct DepartureResultView: View {
                             .frame(height: 14)
                         }
                         .padding(.horizontal, 4)
+
+                        HStack(spacing: 10) {
+                            plantMetric(
+                                icon: selectedSpecies.icon,
+                                value: "\(Int(totalWaterAfter.rounded()))/\(Int(requiredTotalWater.rounded()))pt",
+                                label: "合計水量",
+                                tint: plantColor
+                            )
+                            plantMetric(
+                                icon: growthStage.icon,
+                                value: growthStage.displayName,
+                                label: "成長段階",
+                                tint: plantColor
+                            )
+                        }
 
                         // 統計カード
                         statsGrid
@@ -165,6 +188,27 @@ struct DepartureResultView: View {
         .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
+    private func plantMetric(icon: String, value: String, label: String, tint: Color) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(tint)
+                .symbolRenderingMode(.hierarchical)
+            Text(value)
+                .font(.headline)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.5))
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
     // MARK: - Helpers
 
     private var plannedFormatted: String {
@@ -174,36 +218,25 @@ struct DepartureResultView: View {
     }
 
     private var resultTitle: String {
-        if waterLevel > 0.8 { return "今日も完璧な朝だ！ 🌟" }
-        if waterLevel > 0.5 { return "いい感じの朝でした！ 🌤" }
-        if waterLevel > 0.2 { return "明日はもう少し早めに！ ☁️" }
-        return "お急ぎでしたね 😅\n次は余裕で出発しよう！"
-    }
-
-    private var plantEmoji: String {
-        if waterLevel > 0.8 { return "🌸" }
-        if waterLevel > 0.6 { return "🌼" }
-        if waterLevel > 0.4 { return "🌿" }
-        if waterLevel > 0.2 { return "🌱" }
-        return "🥀"
+        if completedGrowth { return "\(selectedSpecies.displayName)が咲きました！" }
+        return growthStage.message
     }
 
     private var plantBgColor: Color {
-        if waterLevel > 0.6 { return .pink }
-        if waterLevel > 0.3 { return .green }
-        return .orange
+        completedGrowth ? plantColor : .orange
     }
 
     private var theme: WaterLevelTheme { WaterLevelTheme(waterRatio: waterLevel) }
     private var gaugeColors: [Color] { theme.gradientColors }
+    private var plantColor: Color { completedGrowth ? theme.tintColor : .orange }
 
     private var background: some View { LinearGradient.dewTimeSheet }
 
     private var motivationMessage: String {
-        if waterLevel > 0.8 { return "たっぷり水が残りました！\n植物が大きく育ちますように 🌿" }
-        if waterLevel > 0.5 { return "まずまずの水量です\n明日はさらに余裕で出発できるかも！" }
-        if waterLevel > 0.2 { return "少し水が足りなかったけど大丈夫\n早起きの練習、続けましょう ✨" }
-        return "今日は大変でしたね\n明日は少し早めにスタートしてみましょう ☀️"
+        if completedGrowth {
+            return "今回 +\(Int(waterAmount.rounded()))pt で必要水量に届きました。図鑑に開花として登録されます。"
+        }
+        return "今回 +\(Int(waterAmount.rounded()))pt。合計 \(Int(totalWaterAfter.rounded()))/\(Int(requiredTotalWater.rounded()))pt まで育ちました。"
     }
 }
 
@@ -216,6 +249,12 @@ struct DepartureResultView: View {
                 totalSeconds: 1320,
                 delaySeconds: 0,
                 scheduleName: "平日通常モード",
+                selectedSpecies: .tulip,
+                waterAmount: 72,
+                totalWaterAfter: 240,
+                requiredTotalWater: 240,
+                growthStage: .bloom,
+                completedGrowth: true,
                 onDismiss: {}
             )
             .presentationDetents([.large])

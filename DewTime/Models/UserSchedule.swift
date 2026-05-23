@@ -37,4 +37,15 @@ extension UserSchedule {
     static func active(in schedules: [UserSchedule]) -> UserSchedule? {
         schedules.first(where: { $0.isActive }) ?? schedules.first
     }
+
+    static func setActive(_ selected: UserSchedule, in schedules: [UserSchedule]) {
+        for schedule in schedules {
+            schedule.isActive = schedule.id == selected.id
+        }
+    }
+
+    static func ensureSingleActive(in schedules: [UserSchedule]) {
+        guard let preferred = schedules.first(where: { $0.isActive }) ?? schedules.first else { return }
+        setActive(preferred, in: schedules)
+    }
 }
