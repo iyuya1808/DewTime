@@ -51,16 +51,10 @@ struct StartSheet: View {
             LinearGradient.dewTimeSheet
                 .ignoresSafeArea()
 
-            // 微細グレイン
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [.white.opacity(0.03), .clear],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+            // オーロラグロー
+            auroraLayer
                 .ignoresSafeArea()
+                .allowsHitTesting(false)
 
             VStack(spacing: 0) {
                 dragHandle
@@ -112,10 +106,37 @@ struct StartSheet: View {
         }
     }
 
+    // MARK: - Aurora Layer
+    private var auroraLayer: some View {
+        ZStack {
+            Circle()
+                .fill(Color.dewBlue.opacity(0.14))
+                .frame(width: 340, height: 340)
+                .blur(radius: 72)
+                .offset(x: 90, y: -160)
+            Circle()
+                .fill(Color(red: 0.48, green: 0.40, blue: 1.0).opacity(0.10))
+                .frame(width: 280, height: 280)
+                .blur(radius: 60)
+                .offset(x: -100, y: -90)
+            Circle()
+                .fill(Color(red: 0.10, green: 0.60, blue: 1.0).opacity(0.07))
+                .frame(width: 200, height: 200)
+                .blur(radius: 50)
+                .offset(x: -30, y: 200)
+        }
+    }
+
     // MARK: - Drag Handle
     private var dragHandle: some View {
         Capsule()
-            .fill(.white.opacity(0.28))
+            .fill(
+                LinearGradient(
+                    colors: [Color.dewBlue.opacity(0.5), .white.opacity(0.22)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
             .frame(width: 38, height: 4)
             .padding(.top, 14)
             .padding(.bottom, 20)
@@ -124,11 +145,20 @@ struct StartSheet: View {
     // MARK: - Header
     private var headerSection: some View {
         VStack(spacing: 5) {
-            HStack(spacing: 8) {
+            HStack(spacing: 9) {
                 ZStack {
                     Circle()
-                        .fill(Color.dewBlue.opacity(0.18))
-                        .frame(width: 34, height: 34)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.dewBlue.opacity(0.30), Color(red: 0.48, green: 0.40, blue: 1.0).opacity(0.20)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 36, height: 36)
+                    Circle()
+                        .strokeBorder(Color.dewBlue.opacity(0.30), lineWidth: 1)
+                        .frame(width: 36, height: 36)
                     Image(systemName: "timer.circle.fill")
                         .font(.title3)
                         .foregroundStyle(Color.dewBlue)
@@ -139,8 +169,8 @@ struct StartSheet: View {
             }
             Text(scheduleName)
                 .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.45))
-                .tracking(0.3)
+                .foregroundStyle(.white.opacity(0.40))
+                .tracking(0.4)
         }
     }
 
@@ -157,6 +187,7 @@ struct StartSheet: View {
                     .font(.system(size: 68, weight: .ultraLight, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(.white)
+                    .shadow(color: Color.dewBlue.opacity(0.35), radius: 14)
                     .contentTransition(.numericText())
                     .animation(.spring(response: 0.4, dampingFraction: 0.75), value: selectedTime)
             }
@@ -185,32 +216,34 @@ struct StartSheet: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 22)
         .padding(.horizontal, 20)
-        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 26, style: .continuous)
                 .strokeBorder(
                     LinearGradient(
-                        colors: [.white.opacity(0.22), .white.opacity(0.06)],
+                        colors: [.white.opacity(0.25), Color.dewBlue.opacity(0.12), .white.opacity(0.06)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
                     lineWidth: 1
                 )
         )
+        .shadow(color: Color.dewBlue.opacity(0.10), radius: 20, y: 6)
     }
 
     private func badge(icon: String, text: String, tint: Color) -> some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.caption.weight(.semibold))
+                .font(.caption.weight(.bold))
+                .foregroundStyle(tint)
             Text(text)
-                .font(.subheadline.weight(.medium))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
         }
-        .foregroundStyle(tint)
         .padding(.horizontal, 14)
-        .padding(.vertical, 7)
-        .background(tint.opacity(0.14), in: Capsule())
-        .overlay(Capsule().strokeBorder(tint.opacity(0.28), lineWidth: 1))
+        .padding(.vertical, 8)
+        .background(tint.opacity(0.20), in: Capsule())
+        .overlay(Capsule().strokeBorder(tint.opacity(0.60), lineWidth: 1.5))
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: minutesFromNow)
     }
 
@@ -267,18 +300,29 @@ struct StartSheet: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 11)
             .background(
-                isSelected
-                    ? Color.dewBlue
-                    : Color.white.opacity(0.07),
-                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(
+                        isSelected
+                            ? LinearGradient(
+                                colors: [Color.dewBlue, Color(red: 0.22, green: 0.47, blue: 0.90)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                              )
+                            : LinearGradient(
+                                colors: [Color.white.opacity(0.08), Color.white.opacity(0.05)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                              )
+                    )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(
-                        isSelected ? Color.dewBlue.opacity(0.0) : Color.white.opacity(0.1),
+                        isSelected ? Color.dewBlue.opacity(0.0) : Color.white.opacity(0.10),
                         lineWidth: 1
                     )
             )
+            .shadow(color: isSelected ? Color.dewBlue.opacity(0.40) : .clear, radius: 10, y: 4)
             .scaleEffect(isSelected ? 1.04 : 1.0)
         }
         .buttonStyle(.plain)
@@ -349,13 +393,23 @@ struct StartSheet: View {
                 .padding(.vertical, 18)
                 .background(
                     LinearGradient(
-                        colors: [Color.dewBlue, Color.dewNavy],
+                        colors: [Color.dewBlue, Color(red: 0.22, green: 0.47, blue: 0.90), Color(red: 0.18, green: 0.28, blue: 0.80)],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .shadow(color: Color.dewBlue.opacity(0.45), radius: 18, y: 6)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [.white.opacity(0.10), .clear],
+                                startPoint: .topLeading,
+                                endPoint: .center
+                            )
+                        )
+                )
+                .shadow(color: Color.dewBlue.opacity(0.18), radius: 8, y: 3)
             }
 
             // Cancel

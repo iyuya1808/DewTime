@@ -32,8 +32,9 @@ extension LinearGradient {
 
     /// シート（確認・結果）画面の背景
     static let dewTimeSheet = LinearGradient(
-        colors: [Color(red: 0.06, green: 0.10, blue: 0.22),
-                 Color(red: 0.04, green: 0.06, blue: 0.16)],
+        colors: [Color(red: 0.08, green: 0.07, blue: 0.26),   // deep indigo
+                 Color(red: 0.05, green: 0.08, blue: 0.20),   // indigo-navy
+                 Color(red: 0.03, green: 0.04, blue: 0.14)],  // very dark
         startPoint: .top,
         endPoint: .bottom
     )

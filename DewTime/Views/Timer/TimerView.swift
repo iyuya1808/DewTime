@@ -582,86 +582,147 @@ private struct PlantPickerSheet: View {
     let onSelect: (FlowerSpecies) -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            DragHandle()
-                .padding(.top, 14)
-                .padding(.bottom, 12)
+        ZStack {
+            LinearGradient.dewTimeSheet
+                .ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("今日育てる植物")
-                    .font(AppFont.sheetTitle)
-                Text("選んだ種ごとに、必要な総水量が範囲内でランダムに決まります。")
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.58))
+            // オーロラグロー
+            ZStack {
+                Circle()
+                    .fill(Color(hex: "#52D9A4").opacity(0.10))
+                    .frame(width: 280, height: 280)
+                    .blur(radius: 65)
+                    .offset(x: 80, y: -120)
+                Circle()
+                    .fill(Color(red: 0.48, green: 0.40, blue: 1.0).opacity(0.08))
+                    .frame(width: 240, height: 240)
+                    .blur(radius: 55)
+                    .offset(x: -90, y: 50)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 24)
-            .padding(.bottom, 18)
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
 
-            ScrollView {
-                VStack(spacing: 10) {
-                    ForEach(FlowerSpecies.allCases.sorted { $0.requiredTotalWaterRange.lowerBound < $1.requiredTotalWaterRange.lowerBound }) { species in
-                        Button {
-                            onSelect(species)
-                        } label: {
-                            plantRow(species)
-                        }
-                        .buttonStyle(.plain)
+            VStack(spacing: 0) {
+                DragHandle()
+                    .padding(.top, 14)
+                    .padding(.bottom, 16)
+
+                // ヘッダー
+                HStack(spacing: 10) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color(hex: "#52D9A4").opacity(0.28), Color(hex: "#34D399").opacity(0.15)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 36, height: 36)
+                        Circle()
+                            .strokeBorder(Color(hex: "#52D9A4").opacity(0.30), lineWidth: 1)
+                            .frame(width: 36, height: 36)
+                        Image(systemName: "leaf.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(Color(hex: "#52D9A4"))
                     }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("今日育てる植物")
+                            .font(AppFont.sheetTitle)
+                        Text("難易度が高いほど多くの水が必要です")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.40))
+                    }
+                    Spacer()
                 }
                 .padding(.horizontal, 24)
-                .padding(.bottom, 26)
+                .padding(.bottom, 20)
+
+                ScrollView {
+                    VStack(spacing: 8) {
+                        ForEach(FlowerSpecies.allCases.sorted { $0.requiredTotalWaterRange.lowerBound < $1.requiredTotalWaterRange.lowerBound }) { species in
+                            Button {
+                                onSelect(species)
+                            } label: {
+                                plantRow(species)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 32)
+                }
             }
         }
         .foregroundStyle(.white)
-        .background(
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(LinearGradient.dewTimeSheet)
-                .ignoresSafeArea()
-        )
+    }
+
+    private func speciesAccentColor(_ species: FlowerSpecies) -> Color {
+        switch species.difficultyLabel {
+        case "かんたん":   return Color(hex: "#4ADE80")
+        case "やさしい":   return Color(hex: "#34D399")
+        case "ふつう":     return Color(hex: "#60A5FA")
+        case "むずかしい": return Color(hex: "#A78BFA")
+        default:           return Color(hex: "#F472B6")
+        }
     }
 
     private func plantRow(_ species: FlowerSpecies) -> some View {
-        let rowColor = selectedSpecies == species ? Color.dewBlue : Color.orange
+        let isSelected = selectedSpecies == species
+        let accent = isSelected ? Color.dewBlue : speciesAccentColor(species)
 
-        return VStack(spacing: 10) {
-            HStack(spacing: 12) {
-                ZStack {
+        return HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(accent.opacity(0.18))
+                    .frame(width: 52, height: 52)
+                if isSelected {
                     Circle()
-                        .fill(rowColor.opacity(0.18))
-                    Image(systemName: species.icon)
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(rowColor)
-                        .symbolRenderingMode(.hierarchical)
+                        .strokeBorder(accent.opacity(0.45), lineWidth: 1.5)
+                        .frame(width: 52, height: 52)
                 }
-                .frame(width: 50, height: 50)
+                Image(systemName: species.icon)
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(accent)
+                    .symbolRenderingMode(.hierarchical)
+            }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(species.displayName)
-                        .font(.headline)
-                    Text("\(species.difficultyLabel) / 必要総水量 \(species.requiredTotalWaterRangeText)")
+            VStack(alignment: .leading, spacing: 5) {
+                Text(species.displayName)
+                    .font(.headline.weight(.semibold))
+                HStack(spacing: 6) {
+                    Text(species.difficultyLabel)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(accent)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(accent.opacity(0.15), in: Capsule())
+                    Text(species.requiredTotalWaterRangeText)
                         .font(.caption)
-                        .foregroundStyle(.white.opacity(0.56))
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 4) {
-                    Image(systemName: selectedSpecies == species ? "checkmark.circle.fill" : "circle")
-                        .font(.headline)
-                        .foregroundStyle(selectedSpecies == species ? rowColor : .white.opacity(0.3))
-                    Text(selectedSpecies == species ? "選択中" : "この種で育てる")
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(rowColor)
+                        .foregroundStyle(.white.opacity(0.42))
                 }
             }
+
+            Spacer()
+
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .font(.title3)
+                .foregroundStyle(isSelected ? accent : .white.opacity(0.22))
         }
-        .padding(14)
-        .background(.white.opacity(selectedSpecies == species ? 0.14 : 0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder((selectedSpecies == species ? rowColor : .white).opacity(selectedSpecies == species ? 0.45 : 0.12), lineWidth: 1)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(isSelected ? accent.opacity(0.12) : Color.white.opacity(0.05))
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(
+                    isSelected ? accent.opacity(0.50) : Color.white.opacity(0.08),
+                    lineWidth: 1
+                )
+        )
+        .shadow(color: isSelected ? accent.opacity(0.18) : .clear, radius: 10, y: 4)
     }
 }
 
