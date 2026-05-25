@@ -1,0 +1,1828 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DewTime ワイヤーフレーム</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+    background: #0f0f13;
+    color: #e0e0e8;
+    padding: 40px 20px 80px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #4fb8f0, #7c6fff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 48px;
+  }
+
+  /* セクション */
+  .section {
+    margin-bottom: 60px;
+  }
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #666;
+    margin-bottom: 24px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #222;
+  }
+
+  /* 画面グリッド */
+  .screens {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 32px;
+    justify-content: flex-start;
+  }
+
+  /* iPhoneフレーム */
+  .screen-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .screen-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #888;
+    text-align: center;
+    max-width: 200px;
+  }
+  .screen-label .badge {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    margin-left: 5px;
+    vertical-align: middle;
+  }
+  .badge-sheet { background: #2a2a3a; color: #aaa; }
+  .badge-nav { background: #1a2a1a; color: #5a8; }
+  .badge-alert { background: #2a1a1a; color: #a55; }
+
+  .phone {
+    width: 200px;
+    height: 430px;
+    background: #1a1a22;
+    border-radius: 32px;
+    border: 2px solid #333;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+  /* Dynamic Island */
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 12px;
+    background: #111;
+    border-radius: 10px;
+    z-index: 10;
+  }
+
+  /* 共通ナビゲーションバー */
+  .nav-bar {
+    padding: 38px 14px 8px;
+    font-size: 13px;
+    font-weight: 700;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .nav-back {
+    font-size: 11px;
+    color: #4fb8f0;
+    font-weight: 500;
+  }
+  .nav-action {
+    font-size: 11px;
+    color: #4fb8f0;
+    font-weight: 500;
+  }
+
+  /* タブバー */
+  .tab-bar {
+    display: flex;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0;
+    margin-top: auto;
+  }
+  .tab-item {
+    flex: 1;
+    padding: 8px 0 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: 7px;
+    color: #666;
+  }
+  .tab-item.active {
+    color: #4fb8f0;
+  }
+  .tab-icon {
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  /* スクロールコンテンツ */
+  .content {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+  .scroll-area {
+    padding: 10px 10px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  /* ウィジェット・コンポーネント */
+  .card {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 14px;
+    padding: 10px 12px;
+    flex-shrink: 0;
+  }
+  .card-sm {
+    border-radius: 10px;
+    padding: 7px 10px;
+  }
+  .card-dark {
+    background: rgba(0,0,0,0.25);
+    border-color: rgba(255,255,255,0.08);
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .row-between {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot-blue   { background: #4fb8f0; }
+  .dot-green  { background: #4de080; }
+  .dot-orange { background: #f0904f; }
+  .dot-purple { background: #a78bfa; }
+  .dot-teal   { background: #2dd4bf; }
+  .dot-pink   { background: #f472b6; }
+
+  .icon-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+  .icon-circle-sm {
+    width: 24px;
+    height: 24px;
+    font-size: 11px;
+  }
+  .bg-blue   { background: rgba(79,184,240,0.15); }
+  .bg-green  { background: rgba(77,224,128,0.15); }
+  .bg-orange { background: rgba(240,144,79,0.15); }
+  .bg-purple { background: rgba(167,139,250,0.15); }
+  .bg-teal   { background: rgba(45,212,191,0.15); }
+  .bg-pink   { background: rgba(244,114,182,0.15); }
+  .bg-white  { background: rgba(255,255,255,0.08); }
+
+  .text-xs   { font-size: 8px; color: #888; }
+  .text-sm   { font-size: 10px; }
+  .text-base { font-size: 11px; }
+  .text-md   { font-size: 13px; font-weight: 600; }
+  .text-lg   { font-size: 18px; font-weight: 300; }
+  .text-xl   { font-size: 28px; font-weight: 200; letter-spacing: -1px; }
+  .text-hero { font-size: 48px; font-weight: 100; letter-spacing: -2px; line-height: 1; }
+  .text-muted { color: rgba(255,255,255,0.45); }
+  .text-blue  { color: #4fb8f0; }
+  .text-green { color: #4de080; }
+  .text-orange { color: #f0904f; }
+  .text-purple { color: #a78bfa; }
+
+  .fw-semibold { font-weight: 600; }
+  .fw-bold { font-weight: 700; }
+
+  .progress-bar {
+    height: 3px;
+    background: rgba(255,255,255,0.10);
+    border-radius: 2px;
+    margin-top: 5px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 2px;
+  }
+
+  .capsule-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-size: 8px;
+    font-weight: 600;
+  }
+
+  /* リスト行 */
+  .list-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+  .list-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.05);
+    margin: 2px 0;
+  }
+
+  /* ウォータータンク背景 */
+  .water-bg-blue {
+    background: linear-gradient(160deg, #0d2a4a 0%, #0a1a30 100%);
+  }
+  .water-bg-orange {
+    background: linear-gradient(160deg, #2a1a08 0%, #1a1000 100%);
+  }
+  .water-wave {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 55%;
+    background: linear-gradient(180deg, rgba(79,184,240,0.18) 0%, rgba(79,184,240,0.35) 100%);
+    border-radius: 50% 50% 0 0 / 20% 20% 0 0;
+  }
+  .water-wave-orange {
+    background: linear-gradient(180deg, rgba(240,144,79,0.18) 0%, rgba(240,100,50,0.35) 100%);
+  }
+
+  /* グリッド 7日 */
+  .week-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .day-cell {
+    background: rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 4px 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: 7px;
+    color: #888;
+    aspect-ratio: 0.68;
+    position: relative;
+  }
+  .day-cell.today {
+    border: 1px solid rgba(77,224,128,0.6);
+  }
+  .day-cell.has-record {
+    background: rgba(255,255,255,0.12);
+  }
+  .day-cell .day-num {
+    font-size: 9px;
+    font-weight: 600;
+    color: #ddd;
+  }
+  .day-cell .day-bottom-bar {
+    position: absolute;
+    bottom: 3px;
+    left: 5px;
+    right: 5px;
+    height: 2px;
+    border-radius: 1px;
+    background: #4fb8f0;
+  }
+
+  /* コレクション 2列グリッド */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .species-card {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 14px;
+    padding: 10px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    aspect-ratio: unset;
+    min-height: 80px;
+  }
+  .species-card.unlocked {
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(79,184,240,0.24);
+  }
+
+  /* ドラッグハンドル */
+  .drag-handle {
+    width: 32px;
+    height: 3px;
+    background: rgba(255,255,255,0.22);
+    border-radius: 2px;
+    margin: 8px auto 4px;
+  }
+
+  /* シートフレーム */
+  .phone.sheet-phone {
+    background: linear-gradient(160deg, #131320 0%, #0d0d1a 100%);
+  }
+
+  /* ガーデン背景 */
+  .garden-bg {
+    background: linear-gradient(160deg, #0d1f10 0%, #0a180d 100%);
+  }
+
+  /* サマリーカード 3列 */
+  .three-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 5px;
+  }
+  .summary-card {
+    background: rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 7px 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  /* ホリゾンタルスクロールプレビュー */
+  .hscroll-preview {
+    display: flex;
+    gap: 6px;
+    overflow: hidden;
+    padding: 2px 0;
+  }
+  .hcard {
+    background: rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 50px;
+    flex-shrink: 0;
+  }
+
+  /* 設定リスト */
+  .settings-section {
+    margin-bottom: 8px;
+  }
+  .settings-header {
+    font-size: 8px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 0 4px 4px;
+  }
+  .settings-footer {
+    font-size: 7px;
+    color: #555;
+    padding: 3px 4px 0;
+  }
+  .settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.04);
+    font-size: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .settings-row:first-child { border-radius: 8px 8px 0 0; }
+  .settings-row:last-child  { border-radius: 0 0 8px 8px; border-bottom: none; }
+  .settings-row.only        { border-radius: 8px; }
+
+  /* ステータスバー */
+  .status-bar {
+    height: 20px;
+    flex-shrink: 0;
+  }
+
+  /* クイックチップ */
+  .chip-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px;
+  }
+  .chip {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 5px 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    font-size: 8px;
+    color: #bbb;
+  }
+  .chip.selected {
+    background: linear-gradient(135deg, #4fb8f0, #3a6fd8);
+    border-color: transparent;
+    color: white;
+  }
+
+  /* ルーティンタスク行 */
+  .routine-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px;
+  }
+
+  /* カラーピッカー */
+  .color-picker {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    padding: 4px;
+  }
+  .color-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    margin: 0 auto;
+  }
+
+  /* 凡例 */
+  .legend {
+    margin-top: 60px;
+    padding: 20px;
+    background: #14141e;
+    border: 1px solid #222;
+    border-radius: 16px;
+    max-width: 800px;
+  }
+  .legend h3 {
+    font-size: 12px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+  }
+  .legend-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #aaa;
+  }
+
+  /* フローチャート */
+  .flow-desc {
+    font-size: 11px;
+    color: #777;
+    margin-top: 16px;
+    line-height: 1.7;
+  }
+  .flow-arrow {
+    color: #444;
+    margin: 0 4px;
+  }
+
+  /* アニメーションライン */
+  @keyframes pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+  .pulse { animation: pulse 2s ease-in-out infinite; }
+</style>
+</head>
+<body>
+
+<h1>DewTime — ワイヤーフレーム</h1>
+<p class="subtitle">iOS 17+ 朝タイマーアプリ / 現在実装済み全画面 v1.0 (2026-05-26)</p>
+
+<!-- ============================================================
+  SECTION 1: メインタブ画面
+============================================================ -->
+<div class="section">
+  <div class="section-title">01 — メイン画面（TabView）</div>
+  <div class="screens">
+
+    <!-- TimerView: 未スタート -->
+    <div class="screen-wrap">
+      <div class="phone water-bg-blue">
+        <div class="water-wave"></div>
+        <div class="status-bar"></div>
+        <div class="content" style="z-index:1; position:relative;">
+          <div class="scroll-area">
+            <!-- 出発時刻カード -->
+            <div class="card">
+              <div class="row-between">
+                <div>
+                  <div class="text-xs" style="letter-spacing:1px; text-transform:uppercase; margin-bottom:2px;">出発時刻</div>
+                  <div class="text-xs text-muted">平日通常</div>
+                </div>
+                <div class="capsule-badge" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#ccc;">✏️ 変更</div>
+              </div>
+              <div class="row" style="margin-top:8px; gap:8px;">
+                <span style="font-size:14px; opacity:0.7;">🚶</span>
+                <span class="text-xl">08:00</span>
+              </div>
+            </div>
+
+            <!-- 植物選択カード -->
+            <div class="card">
+              <div class="row" style="gap:8px;">
+                <div class="icon-circle bg-orange" style="width:42px; height:42px; font-size:20px;">🌻</div>
+                <div style="flex:1; min-width:0;">
+                  <div class="text-xs text-muted">今日育てる植物</div>
+                  <div class="text-sm fw-semibold">ひまわり</div>
+                  <div class="text-xs text-muted" style="margin-top:1px;">ゆっくり育てよう</div>
+                </div>
+                <div style="text-align:right;">
+                  <div class="text-xs text-muted">育成水量</div>
+                  <div class="text-sm fw-semibold">120/320pt</div>
+                </div>
+                <div class="text-muted" style="font-size:9px;">›</div>
+              </div>
+              <div class="progress-bar" style="margin-top:7px;">
+                <div class="progress-fill" style="width:38%; background:#f0904f;"></div>
+              </div>
+              <div class="row-between" style="margin-top:5px;">
+                <span class="text-xs" style="color:#f0904f;">🌿 葉っぱ</span>
+                <span class="text-xs" style="color:#f0904f;">今回 +72pt</span>
+              </div>
+            </div>
+
+            <!-- カウントダウン -->
+            <div style="text-align:center; padding:12px 0 4px;">
+              <div class="text-xs text-muted" style="letter-spacing:3px; text-transform:uppercase; margin-bottom:4px;">出発まで</div>
+              <div class="text-hero">18:30</div>
+              <div class="row" style="justify-content:center; gap:4px; margin:8px 0 4px;">
+                <div class="dot dot-blue pulse" style="opacity:0.3;"></div>
+                <div class="dot dot-blue pulse" style="opacity:0.3;"></div>
+                <div class="dot dot-blue pulse" style="opacity:0.3;"></div>
+                <div class="dot dot-blue pulse" style="opacity:0.3;"></div>
+                <div class="dot dot-blue pulse" style="opacity:0.3;"></div>
+              </div>
+              <div class="row" style="justify-content:center; align-items:baseline; gap:1px;">
+                <span style="font-size:30px; font-weight:100;">72</span>
+                <span style="font-size:16px; font-weight:100; opacity:0.6;">%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- スタートボタン -->
+        <div style="padding:8px 14px 10px; z-index:1; position:relative;">
+          <div style="background:#4fb8f0; border-radius:14px; padding:11px; text-align:center; font-size:12px; font-weight:700;">
+            ▶ スタート
+          </div>
+        </div>
+        <div class="tab-bar">
+          <div class="tab-item active"><div class="tab-icon">⏱</div>タイマー</div>
+          <div class="tab-item"><div class="tab-icon">🌿</div>お庭</div>
+          <div class="tab-item"><div class="tab-icon">📖</div>図鑑</div>
+          <div class="tab-item"><div class="tab-icon">⚙️</div>設定</div>
+        </div>
+      </div>
+      <div class="screen-label">TimerView<br>① 未スタート状態</div>
+    </div>
+
+    <!-- TimerView: 実行中 -->
+    <div class="screen-wrap">
+      <div class="phone water-bg-blue">
+        <div class="water-wave" style="height:62%;"></div>
+        <div class="status-bar"></div>
+        <div class="content" style="z-index:1; position:relative;">
+          <div class="scroll-area" style="gap:4px;">
+            <!-- コンパクトヘッダー -->
+            <div style="text-align:center; padding: 4px 0 2px;">
+              <div class="text-xs text-muted" style="letter-spacing:1px;">平日通常</div>
+              <div class="row" style="justify-content:center; gap:5px; margin-top:2px;">
+                <span style="font-size:12px; opacity:0.7;">🚶</span>
+                <span class="text-lg">08:00</span>
+              </div>
+            </div>
+            <!-- 植物カード（小） -->
+            <div class="card card-dark" style="margin:0 4px;">
+              <div class="row" style="gap:6px;">
+                <div class="icon-circle bg-orange" style="width:34px; height:34px; font-size:16px;">🌻</div>
+                <div style="flex:1;">
+                  <div class="text-xs text-muted">今日育てる植物</div>
+                  <div class="text-sm fw-semibold">ひまわり</div>
+                </div>
+                <div style="text-align:right;">
+                  <div class="text-xs text-muted">育成水量</div>
+                  <div class="text-sm fw-semibold">120/320pt</div>
+                </div>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width:38%; background:#f0904f;"></div>
+              </div>
+            </div>
+
+            <!-- カウントダウン -->
+            <div style="text-align:center; padding:6px 0 2px;">
+              <div class="text-xs text-muted" style="letter-spacing:3px; text-transform:uppercase; margin-bottom:2px;">出発まで</div>
+              <div class="text-hero">12:15</div>
+              <div class="row" style="justify-content:center; gap:4px; margin:6px 0 2px;">
+                <div class="dot" style="background:rgba(255,255,255,0.2); width:3px; height:3px;"></div>
+                <div class="dot" style="background:rgba(255,255,255,0.2); width:3px; height:3px;"></div>
+                <div class="dot" style="background:rgba(255,255,255,0.2); width:3px; height:3px;"></div>
+                <div class="dot" style="background:rgba(255,255,255,0.2); width:3px; height:3px;"></div>
+                <div class="dot" style="background:rgba(255,255,255,0.2); width:3px; height:3px;"></div>
+              </div>
+              <div class="row" style="justify-content:center; align-items:baseline; gap:1px;">
+                <span style="font-size:26px; font-weight:100;">62</span>
+                <span style="font-size:14px; font-weight:100; opacity:0.6;">%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- 下部パネル -->
+        <div style="padding:0 10px 6px; z-index:1; position:relative; display:flex; flex-direction:column; gap:5px;">
+          <!-- ルーティンパネル -->
+          <div class="card card-dark" style="padding:8px 10px;">
+            <div class="row-between">
+              <div class="row" style="gap:6px;">
+                <div class="dot dot-blue"></div>
+                <div>
+                  <div class="text-sm fw-semibold">身支度</div>
+                  <div class="text-xs text-muted">次: 朝食</div>
+                </div>
+              </div>
+              <div class="text-sm fw-semibold text-blue">04:30</div>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width:55%; background:#4fb8f0;"></div>
+            </div>
+          </div>
+          <!-- ステータスバッジ -->
+          <div style="text-align:center;">
+            <div class="capsule-badge" style="background:rgba(79,184,240,0.12);">
+              <div class="dot dot-blue" style="width:5px; height:5px;"></div>
+              <span style="font-size:9px; color:#4fb8f0;">余裕あり ✨</span>
+            </div>
+          </div>
+          <!-- ボタン -->
+          <div style="background:linear-gradient(90deg, #4fb8f0, #3a6fd8); border-radius:14px; padding:10px; text-align:center; font-size:11px; font-weight:700;">
+            🚶 いってきます！
+          </div>
+          <div style="text-align:center; padding:3px 0; font-size:9px; color:rgba(255,255,255,0.4);">キャンセル</div>
+        </div>
+        <div class="tab-bar">
+          <div class="tab-item active"><div class="tab-icon">⏱</div>タイマー</div>
+          <div class="tab-item"><div class="tab-icon">🌿</div>お庭</div>
+          <div class="tab-item"><div class="tab-icon">📖</div>図鑑</div>
+          <div class="tab-item"><div class="tab-icon">⚙️</div>設定</div>
+        </div>
+      </div>
+      <div class="screen-label">TimerView<br>② 実行中</div>
+    </div>
+
+    <!-- TimerView: 遅刻中 -->
+    <div class="screen-wrap">
+      <div class="phone water-bg-orange">
+        <div class="water-wave water-wave-orange" style="height:20%;"></div>
+        <div class="status-bar"></div>
+        <div class="content" style="z-index:1; position:relative;">
+          <div class="scroll-area">
+            <div style="text-align:center; padding: 4px 0 2px;">
+              <div class="text-xs text-muted" style="letter-spacing:1px;">平日通常</div>
+              <div class="row" style="justify-content:center; gap:5px; margin-top:2px;">
+                <span style="font-size:12px; opacity:0.7;">🚶</span>
+                <span class="text-lg">08:00</span>
+              </div>
+            </div>
+            <div class="card card-dark" style="margin:0 4px;">
+              <div class="row" style="gap:6px;">
+                <div class="icon-circle bg-orange" style="width:34px; height:34px; font-size:16px;">🌻</div>
+                <div style="flex:1;">
+                  <div class="text-xs text-muted">今日育てる植物</div>
+                  <div class="text-sm fw-semibold">ひまわり</div>
+                </div>
+                <div style="text-align:right;">
+                  <div class="text-xs" style="color:#f0904f;">120/320pt</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="text-align:center; padding:8px 0 4px;">
+              <div class="text-xs" style="color:#f0904f; letter-spacing:3px; text-transform:uppercase; margin-bottom:2px;">遅刻中</div>
+              <div class="text-hero" style="color:#f0904f;">+02:15</div>
+              <div class="row" style="justify-content:center; gap:4px; margin:6px 0 2px;">
+                <div class="dot dot-orange" style="width:3px; height:3px;"></div>
+                <div class="dot dot-orange" style="width:3px; height:3px;"></div>
+                <div class="dot dot-orange" style="width:3px; height:3px;"></div>
+                <div class="dot dot-orange" style="width:3px; height:3px;"></div>
+                <div class="dot dot-orange" style="width:3px; height:3px;"></div>
+              </div>
+              <div class="row" style="justify-content:center; align-items:baseline; gap:1px;">
+                <span style="font-size:26px; font-weight:100; color:#f0904f;">18</span>
+                <span style="font-size:14px; font-weight:100; color:rgba(240,144,79,0.6);">%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="padding:0 10px 6px; z-index:1; position:relative; display:flex; flex-direction:column; gap:5px;">
+          <div style="text-align:center;">
+            <div class="capsule-badge" style="background:rgba(240,144,79,0.12);">
+              <div class="dot dot-orange" style="width:5px; height:5px;"></div>
+              <span style="font-size:9px; color:#f0904f;">遅刻中… 早く出発して！</span>
+            </div>
+          </div>
+          <div style="background:linear-gradient(90deg, #f0904f, #c85a2a); border-radius:14px; padding:10px; text-align:center; font-size:11px; font-weight:700;">
+            🚶 いってきます！
+          </div>
+          <div style="text-align:center; padding:3px 0; font-size:9px; color:rgba(255,255,255,0.4);">キャンセル</div>
+        </div>
+        <div class="tab-bar">
+          <div class="tab-item active"><div class="tab-icon">⏱</div>タイマー</div>
+          <div class="tab-item"><div class="tab-icon">🌿</div>お庭</div>
+          <div class="tab-item"><div class="tab-icon">📖</div>図鑑</div>
+          <div class="tab-item"><div class="tab-icon">⚙️</div>設定</div>
+        </div>
+      </div>
+      <div class="screen-label">TimerView<br>③ 遅刻中（isOverdue）</div>
+    </div>
+
+    <!-- GardenView -->
+    <div class="screen-wrap">
+      <div class="phone garden-bg">
+        <div class="status-bar"></div>
+        <div class="nav-bar">
+          <span></span>
+          <span style="font-size:14px;">お庭</span>
+          <span></span>
+        </div>
+        <div class="content">
+          <div class="scroll-area">
+            <!-- ヘッダーカード -->
+            <div class="card" style="background:rgba(255,255,255,0.08);">
+              <div class="row-between">
+                <div class="row" style="gap:8px;">
+                  <div class="icon-circle bg-green">🌿</div>
+                  <div>
+                    <div class="text-sm fw-semibold">直近7日のお庭</div>
+                    <div class="text-xs text-muted">5/20 - 5/26</div>
+                  </div>
+                </div>
+                <div class="icon-circle bg-green icon-circle-sm">📅</div>
+              </div>
+            </div>
+
+            <!-- 7日グリッド -->
+            <div class="week-grid">
+              <div class="day-cell">
+                <span style="font-size:7px; color:#666;">月</span>
+                <span class="day-num">20</span>
+                <span style="font-size:12px; color:#4de080; margin:auto 0;">🌱</span>
+                <span style="font-size:7px; color:#4fb8f0;">+52</span>
+              </div>
+              <div class="day-cell has-record">
+                <span style="font-size:7px; color:#666;">火</span>
+                <span class="day-num">21</span>
+                <span style="font-size:12px; color:#f0904f; margin:auto 0;">🌿</span>
+                <span style="font-size:7px; color:#4fb8f0;">+68</span>
+                <div class="day-bottom-bar" style="background:#f0904f;"></div>
+              </div>
+              <div class="day-cell">
+                <span style="font-size:7px; color:#666;">水</span>
+                <span class="day-num">22</span>
+                <div class="dot" style="width:6px;height:6px;background:rgba(255,255,255,0.1);margin:auto;"></div>
+                <span style="font-size:7px; color:#666;">未記録</span>
+              </div>
+              <div class="day-cell has-record">
+                <span style="font-size:7px; color:#666;">木</span>
+                <span class="day-num">23</span>
+                <span style="font-size:12px; color:#4de080; margin:auto 0;">🌻</span>
+                <span style="font-size:7px; color:#4fb8f0;">+85</span>
+                <div class="day-bottom-bar"></div>
+              </div>
+              <div class="day-cell">
+                <span style="font-size:7px; color:#666;">金</span>
+                <span class="day-num">24</span>
+                <div class="dot" style="width:6px;height:6px;background:rgba(255,255,255,0.1);margin:auto;"></div>
+                <span style="font-size:7px; color:#666;">未記録</span>
+              </div>
+              <div class="day-cell has-record">
+                <span style="font-size:7px; color:#666;">土</span>
+                <span class="day-num">25</span>
+                <span style="font-size:12px; color:#4de080; margin:auto 0;">🌸</span>
+                <span style="font-size:7px; color:#4fb8f0;">+72</span>
+                <div class="day-bottom-bar" style="background:#4de080;"></div>
+              </div>
+              <div class="day-cell today has-record">
+                <span style="font-size:7px; color:#4de080; font-weight:700;">日</span>
+                <span class="day-num" style="color:#4de080; font-weight:700;">26</span>
+                <span style="font-size:12px; color:#4fb8f0; margin:auto 0;">🌻</span>
+                <span style="font-size:7px; color:#4fb8f0;">+79</span>
+                <div class="day-bottom-bar"></div>
+              </div>
+            </div>
+
+            <!-- サマリーカード -->
+            <div class="three-col">
+              <div class="summary-card">
+                <span style="font-size:12px; color:#4fb8f0;">💧</span>
+                <span class="text-sm fw-semibold">356</span>
+                <span class="text-xs text-muted">水やり</span>
+              </div>
+              <div class="summary-card">
+                <span style="font-size:12px; color:#4de080;">🌿</span>
+                <span class="text-sm fw-semibold">5</span>
+                <span class="text-xs text-muted">記録</span>
+              </div>
+              <div class="summary-card">
+                <span style="font-size:12px; color:#f0904f;">✨</span>
+                <span class="text-sm fw-semibold">2</span>
+                <span class="text-xs text-muted">開花</span>
+              </div>
+            </div>
+
+            <!-- インサイト -->
+            <div class="card">
+              <div class="row-between" style="margin-bottom:6px;">
+                <div class="row" style="gap:5px;">
+                  <span style="font-size:12px; color:#f0904f;">🔥</span>
+                  <div>
+                    <div class="text-xs text-muted">連続記録</div>
+                    <div class="text-sm fw-semibold">2日</div>
+                  </div>
+                </div>
+                <div style="width:1px; height:28px; background:rgba(255,255,255,0.1);"></div>
+                <div class="row" style="gap:5px;">
+                  <span style="font-size:12px; color:#4de080;">📈</span>
+                  <div>
+                    <div class="text-xs text-muted">平均進捗</div>
+                    <div class="text-sm fw-semibold">71%</div>
+                  </div>
+                </div>
+              </div>
+              <div class="list-row" style="padding:5px 8px;">
+                <span style="font-size:14px; color:#4de080;">🌻</span>
+                <div style="flex:1;">
+                  <div class="text-xs text-muted">この1週間でいちばん水を残した日</div>
+                  <div class="text-sm fw-semibold">5/23 / +85pt</div>
+                </div>
+                <span class="text-muted" style="font-size:9px;">›</span>
+              </div>
+            </div>
+
+            <!-- 水やり記録スクロール -->
+            <div>
+              <div class="text-sm fw-semibold" style="margin-bottom:5px; padding:0 2px;">この1週間の水やり</div>
+              <div class="hscroll-preview">
+                <div class="hcard"><span style="font-size:16px; color:#4de080;">🌻</span><span class="text-xs">5/23</span><span class="text-xs text-muted">+85pt</span></div>
+                <div class="hcard"><span style="font-size:16px; color:#4fb8f0;">🌸</span><span class="text-xs">5/25</span><span class="text-xs text-muted">+72pt</span></div>
+                <div class="hcard"><span style="font-size:16px; color:#4de080;">🌻</span><span class="text-xs">5/26</span><span class="text-xs text-muted">+79pt</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tab-bar">
+          <div class="tab-item"><div class="tab-icon">⏱</div>タイマー</div>
+          <div class="tab-item active"><div class="tab-icon">🌿</div>お庭</div>
+          <div class="tab-item"><div class="tab-icon">📖</div>図鑑</div>
+          <div class="tab-item"><div class="tab-icon">⚙️</div>設定</div>
+        </div>
+      </div>
+      <div class="screen-label">GardenView<br>④ お庭</div>
+    </div>
+
+    <!-- CollectionView -->
+    <div class="screen-wrap">
+      <div class="phone garden-bg">
+        <div class="status-bar"></div>
+        <div class="nav-bar">
+          <span></span>
+          <span style="font-size:14px;">図鑑</span>
+          <span class="text-blue" style="font-size:12px;">↕</span>
+        </div>
+        <div class="content">
+          <div class="scroll-area">
+            <!-- プログレスヘッダー -->
+            <div class="card" style="background:rgba(255,255,255,0.08);">
+              <div class="row" style="gap:8px; margin-bottom:8px;">
+                <div class="icon-circle bg-green">📖</div>
+                <div>
+                  <div class="text-sm fw-semibold">花のコレクション</div>
+                  <div class="text-xs text-muted">3 / 15 種を発見</div>
+                </div>
+              </div>
+              <div class="progress-bar" style="height:7px;">
+                <div class="progress-fill" style="width:20%; background:linear-gradient(90deg, #4de080, #4fb8f0);"></div>
+              </div>
+            </div>
+
+            <!-- フィルターバー -->
+            <div style="display:flex; gap:5px; flex-wrap:wrap; padding:2px 0;">
+              <div class="capsule-badge" style="background:#4de080; color:#000; font-size:8px;">すべて</div>
+              <div class="capsule-badge" style="background:rgba(255,255,255,0.08); color:#aaa; font-size:8px;">解放済み</div>
+              <div class="capsule-badge" style="background:rgba(255,255,255,0.08); color:#aaa; font-size:8px;">未解放</div>
+              <div class="capsule-badge" style="background:rgba(255,255,255,0.08); color:#aaa; font-size:8px;">やさしい</div>
+              <div class="capsule-badge" style="background:rgba(255,255,255,0.08); color:#aaa; font-size:8px;">ふつう</div>
+            </div>
+
+            <!-- 2列グリッド -->
+            <div class="two-col">
+              <div class="species-card unlocked">
+                <div class="row-between">
+                  <div class="icon-circle bg-blue" style="width:36px; height:36px; font-size:18px;">🌸</div>
+                  <span style="font-size:10px; color:#4de080;">✓</span>
+                </div>
+                <div class="text-sm fw-semibold" style="margin-top:2px;">チューリップ</div>
+                <div class="text-xs text-muted">3回 / 最高 85%</div>
+              </div>
+              <div class="species-card unlocked">
+                <div class="row-between">
+                  <div class="icon-circle bg-orange" style="width:36px; height:36px; font-size:18px;">🌻</div>
+                  <span style="font-size:10px; color:#4de080;">✓</span>
+                </div>
+                <div class="text-sm fw-semibold" style="margin-top:2px;">ひまわり</div>
+                <div class="text-xs text-muted">5回 / 最高 92%</div>
+              </div>
+              <div class="species-card">
+                <div class="row-between">
+                  <div class="icon-circle" style="width:36px; height:36px; font-size:18px; background:rgba(150,150,150,0.1);">🌹</div>
+                  <div class="capsule-badge" style="background:rgba(150,150,150,0.15); color:#888; font-size:7px;">ふつう</div>
+                </div>
+                <div class="text-sm" style="margin-top:2px; color:#888;">バラ</div>
+                <div class="text-xs" style="color:#666;">70%以上で解放</div>
+              </div>
+              <div class="species-card">
+                <div class="row-between">
+                  <div class="icon-circle" style="width:36px; height:36px; font-size:18px; background:rgba(150,150,150,0.1);">🌷</div>
+                  <div class="capsule-badge" style="background:rgba(150,150,150,0.15); color:#888; font-size:7px;">むずかしい</div>
+                </div>
+                <div class="text-sm" style="margin-top:2px; color:#888;">ラン</div>
+                <div class="text-xs" style="color:#666;">85%以上で解放</div>
+              </div>
+            </div>
+
+            <!-- 最近咲いた花 -->
+            <div>
+              <div class="text-sm fw-semibold" style="margin-bottom:5px; padding:0 2px;">最近咲いた花</div>
+              <div class="hscroll-preview">
+                <div class="hcard"><span style="font-size:16px; color:#4de080;">🌸</span><span class="text-xs">5/23</span><span class="text-xs text-muted">85%</span></div>
+                <div class="hcard"><span style="font-size:16px; color:#f0904f;">🌻</span><span class="text-xs">5/25</span><span class="text-xs text-muted">79%</span></div>
+                <div class="hcard"><span style="font-size:16px; color:#4fb8f0;">🌸</span><span class="text-xs">5/20</span><span class="text-xs text-muted">72%</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tab-bar">
+          <div class="tab-item"><div class="tab-icon">⏱</div>タイマー</div>
+          <div class="tab-item"><div class="tab-icon">🌿</div>お庭</div>
+          <div class="tab-item active"><div class="tab-icon">📖</div>図鑑</div>
+          <div class="tab-item"><div class="tab-icon">⚙️</div>設定</div>
+        </div>
+      </div>
+      <div class="screen-label">CollectionView<br>⑤ 図鑑</div>
+    </div>
+
+    <!-- SettingsView -->
+    <div class="screen-wrap">
+      <div class="phone" style="background:#111118;">
+        <div class="status-bar"></div>
+        <div class="nav-bar">
+          <span></span>
+          <span style="font-size:14px;">設定</span>
+          <span></span>
+        </div>
+        <div class="content">
+          <div class="scroll-area">
+            <div class="settings-section">
+              <div class="settings-header">出発スケジュール</div>
+              <div>
+                <div class="settings-row" style="border-radius:8px 8px 0 0;">
+                  <div>
+                    <div class="text-sm fw-semibold">平日通常</div>
+                    <div class="text-xs text-muted" style="margin-top:1px;">08:00</div>
+                  </div>
+                  <div class="row" style="gap:6px;">
+                    <div class="capsule-badge" style="background:rgba(77,224,128,0.15); color:#4de080; font-size:8px;">✓ 使用中</div>
+                    <span class="text-muted" style="font-size:10px;">›</span>
+                  </div>
+                </div>
+                <div class="settings-row" style="border-radius:0 0 8px 8px;">
+                  <div>
+                    <div class="text-sm" style="color:#ccc;">休日</div>
+                    <div class="text-xs text-muted" style="margin-top:1px;">09:30</div>
+                  </div>
+                  <span class="text-muted" style="font-size:10px;">›</span>
+                </div>
+              </div>
+              <div class="settings-footer">有効化したスケジュールがタイマーに使われます</div>
+            </div>
+
+            <div class="settings-section">
+              <div>
+                <div class="settings-row only">
+                  <div class="row" style="gap:6px;">
+                    <span style="color:#4fb8f0; font-size:12px;">＋</span>
+                    <span class="text-sm">スケジュールを追加</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div>
+                <div class="settings-row only">
+                  <div class="row" style="gap:6px;">
+                    <span style="font-size:12px;">💾</span>
+                    <span class="text-sm">データ管理</span>
+                  </div>
+                  <span class="text-muted" style="font-size:10px;">›</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tab-bar">
+          <div class="tab-item"><div class="tab-icon">⏱</div>タイマー</div>
+          <div class="tab-item"><div class="tab-icon">🌿</div>お庭</div>
+          <div class="tab-item"><div class="tab-icon">📖</div>図鑑</div>
+          <div class="tab-item active"><div class="tab-icon">⚙️</div>設定</div>
+        </div>
+      </div>
+      <div class="screen-label">SettingsView<br>⑥ 設定</div>
+    </div>
+
+    <!-- RoutineEditorView -->
+    <div class="screen-wrap">
+      <div class="phone" style="background:#111118;">
+        <div class="status-bar"></div>
+        <div class="nav-bar">
+          <span class="nav-back">‹ 設定</span>
+          <span style="font-size:12px;">平日通常</span>
+          <span></span>
+        </div>
+        <div class="content">
+          <div class="scroll-area">
+            <div class="settings-section">
+              <div class="settings-header">基本情報</div>
+              <div>
+                <div class="settings-row" style="border-radius:8px 8px 0 0;">
+                  <span class="text-xs text-muted" style="min-width:36px;">名前</span>
+                  <span class="text-sm" style="flex:1; color:#ccc;">平日通常</span>
+                </div>
+                <div class="settings-row">
+                  <span class="text-xs text-muted" style="min-width:60px;">出発予定時刻</span>
+                  <span class="text-sm fw-semibold">08:00</span>
+                </div>
+                <div class="settings-row" style="border-radius:0 0 8px 8px;">
+                  <span class="text-xs text-muted">このスケジュールを使用</span>
+                  <div style="width:30px; height:16px; background:#4de080; border-radius:10px; position:relative;">
+                    <div style="width:12px; height:12px; background:white; border-radius:50%; position:absolute; right:2px; top:2px;"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-header">タスク（合計 22 分）<span style="float:right; color:#4fb8f0; text-transform:none; letter-spacing:0;">編集</span></div>
+              <div style="display:flex; flex-direction:column; gap:3px;">
+                <div class="routine-row">
+                  <div class="dot" style="width:10px; height:10px; border-radius:50%; background:#4fb8f0;"></div>
+                  <span class="text-sm" style="flex:1;">洗顔・歯磨き</span>
+                  <span class="text-xs text-muted">5分</span>
+                  <span class="text-muted" style="font-size:9px;">⠿</span>
+                </div>
+                <div class="routine-row">
+                  <div class="dot" style="width:10px; height:10px; border-radius:50%; background:#a78bfa;"></div>
+                  <span class="text-sm" style="flex:1;">着替え</span>
+                  <span class="text-xs text-muted">5分</span>
+                  <span class="text-muted" style="font-size:9px;">⠿</span>
+                </div>
+                <div class="routine-row">
+                  <div class="dot" style="width:10px; height:10px; border-radius:50%; background:#f0904f;"></div>
+                  <span class="text-sm" style="flex:1;">朝食</span>
+                  <span class="text-xs text-muted">10分</span>
+                  <span class="text-muted" style="font-size:9px;">⠿</span>
+                </div>
+                <div class="routine-row">
+                  <div class="dot" style="width:10px; height:10px; border-radius:50%; background:#4de080;"></div>
+                  <span class="text-sm" style="flex:1;">持ち物確認</span>
+                  <span class="text-xs text-muted">2分</span>
+                  <span class="text-muted" style="font-size:9px;">⠿</span>
+                </div>
+                <div class="routine-row" style="background:transparent; border:1px dashed rgba(79,184,240,0.3);">
+                  <span style="font-size:14px; color:#4fb8f0;">＋</span>
+                  <span class="text-sm text-blue">タスクを追加</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="screen-label">RoutineEditorView<br>⑦ ルーティン編集</div>
+    </div>
+
+  </div><!-- /screens -->
+</div>
+
+<!-- ============================================================
+  SECTION 2: シート（モーダル）
+============================================================ -->
+<div class="section">
+  <div class="section-title">02 — シート（モーダル）</div>
+  <div class="screens">
+
+    <!-- StartSheet -->
+    <div class="screen-wrap">
+      <div class="phone sheet-phone">
+        <div class="drag-handle" style="margin-top:14px;"></div>
+        <div class="content">
+          <div class="scroll-area" style="gap:8px;">
+            <!-- ヘッダー -->
+            <div style="display:flex; align-items:center; gap:8px; justify-content:center; margin-bottom:2px;">
+              <div class="icon-circle bg-blue" style="width:28px; height:28px; font-size:13px;">⏲</div>
+              <div class="text-md">出発時刻を確認</div>
+            </div>
+            <div class="text-xs text-muted" style="text-align:center;">平日通常</div>
+
+            <!-- ヒーローカード -->
+            <div class="card" style="text-align:center; padding:14px;">
+              <div class="row" style="justify-content:center; gap:8px; align-items:baseline; margin-bottom:8px;">
+                <span style="font-size:14px; opacity:0.6;">🚶</span>
+                <span style="font-size:40px; font-weight:100; letter-spacing:-1px;">08:00</span>
+              </div>
+              <div class="capsule-badge" style="background:rgba(79,184,240,0.2); border:1.5px solid rgba(79,184,240,0.6); color:#4fb8f0;">
+                🕐 今から 30 分後に出発
+              </div>
+            </div>
+
+            <!-- クイック設定 -->
+            <div>
+              <div class="row-between" style="margin-bottom:5px;">
+                <span class="text-xs" style="letter-spacing:1px; text-transform:uppercase; color:#666;">クイック設定</span>
+                <span class="text-xs text-blue">↩ 元の時刻</span>
+              </div>
+              <div class="chip-row">
+                <div class="chip"><span style="font-weight:700;">+15分</span><span style="color:#888;">15分後</span></div>
+                <div class="chip selected"><span style="font-weight:700;">+30分</span><span>✓</span></div>
+                <div class="chip"><span style="font-weight:700;">+45分</span><span style="color:#888;">45分後</span></div>
+                <div class="chip"><span style="font-weight:700;">+1時間</span><span style="color:#888;">1時間後</span></div>
+              </div>
+            </div>
+
+            <!-- 区切り -->
+            <div class="row" style="gap:8px; padding:0 4px;">
+              <div style="flex:1; height:0.5px; background:rgba(255,255,255,0.08);"></div>
+              <span class="text-xs text-muted">または時刻を直接指定</span>
+              <div style="flex:1; height:0.5px; background:rgba(255,255,255,0.08);"></div>
+            </div>
+
+            <!-- ホイールピッカー（模擬） -->
+            <div style="height:70px; background:rgba(255,255,255,0.03); border-radius:10px; display:flex; align-items:center; justify-content:center; gap:16px; overflow:hidden; position:relative;">
+              <div style="position:absolute; top:50%; transform:translateY(-50%); left:0; right:0; height:22px; background:rgba(255,255,255,0.06); pointer-events:none;"></div>
+              <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+                <span class="text-xs text-muted">07</span>
+                <span class="text-md">08</span>
+                <span class="text-xs text-muted">09</span>
+              </div>
+              <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+                <span class="text-xs text-muted">55</span>
+                <span class="text-md">00</span>
+                <span class="text-xs text-muted">05</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ボタン -->
+        <div style="padding:6px 12px 16px; display:flex; flex-direction:column; gap:6px;">
+          <div style="background:linear-gradient(90deg, #4fb8f0, #3a6fd8); border-radius:14px; padding:11px; text-align:center; font-size:12px; font-weight:700;">
+            ▶ スタート！
+          </div>
+          <div style="text-align:center; font-size:9px; color:rgba(255,255,255,0.4); padding:4px;">キャンセル</div>
+        </div>
+      </div>
+      <div class="screen-label">StartSheet <span class="badge badge-sheet">Sheet 88%</span><br>出発時刻確認</div>
+    </div>
+
+    <!-- DepartureConfirmView -->
+    <div class="screen-wrap">
+      <div class="phone sheet-phone">
+        <div class="drag-handle" style="margin-top:10px;"></div>
+        <div class="content">
+          <div class="scroll-area" style="gap:8px;">
+            <!-- 植物アイコン + メッセージ -->
+            <div style="text-align:center; padding:8px 0 4px;">
+              <div style="font-size:44px; margin-bottom:8px;">🌻</div>
+              <div class="text-md" style="line-height:1.5;">ひまわりが咲きそうです<br>出発しますか？</div>
+              <div class="text-xs text-muted" style="margin-top:5px;">今回 +72pt で、合計 192/320pt になります。</div>
+            </div>
+
+            <!-- バッジ2行 -->
+            <div class="two-col" style="gap:6px;">
+              <div class="card" style="text-align:center; padding:10px 6px;">
+                <span style="font-size:14px; color:#4fb8f0; display:block; margin-bottom:3px;">💧</span>
+                <div class="text-sm fw-semibold">72%</div>
+                <div class="text-xs text-muted">タンク残量</div>
+              </div>
+              <div class="card" style="text-align:center; padding:10px 6px;">
+                <span style="font-size:14px; color:#4de080; display:block; margin-bottom:3px;">✓</span>
+                <div class="text-sm fw-semibold">オンタイム</div>
+                <div class="text-xs text-muted">スケジュール</div>
+              </div>
+            </div>
+            <div class="two-col" style="gap:6px;">
+              <div class="card" style="text-align:center; padding:10px 6px;">
+                <span style="font-size:14px; color:#f0904f; display:block; margin-bottom:3px;">🌻</span>
+                <div class="text-sm fw-semibold">120/320pt</div>
+                <div class="text-xs text-muted">現在の育成水量</div>
+              </div>
+              <div class="card" style="text-align:center; padding:10px 6px;">
+                <span style="font-size:14px; color:#4fb8f0; display:block; margin-bottom:3px;">💧</span>
+                <div class="text-sm fw-semibold">+72pt</div>
+                <div class="text-xs text-muted">今回の水やり</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="padding:6px 12px 12px; display:flex; flex-direction:column; gap:6px;">
+          <div style="background:linear-gradient(90deg, #4fb8f0, #3a6fd8); border-radius:14px; padding:11px; text-align:center; font-size:12px; font-weight:700;">
+            🚶 いってきます！
+          </div>
+          <div style="text-align:center; font-size:9px; color:rgba(255,255,255,0.4); padding:4px;">まだもう少し…戻る</div>
+        </div>
+      </div>
+      <div class="screen-label">DepartureConfirmView <span class="badge badge-sheet">Sheet medium</span><br>出発確認</div>
+    </div>
+
+    <!-- DepartureResultView -->
+    <div class="screen-wrap">
+      <div class="phone sheet-phone">
+        <div class="drag-handle" style="margin-top:10px;"></div>
+        <div class="content">
+          <div class="scroll-area" style="gap:8px; padding-top:6px;">
+            <div style="text-align:center;">
+              <div class="text-xs text-muted" style="margin-bottom:2px;">お疲れさまでした！</div>
+              <div class="text-xs text-muted" style="margin-bottom:4px;">平日通常</div>
+              <div class="text-md" style="font-size:13px;">ひまわりが咲きました！</div>
+            </div>
+
+            <!-- 植物プレビュー -->
+            <div style="text-align:center;">
+              <div style="display:inline-flex; align-items:center; justify-content:center; width:70px; height:70px; border-radius:50%; background:rgba(79,184,240,0.15);">
+                <span style="font-size:40px;">🌻</span>
+              </div>
+            </div>
+
+            <!-- 水量ゲージ -->
+            <div class="card" style="padding:10px 12px;">
+              <div class="row-between" style="margin-bottom:5px;">
+                <span class="text-xs text-muted">残水量</span>
+                <span class="text-sm fw-semibold">72%</span>
+              </div>
+              <div style="height:10px; background:rgba(255,255,255,0.1); border-radius:6px; overflow:hidden;">
+                <div style="width:72%; height:100%; background:linear-gradient(90deg, #4fb8f0, #3a6fd8); border-radius:6px;"></div>
+              </div>
+            </div>
+
+            <!-- 植物メトリクス -->
+            <div class="two-col" style="gap:5px;">
+              <div class="card" style="text-align:center; padding:8px 4px;">
+                <span style="font-size:12px; color:#4de080; display:block; margin-bottom:2px;">🌻</span>
+                <div class="text-xs fw-semibold">240/240pt</div>
+                <div class="text-xs text-muted">合計水量</div>
+              </div>
+              <div class="card" style="text-align:center; padding:8px 4px;">
+                <span style="font-size:12px; color:#4de080; display:block; margin-bottom:2px;">🌸</span>
+                <div class="text-xs fw-semibold">開花</div>
+                <div class="text-xs text-muted">成長段階</div>
+              </div>
+            </div>
+
+            <!-- 統計カード 3列 -->
+            <div class="three-col">
+              <div class="card" style="text-align:center; padding:6px 3px;">
+                <span style="font-size:10px; color:#4fb8f0; display:block;">🕐</span>
+                <div style="font-size:10px; font-weight:600; margin:2px 0;">18:34</div>
+                <div class="text-xs text-muted">経過時間</div>
+              </div>
+              <div class="card" style="text-align:center; padding:6px 3px;">
+                <span style="font-size:10px; color:#7c6fff; display:block;">📅</span>
+                <div style="font-size:10px; font-weight:600; margin:2px 0;">22分</div>
+                <div class="text-xs text-muted">予定時間</div>
+              </div>
+              <div class="card" style="text-align:center; padding:6px 3px;">
+                <span style="font-size:10px; color:#4de080; display:block;">🐇</span>
+                <div style="font-size:10px; font-weight:600; margin:2px 0;">ジャスト</div>
+                <div class="text-xs text-muted">スケジュール通り</div>
+              </div>
+            </div>
+
+            <div class="text-xs text-muted" style="text-align:center; padding:0 10px;">図鑑に開花として登録されます。</div>
+          </div>
+        </div>
+        <div style="padding:6px 12px 12px;">
+          <div style="background:linear-gradient(90deg, #4fb8f0, #3a6fd8); border-radius:14px; padding:10px; text-align:center; font-size:11px; font-weight:700;">
+            また明日！ 🌱
+          </div>
+        </div>
+      </div>
+      <div class="screen-label">DepartureResultView <span class="badge badge-sheet">Sheet large</span><br>出発結果</div>
+    </div>
+
+    <!-- PlantPickerSheet -->
+    <div class="screen-wrap">
+      <div class="phone sheet-phone">
+        <div class="drag-handle" style="margin-top:10px;"></div>
+        <div class="content">
+          <div class="scroll-area" style="gap:8px; padding-top:4px;">
+            <!-- ヘッダー -->
+            <div style="display:flex; align-items:center; gap:8px; padding:0 2px;">
+              <div class="icon-circle bg-green" style="font-size:13px;">🌿</div>
+              <div>
+                <div class="text-sm fw-semibold">今日育てる植物</div>
+                <div class="text-xs text-muted">難易度が高いほど多くの水が必要です</div>
+              </div>
+            </div>
+
+            <!-- 植物リスト -->
+            <div style="display:flex; flex-direction:column; gap:5px;">
+              <div class="list-row" style="border:1px solid rgba(79,184,240,0.4); background:rgba(79,184,240,0.1);">
+                <div class="icon-circle bg-blue" style="font-size:18px; flex-shrink:0;">🌸</div>
+                <div style="flex:1;">
+                  <div class="text-sm fw-semibold">チューリップ</div>
+                  <div class="row" style="gap:5px; margin-top:2px;">
+                    <span class="capsule-badge" style="background:rgba(77,224,128,0.15); color:#4de080; font-size:7px;">かんたん</span>
+                    <span class="text-xs text-muted">100-150pt</span>
+                  </div>
+                </div>
+                <span style="font-size:14px; color:#4fb8f0;">✓</span>
+              </div>
+              <div class="list-row">
+                <div class="icon-circle bg-orange" style="font-size:18px; flex-shrink:0;">🌻</div>
+                <div style="flex:1;">
+                  <div class="text-sm fw-semibold">ひまわり</div>
+                  <div class="row" style="gap:5px; margin-top:2px;">
+                    <span class="capsule-badge" style="background:rgba(96,165,250,0.15); color:#60a5fa; font-size:7px;">ふつう</span>
+                    <span class="text-xs text-muted">200-320pt</span>
+                  </div>
+                </div>
+                <span style="font-size:14px; color:rgba(255,255,255,0.2);">○</span>
+              </div>
+              <div class="list-row">
+                <div class="icon-circle bg-purple" style="font-size:18px; flex-shrink:0;">🌹</div>
+                <div style="flex:1;">
+                  <div class="text-sm fw-semibold">バラ</div>
+                  <div class="row" style="gap:5px; margin-top:2px;">
+                    <span class="capsule-badge" style="background:rgba(167,139,250,0.15); color:#a78bfa; font-size:7px;">むずかしい</span>
+                    <span class="text-xs text-muted">280-420pt</span>
+                  </div>
+                </div>
+                <span style="font-size:14px; color:rgba(255,255,255,0.2);">○</span>
+              </div>
+              <div class="list-row">
+                <div class="icon-circle bg-teal" style="font-size:18px; flex-shrink:0;">🌷</div>
+                <div style="flex:1;">
+                  <div class="text-sm fw-semibold">ラン</div>
+                  <div class="row" style="gap:5px; margin-top:2px;">
+                    <span class="capsule-badge" style="background:rgba(167,139,250,0.15); color:#a78bfa; font-size:7px;">むずかしい</span>
+                    <span class="text-xs text-muted">350-500pt</span>
+                  </div>
+                </div>
+                <span style="font-size:14px; color:rgba(255,255,255,0.2);">○</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="screen-label">PlantPickerSheet <span class="badge badge-sheet">Sheet 72%</span><br>植物選択</div>
+    </div>
+
+    <!-- WateringRecordDetailSheet -->
+    <div class="screen-wrap">
+      <div class="phone sheet-phone" style="background:linear-gradient(160deg, #0d1f10 0%, #0a180d 100%);">
+        <div class="drag-handle" style="margin-top:10px;"></div>
+        <div class="content">
+          <div class="scroll-area" style="gap:10px; align-items:center;">
+            <!-- 植物アイコン -->
+            <div style="display:flex; justify-content:center; margin-top:8px;">
+              <div style="width:80px; height:80px; border-radius:50%; background:rgba(79,184,240,0.15); display:flex; align-items:center; justify-content:center;">
+                <span style="font-size:46px;">🌻</span>
+              </div>
+            </div>
+            <!-- メッセージ -->
+            <div style="text-align:center;">
+              <div class="text-md">ひまわりが咲きました</div>
+              <div class="text-xs text-muted" style="margin-top:3px;">2026/5/23 08:18</div>
+            </div>
+            <!-- メトリクス -->
+            <div class="two-col" style="width:100%; gap:8px;">
+              <div class="card" style="text-align:center; padding:10px 6px; background:rgba(255,255,255,0.08);">
+                <span style="font-size:14px; color:#4fb8f0; display:block; margin-bottom:2px;">💧</span>
+                <div class="text-sm fw-semibold">+85pt</div>
+                <div class="text-xs text-muted">今回</div>
+              </div>
+              <div class="card" style="text-align:center; padding:10px 6px; background:rgba(255,255,255,0.08);">
+                <span style="font-size:14px; color:#4de080; display:block; margin-bottom:2px;">📈</span>
+                <div class="text-sm fw-semibold">240/240pt</div>
+                <div class="text-xs text-muted">合計</div>
+              </div>
+            </div>
+            <div class="text-xs text-muted" style="text-align:center; padding:0 16px;">完成した花は図鑑に登録されています。</div>
+          </div>
+        </div>
+      </div>
+      <div class="screen-label">WateringRecordDetail <span class="badge badge-sheet">Sheet medium</span><br>水やり記録詳細</div>
+    </div>
+
+    <!-- SpeciesDetailSheet -->
+    <div class="screen-wrap">
+      <div class="phone sheet-phone" style="background:linear-gradient(160deg, #0d1f10 0%, #0a180d 100%);">
+        <div class="status-bar"></div>
+        <div style="display:flex; justify-content:flex-end; padding:8px 12px 2px;">
+          <div style="width:22px; height:22px; border-radius:50%; background:rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; font-size:9px; color:#aaa;">✕</div>
+        </div>
+        <div class="content">
+          <div class="scroll-area" style="gap:8px; align-items:center;">
+            <!-- ヘッダー -->
+            <div style="text-align:center;">
+              <div style="width:70px; height:70px; border-radius:50%; background:rgba(79,184,240,0.15); display:flex; align-items:center; justify-content:center; margin:0 auto 6px;">
+                <span style="font-size:40px;">🌸</span>
+              </div>
+              <div class="text-md">チューリップ</div>
+              <div class="text-xs text-muted" style="margin-top:2px;">3回咲きました / 最高 85%</div>
+            </div>
+
+            <!-- タイル3列 -->
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:5px; width:100%;">
+              <div class="hcard" style="aspect-ratio:1; min-width:unset; padding:8px 4px;">
+                <span style="font-size:18px; color:#4fb8f0;">🌸</span>
+                <span class="text-xs">5/15</span>
+                <span class="text-xs text-muted">72%</span>
+              </div>
+              <div class="hcard" style="aspect-ratio:1; min-width:unset; padding:8px 4px;">
+                <span style="font-size:18px; color:#4de080;">🌸</span>
+                <span class="text-xs">5/20</span>
+                <span class="text-xs text-muted">85%</span>
+              </div>
+              <div class="hcard" style="aspect-ratio:1; min-width:unset; padding:8px 4px;">
+                <span style="font-size:18px; color:#a78bfa;">🌸</span>
+                <span class="text-xs">5/25</span>
+                <span class="text-xs text-muted">79%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="screen-label">SpeciesDetailSheet <span class="badge badge-sheet">Sheet large</span><br>種族詳細</div>
+    </div>
+
+    <!-- AddScheduleSheet -->
+    <div class="screen-wrap">
+      <div class="phone" style="background:#111118;">
+        <div class="status-bar"></div>
+        <div class="nav-bar">
+          <span class="nav-back" style="color:rgba(255,255,255,0.45);">キャンセル</span>
+          <span style="font-size:12px;">新しいスケジュール</span>
+          <span class="nav-action">追加</span>
+        </div>
+        <div class="content">
+          <div class="scroll-area">
+            <div class="settings-section">
+              <div class="settings-header">名前</div>
+              <div class="settings-row only" style="border-radius:8px;">
+                <span class="text-sm" style="color:#555;">例: 平日・休日</span>
+              </div>
+            </div>
+            <div class="settings-section">
+              <div class="settings-header">出発時刻</div>
+              <div style="background:rgba(255,255,255,0.04); border-radius:8px; padding:8px; text-align:center;">
+                <!-- ホイールピッカー模擬 -->
+                <div style="height:90px; display:flex; align-items:center; justify-content:center; gap:20px; position:relative;">
+                  <div style="position:absolute; top:50%; transform:translateY(-50%); left:0; right:0; height:26px; background:rgba(255,255,255,0.05);"></div>
+                  <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+                    <span class="text-xs text-muted">07</span>
+                    <span class="text-md fw-semibold">08</span>
+                    <span class="text-xs text-muted">09</span>
+                  </div>
+                  <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+                    <span class="text-xs text-muted">55</span>
+                    <span class="text-md fw-semibold">00</span>
+                    <span class="text-xs text-muted">05</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="screen-label">AddScheduleSheet <span class="badge badge-sheet">Sheet medium</span><br>スケジュール追加</div>
+    </div>
+
+    <!-- AddRoutineItemSheet -->
+    <div class="screen-wrap">
+      <div class="phone" style="background:#111118;">
+        <div class="status-bar"></div>
+        <div class="nav-bar">
+          <span class="nav-back" style="color:rgba(255,255,255,0.45);">キャンセル</span>
+          <span style="font-size:12px;">新しいタスク</span>
+          <span class="nav-action">追加</span>
+        </div>
+        <div class="content">
+          <div class="scroll-area">
+            <div class="settings-section">
+              <div class="settings-row only" style="border-radius:8px;">
+                <span class="text-sm" style="color:#555;">タスク名</span>
+              </div>
+            </div>
+            <div class="settings-section">
+              <div class="settings-row only" style="border-radius:8px;">
+                <span class="text-sm">所要時間: 5 分</span>
+                <div class="row" style="gap:6px;">
+                  <div style="width:22px; height:22px; border-radius:6px; background:rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; font-size:11px;">−</div>
+                  <div style="width:22px; height:22px; border-radius:6px; background:rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; font-size:11px;">＋</div>
+                </div>
+              </div>
+            </div>
+            <!-- カラーピッカー -->
+            <div class="settings-section">
+              <div class="color-picker">
+                <div class="color-dot" style="background:#4fb8f0; border:2px solid white;"></div>
+                <div class="color-dot" style="background:#a78bfa;"></div>
+                <div class="color-dot" style="background:#f0904f;"></div>
+                <div class="color-dot" style="background:#4de080;"></div>
+                <div class="color-dot" style="background:#f472b6;"></div>
+                <div class="color-dot" style="background:#2dd4bf;"></div>
+                <div class="color-dot" style="background:#fbbf24;"></div>
+                <div class="color-dot" style="background:#e45555;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="screen-label">AddRoutineItemSheet <span class="badge badge-sheet">Sheet medium</span><br>タスク追加</div>
+    </div>
+
+  </div><!-- /screens -->
+</div>
+
+<!-- ============================================================
+  SECTION 3: ナビゲーション遷移
+============================================================ -->
+<div class="section">
+  <div class="section-title">03 — NavigationStack 画面</div>
+  <div class="screens">
+
+    <!-- MonthlyGardenView -->
+    <div class="screen-wrap">
+      <div class="phone garden-bg">
+        <div class="status-bar"></div>
+        <div class="nav-bar">
+          <span class="nav-back">‹ お庭</span>
+          <span style="font-size:12px;">月間ガーデン</span>
+          <span></span>
+        </div>
+        <div class="content">
+          <div class="scroll-area">
+            <div style="text-align:center; padding:8px 0 6px;">
+              <div class="text-md">2026年 5月</div>
+              <div class="row" style="justify-content:center; gap:6px; margin-top:6px;">
+                <div class="icon-circle bg-green icon-circle-sm">‹</div>
+                <div class="icon-circle bg-green icon-circle-sm">›</div>
+              </div>
+            </div>
+            <!-- 月間グリッド模擬 -->
+            <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:3px;">
+              <div class="text-xs text-muted" style="text-align:center; padding:2px 0;">月</div>
+              <div class="text-xs text-muted" style="text-align:center; padding:2px 0;">火</div>
+              <div class="text-xs text-muted" style="text-align:center; padding:2px 0;">水</div>
+              <div class="text-xs text-muted" style="text-align:center; padding:2px 0;">木</div>
+              <div class="text-xs text-muted" style="text-align:center; padding:2px 0;">金</div>
+              <div class="text-xs text-muted" style="text-align:center; padding:2px 0;">土</div>
+              <div class="text-xs text-muted" style="text-align:center; padding:2px 0;">日</div>
+              <!-- 空きセル -->
+              <div></div><div></div><div></div>
+              <!-- 日付セル（5月は木曜から） -->
+              <div class="day-cell" style="font-size:8px; aspect-ratio:1; padding:3px;"><span class="day-num" style="font-size:8px;">1</span></div>
+              <div class="day-cell" style="font-size:8px; aspect-ratio:1; padding:3px;"><span class="day-num" style="font-size:8px;">2</span></div>
+              <div class="day-cell" style="font-size:8px; aspect-ratio:1; padding:3px;"><span class="day-num" style="font-size:8px;">3</span></div>
+              <div class="day-cell" style="font-size:8px; aspect-ratio:1; padding:3px;"><span class="day-num" style="font-size:8px;">4</span></div>
+              <div class="day-cell has-record" style="font-size:8px; aspect-ratio:1; padding:3px;"><span class="day-num" style="font-size:8px;">5</span><span style="font-size:9px;">🌱</span></div>
+              <div class="day-cell has-record" style="font-size:8px; aspect-ratio:1; padding:3px;"><span class="day-num" style="font-size:8px;">6</span><span style="font-size:9px;">🌿</span></div>
+              <div class="day-cell" style="font-size:8px; aspect-ratio:1; padding:3px;"><span class="day-num" style="font-size:8px;">7</span></div>
+              <!-- 続き省略 -->
+              <div class="day-cell has-record" style="font-size:8px; aspect-ratio:1; padding:3px;"><span class="day-num" style="font-size:8px;">8</span><span style="font-size:9px;">🌻</span></div>
+              <div class="day-cell" style="font-size:8px; aspect-ratio:1; padding:3px;"><span class="day-num" style="font-size:8px;">9</span></div>
+              <div class="day-cell has-record" style="font-size:8px; aspect-ratio:1; padding:3px;"><span class="day-num" style="font-size:8px;">10</span><span style="font-size:9px;">🌸</span></div>
+              <div class="day-cell" style="font-size:8px; aspect-ratio:1; padding:3px;"><span class="day-num" style="font-size:8px;">11</span></div>
+              <div class="day-cell" style="font-size:8px; aspect-ratio:1; padding:3px;"><span class="day-num" style="font-size:8px;">12</span></div>
+              <div class="day-cell has-record" style="font-size:8px; aspect-ratio:1; padding:3px;"><span class="day-num" style="font-size:8px;">13</span><span style="font-size:9px;">🌼</span></div>
+              <div class="day-cell" style="font-size:8px; aspect-ratio:1; padding:3px;"><span class="day-num" style="font-size:8px;">14</span></div>
+            </div>
+            <div class="text-xs text-muted" style="text-align:center; padding:6px 0 2px;">…</div>
+            <!-- 月間サマリー -->
+            <div class="three-col">
+              <div class="summary-card">
+                <span style="font-size:10px; color:#4fb8f0;">💧</span>
+                <span style="font-size:11px; font-weight:600;">1,842</span>
+                <span class="text-xs text-muted">水やり</span>
+              </div>
+              <div class="summary-card">
+                <span style="font-size:10px; color:#4de080;">📅</span>
+                <span style="font-size:11px; font-weight:600;">18</span>
+                <span class="text-xs text-muted">記録日</span>
+              </div>
+              <div class="summary-card">
+                <span style="font-size:10px; color:#f0904f;">✨</span>
+                <span style="font-size:11px; font-weight:600;">8</span>
+                <span class="text-xs text-muted">開花</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="screen-label">MonthlyGardenView <span class="badge badge-nav">NavigationLink</span><br>月間ガーデン</div>
+    </div>
+
+    <!-- DataManagementView -->
+    <div class="screen-wrap">
+      <div class="phone" style="background:#111118;">
+        <div class="status-bar"></div>
+        <div class="nav-bar">
+          <span class="nav-back">‹ 設定</span>
+          <span style="font-size:12px;">データ管理</span>
+          <span></span>
+        </div>
+        <div class="content">
+          <div class="scroll-area">
+            <div class="settings-section">
+              <div class="settings-header">エクスポート</div>
+              <div>
+                <div class="settings-row only" style="border-radius:8px;">
+                  <div class="row" style="gap:6px;">
+                    <span style="font-size:12px; color:#4fb8f0;">📤</span>
+                    <span class="text-sm">データをエクスポート</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="settings-section">
+              <div class="settings-header">リセット</div>
+              <div style="display:flex; flex-direction:column; gap:1px;">
+                <div class="settings-row" style="border-radius:8px 8px 0 0;">
+                  <div class="row" style="gap:6px;">
+                    <span style="font-size:12px; color:#e45;">🗑</span>
+                    <span class="text-sm" style="color:#e45;">水やり記録を全削除</span>
+                  </div>
+                </div>
+                <div class="settings-row" style="border-radius:0 0 8px 8px;">
+                  <div class="row" style="gap:6px;">
+                    <span style="font-size:12px; color:#e45;">⚠️</span>
+                    <span class="text-sm" style="color:#e45;">すべてのデータを初期化</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="settings-section">
+              <div class="settings-header">アプリ情報</div>
+              <div>
+                <div class="settings-row only" style="border-radius:8px;">
+                  <span class="text-xs text-muted">バージョン</span>
+                  <span class="text-xs text-muted">1.0.0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="screen-label">DataManagementView <span class="badge badge-nav">NavigationLink</span><br>データ管理</div>
+    </div>
+
+  </div><!-- /screens -->
+</div>
+
+<!-- ============================================================
+  SECTION 4: アラート
+============================================================ -->
+<div class="section">
+  <div class="section-title">04 — アラートダイアログ</div>
+  <div class="screens">
+
+    <!-- キャンセル確認 -->
+    <div class="screen-wrap">
+      <div class="phone water-bg-blue">
+        <div class="water-wave" style="height:55%; opacity:0.5;"></div>
+        <div style="position:absolute; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:10; padding:20px;">
+          <div style="background:#1e1e2a; border-radius:18px; padding:20px 18px; width:100%; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+            <div class="text-md" style="margin-bottom:6px;">タイマーをキャンセルしますか？</div>
+            <div class="text-xs text-muted" style="margin-bottom:14px; line-height:1.6;">タイマーをリセットして最初の状態に戻ります。</div>
+            <div style="border-top:1px solid rgba(255,255,255,0.08); padding-top:10px; display:flex; gap:0;">
+              <div style="flex:1; padding:8px; font-size:11px; font-weight:600; color:#4fb8f0; text-align:center;">続ける</div>
+              <div style="width:1px; background:rgba(255,255,255,0.08);"></div>
+              <div style="flex:1; padding:8px; font-size:11px; font-weight:600; color:#e45; text-align:center;">キャンセルする</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="screen-label">Alert <span class="badge badge-alert">Destructive</span><br>タイマーキャンセル確認</div>
+    </div>
+
+    <!-- 保存エラー -->
+    <div class="screen-wrap">
+      <div class="phone" style="background:#111118;">
+        <div style="position:absolute; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:10; padding:20px;">
+          <div style="background:#1e1e2a; border-radius:18px; padding:20px 18px; width:100%; text-align:center;">
+            <div class="text-md" style="margin-bottom:6px;">保存エラー</div>
+            <div class="text-xs text-muted" style="margin-bottom:14px; line-height:1.6;">データの保存に失敗しました</div>
+            <div style="border-top:1px solid rgba(255,255,255,0.08); padding-top:10px;">
+              <div style="padding:8px; font-size:11px; font-weight:600; color:#4fb8f0; text-align:center;">OK</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="screen-label">Alert <span class="badge badge-alert">Error</span><br>保存エラー</div>
+    </div>
+
+  </div><!-- /screens -->
+</div>
+
+<!-- ============================================================
+  凡例
+============================================================ -->
+<div class="legend">
+  <h3>凡例 / 画面遷移</h3>
+  <div class="legend-items">
+    <div class="legend-item"><div class="dot dot-blue" style="width:10px;height:10px;"></div>TabView タブ切替</div>
+    <div class="legend-item"><div style="width:10px;height:10px;border-radius:3px;background:#1a2a1a;border:1px solid #5a8;"></div>NavigationLink (Push)</div>
+    <div class="legend-item"><div style="width:10px;height:10px;border-radius:3px;background:#2a2a3a;border:1px solid #888;"></div>Sheet (Modal)</div>
+    <div class="legend-item"><div style="width:10px;height:10px;border-radius:3px;background:#2a1a1a;border:1px solid #a55;"></div>Alert</div>
+  </div>
+  <div class="flow-desc">
+    <strong>主要フロー：</strong><br>
+    ① TimerView (未スタート) → [スタートボタン] → StartSheet → [スタート！] → TimerView (実行中)<br>
+    ② TimerView (実行中) → [いってきます！] → DepartureConfirmView → [確認] → DepartureResultView → [また明日！] → TimerView (リセット)<br>
+    ③ TimerView → [植物カード] → PlantPickerSheet → 植物選択 → 閉じる<br>
+    ④ GardenView → [日付セル] → WateringRecordDetailSheet<br>
+    ⑤ GardenView → [📅カレンダー] → MonthlyGardenView<br>
+    ⑥ CollectionView → [種族カード] → SpeciesDetailSheet → [花タイル] → FlowerDetailSheet<br>
+    ⑦ SettingsView → [スケジュール行] → RoutineEditorView → [タスク追加] → AddRoutineItemSheet<br>
+    ⑧ SettingsView → [データ管理] → DataManagementView
+  </div>
+</div>
+
+</body>
+</html>
