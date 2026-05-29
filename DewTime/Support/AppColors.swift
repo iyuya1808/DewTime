@@ -19,9 +19,9 @@ extension Color {
     static let dewTankOverdueTop    = Color(red: 0.95, green: 0.35, blue: 0.25)
     static let dewTankOverdueBottom = Color(red: 0.70, green: 0.15, blue: 0.10)
 
-    // MARK: - Garden
-    static let gardenTop    = Color(red: 0.92, green: 0.97, blue: 0.92)
-    static let gardenBottom = Color(red: 0.78, green: 0.90, blue: 0.82)
+    // MARK: - Aquarium
+    static let aquariumTop    = Color(red: 0.90, green: 0.97, blue: 0.99)
+    static let aquariumBottom = Color(red: 0.72, green: 0.88, blue: 0.96)
 
     // MARK: - Routine task color palette
     static let routinePalette: [Color] = [

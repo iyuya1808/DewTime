@@ -5,14 +5,14 @@ struct TimerView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Query private var schedules: [UserSchedule]
-    @Query(sort: \ActivePlant.startedAt, order: .reverse) private var activePlants: [ActivePlant]
+    @Query(sort: \ActiveFish.startedAt, order: .reverse) private var activeFishes: [ActiveFish]
 
     @State private var viewModel: TimerViewModel?
     @State private var showConfirm = false
     @State private var showResult = false
     @State private var showCancelConfirm = false
     @State private var showStartSheet = false
-    @State private var showPlantPicker = false
+    @State private var showFishPicker = false
 
     var body: some View {
         ZStack {
@@ -26,15 +26,15 @@ struct TimerView: View {
         }
         .onAppear {
             ensureViewModel()
-            viewModel?.syncActivePlant(activePlants)
+            viewModel?.syncActiveFish(activeFishes)
         }
         .onChange(of: activeSchedule?.id) { _, _ in
             viewModel = nil
             ensureViewModel()
-            viewModel?.syncActivePlant(activePlants)
+            viewModel?.syncActiveFish(activeFishes)
         }
-        .onChange(of: activePlants.map(\.id)) { _, _ in
-            viewModel?.syncActivePlant(activePlants)
+        .onChange(of: activeFishes.map(\.id)) { _, _ in
+            viewModel?.syncActiveFish(activeFishes)
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
@@ -127,13 +127,13 @@ struct TimerView: View {
                 .interactiveDismissDisabled()
             }
         }
-        .sheet(isPresented: $showPlantPicker) {
+        .sheet(isPresented: $showFishPicker) {
             if let vm = viewModel {
-                PlantPickerSheet(
+                FishPickerSheet(
                     selectedSpecies: vm.selectedSpecies,
                     onSelect: { species in
                         vm.selectSpecies(species, context: modelContext)
-                        showPlantPicker = false
+                        showFishPicker = false
                     }
                 )
                 .presentationDetents([.fraction(0.72), .large])
@@ -163,14 +163,14 @@ struct TimerView: View {
                     if !vm.isRunning && !vm.departed {
                         VStack(spacing: 12) {
                             departureCard(vm: vm)
-                            plantSelectionCard(vm: vm, isEditable: true)
+                            fishSelectionCard(vm: vm, isEditable: true)
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 20)
                     } else {
                         VStack(spacing: 10) {
                             compactDepartureHeader(vm: vm)
-                            plantSelectionCard(vm: vm, isEditable: false)
+                            fishSelectionCard(vm: vm, isEditable: false)
                                 .padding(.horizontal, 24)
                         }
                         .padding(.top, 16)
@@ -255,30 +255,28 @@ struct TimerView: View {
         .buttonStyle(DepartureCardButtonStyle())
     }
 
-    private func plantSelectionCard(vm: TimerViewModel, isEditable: Bool) -> some View {
+    private func fishSelectionCard(vm: TimerViewModel, isEditable: Bool) -> some View {
         Button {
-            if isEditable { showPlantPicker = true }
+            if isEditable { showFishPicker = true }
         } label: {
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
                     ZStack {
                         Circle()
-                            .fill(plantStatusColor(vm: vm).opacity(0.18))
-                        Image(systemName: vm.selectedSpecies.icon)
-                            .font(.system(size: isEditable ? 30 : 22, weight: .semibold))
-                            .foregroundStyle(plantStatusColor(vm: vm))
-                            .symbolRenderingMode(.hierarchical)
+                            .fill(fishStatusColor(vm: vm).opacity(0.18))
+                        Text(vm.selectedSpecies.emoji)
+                            .font(.system(size: isEditable ? 30 : 22))
                     }
                     .frame(width: isEditable ? 54 : 42, height: isEditable ? 54 : 42)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("今日育てる植物")
+                        Text("今日育てる魚")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.white.opacity(0.68))
                         Text(vm.selectedSpecies.displayName)
                             .font(isEditable ? .headline : .subheadline.weight(.semibold))
                             .foregroundStyle(.white)
-                        Text(vm.hasActivePlant ? vm.currentGrowthStage.message : "種を選んで育てましょう")
+                        Text(vm.hasActiveFish ? vm.currentGrowthStage.message : "魚を選んで育てましょう")
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.54))
                             .lineLimit(1)
@@ -303,16 +301,16 @@ struct TimerView: View {
                     }
                 }
 
-                progressBar(value: vm.growthProgress, color: plantStatusColor(vm: vm), trackOpacity: 0.14)
+                progressBar(value: vm.growthProgress, color: fishStatusColor(vm: vm), trackOpacity: 0.14)
 
                 HStack {
                     Label(vm.currentGrowthStage.displayName, systemImage: vm.currentGrowthStage.icon)
                     Spacer()
-                    Text(vm.meetsSelectedRequirement ? "今回で開花" : "今回 +\(Int(vm.currentWaterAmount.rounded()))pt")
+                    Text(vm.meetsSelectedRequirement ? "今回で成魚に" : "今回 +\(Int(vm.currentWaterAmount.rounded()))pt")
                         .monospacedDigit()
                 }
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(plantStatusColor(vm: vm).opacity(0.92))
+                .foregroundStyle(fishStatusColor(vm: vm).opacity(0.92))
             }
             .padding(.horizontal, isEditable ? 18 : 14)
             .padding(.vertical, isEditable ? 16 : 12)
@@ -537,8 +535,8 @@ struct TimerView: View {
         WaterLevelTheme(waterRatio: level).gradientColors
     }
 
-    private func plantStatusColor(vm: TimerViewModel) -> Color {
-        vm.projectedGrowthStage == .bloom ? WaterLevelTheme(waterRatio: vm.waterLevel).tintColor : .orange
+    private func fishStatusColor(vm: TimerViewModel) -> Color {
+        vm.projectedGrowthStage == .adult ? WaterLevelTheme(waterRatio: vm.waterLevel).tintColor : .orange
     }
 
     // MARK: - Empty state
@@ -577,9 +575,9 @@ struct TimerView: View {
     }
 }
 
-private struct PlantPickerSheet: View {
-    let selectedSpecies: FlowerSpecies
-    let onSelect: (FlowerSpecies) -> Void
+private struct FishPickerSheet: View {
+    let selectedSpecies: FishSpecies
+    let onSelect: (FishSpecies) -> Void
 
     var body: some View {
         ZStack {
@@ -622,12 +620,12 @@ private struct PlantPickerSheet: View {
                         Circle()
                             .strokeBorder(Color(hex: "#52D9A4").opacity(0.30), lineWidth: 1)
                             .frame(width: 36, height: 36)
-                        Image(systemName: "leaf.circle.fill")
+                        Image(systemName: "fish.circle.fill")
                             .font(.title3)
                             .foregroundStyle(Color(hex: "#52D9A4"))
                     }
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("今日育てる植物")
+                        Text("今日育てる魚")
                             .font(AppFont.sheetTitle)
                         Text("難易度が高いほど多くの水が必要です")
                             .font(.caption)
@@ -640,11 +638,11 @@ private struct PlantPickerSheet: View {
 
                 ScrollView {
                     VStack(spacing: 8) {
-                        ForEach(FlowerSpecies.allCases.sorted { $0.requiredTotalWaterRange.lowerBound < $1.requiredTotalWaterRange.lowerBound }) { species in
+                        ForEach(FishSpecies.allCases.sorted { $0.requiredTotalWaterRange.lowerBound < $1.requiredTotalWaterRange.lowerBound }) { species in
                             Button {
                                 onSelect(species)
                             } label: {
-                                plantRow(species)
+                                fishRow(species)
                             }
                             .buttonStyle(.plain)
                         }
@@ -657,7 +655,7 @@ private struct PlantPickerSheet: View {
         .foregroundStyle(.white)
     }
 
-    private func speciesAccentColor(_ species: FlowerSpecies) -> Color {
+    private func speciesAccentColor(_ species: FishSpecies) -> Color {
         switch species.difficultyLabel {
         case "かんたん":   return Color(hex: "#4ADE80")
         case "やさしい":   return Color(hex: "#34D399")
@@ -667,7 +665,7 @@ private struct PlantPickerSheet: View {
         }
     }
 
-    private func plantRow(_ species: FlowerSpecies) -> some View {
+    private func fishRow(_ species: FishSpecies) -> some View {
         let isSelected = selectedSpecies == species
         let accent = isSelected ? Color.dewBlue : speciesAccentColor(species)
 
@@ -681,10 +679,8 @@ private struct PlantPickerSheet: View {
                         .strokeBorder(accent.opacity(0.45), lineWidth: 1.5)
                         .frame(width: 52, height: 52)
                 }
-                Image(systemName: species.icon)
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(accent)
-                    .symbolRenderingMode(.hierarchical)
+                Text(species.emoji)
+                    .font(.system(size: 26))
             }
 
             VStack(alignment: .leading, spacing: 5) {
@@ -739,5 +735,5 @@ private struct DepartureCardButtonStyle: ButtonStyle {
 
 #Preview {
     TimerView()
-        .modelContainer(for: [UserSchedule.self, RoutineItem.self, PlantFlower.self, ActivePlant.self, PlantWateringRecord.self], inMemory: true)
+        .modelContainer(for: [UserSchedule.self, RoutineItem.self, CollectedFish.self, ActiveFish.self, FishCareRecord.self, Aquarium.self], inMemory: true)
 }

@@ -1,41 +1,41 @@
 import Foundation
 
 enum GrowthStage: String, CaseIterable, Identifiable {
-    case seed, sprout, leaves, bloom
+    case egg, fry, juvenile, adult
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .seed: return "種"
-        case .sprout: return "芽"
-        case .leaves: return "葉っぱ"
-        case .bloom: return "開花"
+        case .egg: return "卵"
+        case .fry: return "稚魚"
+        case .juvenile: return "幼魚"
+        case .adult: return "成魚"
         }
     }
 
     var message: String {
         switch self {
-        case .seed: return "種をまきました"
-        case .sprout: return "芽が出ました"
-        case .leaves: return "葉っぱが出てきました"
-        case .bloom: return "花が咲きました"
+        case .egg: return "卵を水槽に入れました"
+        case .fry: return "稚魚が生まれました"
+        case .juvenile: return "幼魚に育ちました"
+        case .adult: return "成魚に育ちました"
         }
     }
 
     var icon: String {
         switch self {
-        case .seed: return "circle.dotted"
-        case .sprout: return "leaf.fill"
-        case .leaves: return "laurel.leading"
-        case .bloom: return "sparkles"
+        case .egg: return "circle.dotted"
+        case .fry: return "fish"
+        case .juvenile: return "fish.fill"
+        case .adult: return "sparkles"
         }
     }
 
     static func stage(for progress: Double) -> GrowthStage {
-        if progress >= 1.0 { return .bloom }
-        if progress >= 0.55 { return .leaves }
-        if progress >= 0.25 { return .sprout }
-        return .seed
+        if progress >= 1.0 { return .adult }
+        if progress >= 0.55 { return .juvenile }
+        if progress >= 0.25 { return .fry }
+        return .egg
     }
 }

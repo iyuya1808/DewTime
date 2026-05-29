@@ -3,7 +3,7 @@ import SwiftUI
 struct DepartureConfirmView: View {
     let waterLevel: Double
     let isOnTime: Bool
-    let selectedSpecies: FlowerSpecies
+    let selectedSpecies: FishSpecies
     let waterAmount: Double
     let totalWaterBefore: Double
     let totalWaterAfter: Double
@@ -22,10 +22,8 @@ struct DepartureConfirmView: View {
 
             // メインメッセージ
             VStack(spacing: 12) {
-                Image(systemName: selectedSpecies.icon)
-                    .font(.system(size: 58, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(stageColor)
+                Text(selectedSpecies.emoji)
+                    .font(.system(size: 58))
                     .scaleEffect(emojiScale)
                     .animation(.spring(response: 0.4, dampingFraction: 0.5), value: emojiScale)
                     .onAppear {
@@ -56,7 +54,7 @@ struct DepartureConfirmView: View {
                     value: isOnTime ? "オンタイム" : "遅延あり",
                     label: "スケジュール",
                     icon: isOnTime ? "checkmark.circle.fill" : "exclamationmark.circle.fill",
-                    color: isOnTime ? .green : .orange
+                    color: isOnTime ? .teal : .orange
                 )
             }
             .padding(.horizontal, 24)
@@ -132,7 +130,7 @@ struct DepartureConfirmView: View {
     }
 
     private var headline: String {
-        if completesGrowth { return "\(selectedSpecies.displayName)が咲きそうです\n出発しますか？" }
+        if completesGrowth { return "\(selectedSpecies.displayName)が成魚になりそうです\n出発しますか？" }
         return "\(growthStage.message)\n出発しますか？"
     }
 
@@ -156,12 +154,12 @@ struct DepartureConfirmView: View {
             DepartureConfirmView(
                 waterLevel: 0.72,
                 isOnTime: true,
-                selectedSpecies: .sunflower,
+                selectedSpecies: .dolphin,
                 waterAmount: 72,
                 totalWaterBefore: 120,
                 totalWaterAfter: 192,
                 requiredTotalWater: 320,
-                growthStage: .leaves,
+                growthStage: .juvenile,
                 completesGrowth: false,
                 onConfirm: {},
                 onCancel: {}

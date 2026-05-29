@@ -1,11 +1,11 @@
 import SwiftUI
 import SwiftData
 
-struct MonthlyGardenView: View {
-    @Query(sort: \PlantWateringRecord.recordedAt, order: .reverse) private var records: [PlantWateringRecord]
+struct MonthlyAquariumView: View {
+    @Query(sort: \FishCareRecord.recordedAt, order: .reverse) private var records: [FishCareRecord]
 
     @State private var displayedMonth = Date()
-    @State private var selectedRecord: PlantWateringRecord?
+    @State private var selectedRecord: FishCareRecord?
 
     private let calendar = Calendar.current
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 7)
@@ -48,11 +48,11 @@ struct MonthlyGardenView: View {
         .navigationTitle("月間カレンダー")
         .navigationBarTitleDisplayMode(.inline)
         .background(
-            LinearGradient(colors: [.gardenTop, .gardenBottom], startPoint: .top, endPoint: .bottom)
+            LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
         )
         .sheet(item: $selectedRecord) { record in
-            WateringRecordDetailSheet(record: record)
+            FishCareDetailSheet(record: record)
                 .presentationDetents([.medium])
                 .presentationBackground(.clear)
                 .presentationDragIndicator(.hidden)
@@ -113,7 +113,7 @@ struct MonthlyGardenView: View {
         }
     }
 
-    private func dayCell(_ day: GardenCalendarDay) -> some View {
+    private func dayCell(_ day: AquariumCalendarDay) -> some View {
         Button {
             selectedRecord = day.record
         } label: {
@@ -126,10 +126,7 @@ struct MonthlyGardenView: View {
                 Spacer(minLength: 0)
 
                 if let record = day.record {
-                    Image(systemName: record.completedGrowth ? record.species.icon : record.growthStage.icon)
-                        .font(.system(size: 23, weight: .semibold))
-                        .foregroundStyle(recordColor(for: record))
-                        .symbolRenderingMode(.hierarchical)
+                    recordSymbol(for: record, size: 23)
                         .frame(height: 26)
 
                     HStack(spacing: 2) {
@@ -161,7 +158,7 @@ struct MonthlyGardenView: View {
             .overlay {
                 if day.isToday {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.green.opacity(0.7), lineWidth: 1.5)
+                        .strokeBorder(Color.teal.opacity(0.7), lineWidth: 1.5)
                 }
             }
             .overlay(alignment: .bottom) {
@@ -182,8 +179,8 @@ struct MonthlyGardenView: View {
         let records = recordsInDisplayedMonth
         return HStack(spacing: 8) {
             summaryCard(icon: "drop.fill", value: "\(Int(records.reduce(0) { $0 + $1.waterAmount }.rounded()))", label: "水やり", tint: .cyan)
-            summaryCard(icon: "leaf.fill", value: "\(records.count)", label: "記録", tint: .green)
-            summaryCard(icon: "sparkles", value: "\(records.filter(\.completedGrowth).count)", label: "開花", tint: .orange)
+            summaryCard(icon: "fish.fill", value: "\(records.count)", label: "記録", tint: .teal)
+            summaryCard(icon: "sparkles", value: "\(records.filter(\.completedGrowth).count)", label: "成魚", tint: .orange)
         }
     }
 
@@ -200,7 +197,7 @@ struct MonthlyGardenView: View {
                     icon: "chart.line.uptrend.xyaxis",
                     title: "平均進捗",
                     value: "\(Int((averageProgress(in: records) * 100).rounded()))%",
-                    tint: .green
+                    tint: .teal
                 )
             }
 
@@ -209,10 +206,7 @@ struct MonthlyGardenView: View {
                     selectedRecord = best
                 } label: {
                     HStack(spacing: 10) {
-                        Image(systemName: best.completedGrowth ? best.species.icon : best.growthStage.icon)
-                            .font(.title3)
-                            .foregroundStyle(recordColor(for: best))
-                            .symbolRenderingMode(.hierarchical)
+                        recordSymbol(for: best, size: 22)
                             .frame(width: 28)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("今月いちばん水を残した日")
@@ -250,10 +244,7 @@ struct MonthlyGardenView: View {
                             selectedRecord = record
                         } label: {
                             VStack(spacing: 6) {
-                                Image(systemName: record.completedGrowth ? record.species.icon : record.growthStage.icon)
-                                    .font(.system(size: 28, weight: .semibold))
-                                    .foregroundStyle(recordColor(for: record))
-                                    .symbolRenderingMode(.hierarchical)
+                                recordSymbol(for: record, size: 28)
                                 Text(record.recordedAt, format: .dateTime.day())
                                     .font(.caption2.weight(.semibold))
                                 Text("+\(Int(record.waterAmount.rounded()))pt")
@@ -276,7 +267,7 @@ struct MonthlyGardenView: View {
         VStack(spacing: 10) {
             Image(systemName: "calendar.badge.plus")
                 .font(.system(size: 38))
-                .foregroundStyle(.green)
+                .foregroundStyle(.teal)
             Text("この月はまだ静かです")
                 .font(.headline)
             Text("別の月へ移動するか、次の朝に水やり記録を残しましょう")
@@ -301,6 +292,20 @@ struct MonthlyGardenView: View {
         .padding(.vertical, 28)
         .padding(.horizontal)
         .background(.white.opacity(0.56), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    /// 成魚なら魚の絵文字、それ以外は成長段階の SF Symbol を表示する。
+    @ViewBuilder
+    private func recordSymbol(for record: FishCareRecord, size: CGFloat) -> some View {
+        if record.completedGrowth {
+            Text(record.species.emoji)
+                .font(.system(size: size))
+        } else {
+            Image(systemName: record.growthStage.icon)
+                .font(.system(size: size, weight: .semibold))
+                .foregroundStyle(recordColor(for: record))
+                .symbolRenderingMode(.hierarchical)
+        }
     }
 
     private func summaryCard(icon: String, value: String, label: String, tint: Color) -> some View {
@@ -339,7 +344,7 @@ struct MonthlyGardenView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private var calendarDays: [GardenCalendarDay] {
+    private var calendarDays: [AquariumCalendarDay] {
         guard let monthInterval = calendar.dateInterval(of: .month, for: displayedMonth),
               let firstWeek = calendar.dateInterval(of: .weekOfMonth, for: monthInterval.start),
               let lastWeek = calendar.dateInterval(of: .weekOfMonth, for: monthInterval.end.addingTimeInterval(-1))
@@ -354,7 +359,7 @@ struct MonthlyGardenView: View {
             guard let date = calendar.date(byAdding: .day, value: offset, to: firstWeek.start) else { return nil }
             let startOfDay = calendar.startOfDay(for: date)
             let dayRecords = recordsByDay[startOfDay] ?? []
-            return GardenCalendarDay(
+            return AquariumCalendarDay(
                 date: date,
                 isCurrentMonth: calendar.isDate(date, equalTo: displayedMonth, toGranularity: .month),
                 isToday: calendar.isDateInToday(date),
@@ -364,7 +369,7 @@ struct MonthlyGardenView: View {
         }
     }
 
-    private var recordsInDisplayedMonth: [PlantWateringRecord] {
+    private var recordsInDisplayedMonth: [FishCareRecord] {
         records
             .filter { calendar.isDate($0.recordedAt, equalTo: displayedMonth, toGranularity: .month) }
             .sorted { $0.recordedAt > $1.recordedAt }
@@ -374,16 +379,16 @@ struct MonthlyGardenView: View {
         displayedMonth = calendar.date(byAdding: .month, value: amount, to: displayedMonth) ?? displayedMonth
     }
 
-    private func recordColor(for record: PlantWateringRecord) -> Color {
+    private func recordColor(for record: FishCareRecord) -> Color {
         record.completedGrowth ? WaterLevelTheme(waterRatio: 1).tintColor : .orange
     }
 
-    private func averageProgress(in records: [PlantWateringRecord]) -> Double {
+    private func averageProgress(in records: [FishCareRecord]) -> Double {
         guard !records.isEmpty else { return 0 }
         return records.reduce(0.0) { $0 + $1.progress } / Double(records.count)
     }
 
-    private func longestStreak(in records: [PlantWateringRecord]) -> Int {
+    private func longestStreak(in records: [FishCareRecord]) -> Int {
         let days = Set(records.map { calendar.startOfDay(for: $0.recordedAt) }).sorted()
         guard !days.isEmpty else { return 0 }
 
@@ -403,11 +408,11 @@ struct MonthlyGardenView: View {
     }
 }
 
-private struct GardenCalendarDay: Identifiable {
+private struct AquariumCalendarDay: Identifiable {
     var date: Date
     var isCurrentMonth: Bool
     var isToday: Bool
-    var record: PlantWateringRecord?
+    var record: FishCareRecord?
     var recordCount: Int
 
     var id: Date { date }
@@ -415,7 +420,7 @@ private struct GardenCalendarDay: Identifiable {
 
 #Preview {
     NavigationStack {
-        MonthlyGardenView()
-            .modelContainer(for: [UserSchedule.self, RoutineItem.self, PlantFlower.self, ActivePlant.self, PlantWateringRecord.self], inMemory: true)
+        MonthlyAquariumView()
+            .modelContainer(for: [UserSchedule.self, RoutineItem.self, CollectedFish.self, ActiveFish.self, FishCareRecord.self, Aquarium.self], inMemory: true)
     }
 }
