@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class CollectedFish {
+final class PlantFlower {
     @Attribute(.unique) var id: UUID
     var name: String
     var speciesId: String

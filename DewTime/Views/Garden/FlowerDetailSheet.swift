@@ -1,7 +1,7 @@
 import SwiftUI
 
-struct FishDetailSheet: View {
-    let fish: CollectedFish
+struct FlowerDetailSheet: View {
+    let flower: PlantFlower
 
     @Environment(\.dismiss) private var dismiss
 
@@ -21,28 +21,29 @@ struct FishDetailSheet: View {
 
             ZStack {
                 Circle()
-                    .fill(fishColor.opacity(0.16))
+                    .fill(flowerColor.opacity(0.16))
                     .frame(width: 112, height: 112)
-                Text(fishEmoji)
-                    .font(.system(size: 58))
-                    .grayscale(fish.succeeded ? 0 : 1)
+                Image(systemName: flowerIcon)
+                    .font(.system(size: 58, weight: .semibold))
+                    .foregroundStyle(flowerColor)
+                    .symbolRenderingMode(.hierarchical)
             }
 
             VStack(spacing: 6) {
                 Text(speciesName)
                     .font(.title2.weight(.bold))
-                Text(fish.recordedAt, format: .dateTime.year().month().day().hour().minute())
+                Text(flower.recordedAt, format: .dateTime.year().month().day().hour().minute())
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             HStack(spacing: 10) {
-                detailMetric(icon: "drop.fill", value: "\(Int(fish.waterRatio * 100))%", label: "残水量", tint: fishColor)
+                detailMetric(icon: "drop.fill", value: "\(Int(flower.waterRatio * 100))%", label: "残水量", tint: flowerColor)
                 detailMetric(
-                    icon: fish.succeeded ? "checkmark.circle.fill" : "exclamationmark.circle.fill",
-                    value: fish.succeeded ? "成功" : "未達",
+                    icon: flower.succeeded ? "checkmark.circle.fill" : "exclamationmark.circle.fill",
+                    value: flower.succeeded ? "成功" : "未達",
                     label: "出発",
-                    tint: fish.succeeded ? .teal : .orange
+                    tint: flower.succeeded ? .green : .orange
                 )
             }
 
@@ -59,7 +60,7 @@ struct FishDetailSheet: View {
         .padding(.bottom, 24)
         .background(
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom))
+                .fill(LinearGradient(colors: [.gardenTop, .gardenBottom], startPoint: .top, endPoint: .bottom))
                 .ignoresSafeArea()
         )
     }
@@ -81,23 +82,24 @@ struct FishDetailSheet: View {
         .background(.white.opacity(0.62), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    private var fishEmoji: String {
-        FishSpecies(rawValue: fish.speciesId)?.emoji ?? "🐟"
+    private var flowerIcon: String {
+        if !flower.succeeded { return "leaf.fill" }
+        return FlowerSpecies(rawValue: flower.speciesId)?.icon ?? "sparkles"
     }
 
-    private var fishColor: Color {
-        if !fish.succeeded { return .gray }
-        return WaterLevelTheme(waterRatio: fish.waterRatio).tintColor
+    private var flowerColor: Color {
+        if !flower.succeeded { return .gray }
+        return WaterLevelTheme(waterRatio: flower.waterRatio).tintColor
     }
 
     private var speciesName: String {
-        FishSpecies(rawValue: fish.speciesId)?.displayName ?? fish.name
+        FlowerSpecies(rawValue: flower.speciesId)?.displayName ?? flower.name
     }
 
     private var message: String {
-        if fish.waterRatio >= 0.8 { return "たっぷり水が残った朝。元気いっぱいの魚に育ちました。" }
-        if fish.waterRatio >= 0.5 { return "いいペースで出発できました。水槽にもちゃんと潤いが残っています。" }
-        if fish.waterRatio >= 0.2 { return "少し慌ただしい朝でしたが、魚はきちんと育っています。" }
-        return "ぎりぎりの朝でした。次はもう少し水を残して育てましょう。"
+        if flower.waterRatio >= 0.8 { return "たっぷり水が残った朝。大きく明るい花が咲きました。" }
+        if flower.waterRatio >= 0.5 { return "いいペースで出発できました。庭にもちゃんと潤いが残っています。" }
+        if flower.waterRatio >= 0.2 { return "少し慌ただしい朝でしたが、芽はきちんと残っています。" }
+        return "ぎりぎりの朝でした。次はもう少し水を残して咲かせましょう。"
     }
 }

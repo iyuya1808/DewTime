@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class ActiveFish {
+final class ActivePlant {
     @Attribute(.unique) var id: UUID
     var speciesId: String
     var name: String
@@ -32,8 +32,8 @@ final class ActiveFish {
         self.isCompleted = isCompleted
     }
 
-    var species: FishSpecies {
-        FishSpecies(rawValue: speciesId) ?? .medaka
+    var species: FlowerSpecies {
+        FlowerSpecies(rawValue: speciesId) ?? .cactus
     }
 
     var progress: Double {

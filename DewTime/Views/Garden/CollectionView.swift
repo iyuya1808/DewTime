@@ -22,18 +22,18 @@ private enum SpeciesSortOrder: String, CaseIterable {
 }
 
 struct CollectionView: View {
-    @Query(sort: \CollectedFish.recordedAt, order: .reverse) private var collected: [CollectedFish]
+    @Query(sort: \PlantFlower.recordedAt, order: .reverse) private var flowers: [PlantFlower]
 
-    @State private var selectedSpecies: FishSpecies?
-    @State private var selectedFish: CollectedFish?
+    @State private var selectedSpecies: FlowerSpecies?
+    @State private var selectedFlower: PlantFlower?
     @State private var unlockFilter: UnlockFilter = .all
     @State private var difficultyFilter: DifficultyFilter = .all
     @State private var sortOrder: SpeciesSortOrder = .default
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 2)
 
-    private var filteredSpecies: [FishSpecies] {
-        var result = FishSpecies.allCases
+    private var filteredSpecies: [FlowerSpecies] {
+        var result = FlowerSpecies.allCases
 
         switch unlockFilter {
         case .all: break
@@ -93,8 +93,8 @@ struct CollectionView: View {
                         .animation(.spring(duration: 0.3), value: filteredSpecies.map(\.id))
                     }
 
-                    if !collected.isEmpty {
-                        latestFishes
+                    if !flowers.isEmpty {
+                        latestFlowers
                     }
                 }
                 .padding(.bottom, 24)
@@ -110,13 +110,13 @@ struct CollectionView: View {
                         }
                     } label: {
                         Label("並び替え", systemImage: sortOrder == .default ? "arrow.up.arrow.down" : "arrow.up.arrow.down.circle.fill")
-                            .foregroundStyle(sortOrder == .default ? Color.secondary : Color.teal)
+                            .foregroundStyle(sortOrder == .default ? Color.secondary : Color.green)
                     }
                 }
             }
             .background(
                 LinearGradient(
-                    colors: [.aquariumTop, .aquariumBottom],
+                    colors: [.gardenTop, .gardenBottom],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -126,11 +126,11 @@ struct CollectionView: View {
         .sheet(item: $selectedSpecies) { species in
             SpeciesDetailSheet(
                 species: species,
-                fishes: records(for: species),
-                onSelectFish: { fish in
+                flowers: records(for: species),
+                onSelectFlower: { flower in
                     selectedSpecies = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                        selectedFish = fish
+                        selectedFlower = flower
                     }
                 }
             )
@@ -138,8 +138,8 @@ struct CollectionView: View {
             .presentationBackground(.clear)
             .presentationDragIndicator(.hidden)
         }
-        .sheet(item: $selectedFish) { fish in
-            FishDetailSheet(fish: fish)
+        .sheet(item: $selectedFlower) { flower in
+            FlowerDetailSheet(flower: flower)
                 .presentationDetents([.medium])
                 .presentationBackground(.clear)
                 .presentationDragIndicator(.hidden)
@@ -199,7 +199,7 @@ struct CollectionView: View {
                         .padding(.vertical, 6)
                         .background(
                             isSelected
-                                ? AnyShapeStyle(Color.teal.opacity(0.85))
+                                ? AnyShapeStyle(Color.green.opacity(0.85))
                                 : AnyShapeStyle(.white.opacity(0.5)),
                             in: Capsule()
                         )
@@ -215,7 +215,7 @@ struct CollectionView: View {
             Image(systemName: "magnifyingglass")
                 .font(.title2)
                 .foregroundStyle(.secondary)
-            Text("条件に合う魚がいません")
+            Text("条件に合う植物がありません")
                 .font(.headline)
                 .foregroundStyle(.secondary)
             Button {
@@ -227,7 +227,7 @@ struct CollectionView: View {
             } label: {
                 Text("フィルターをリセット")
                     .font(.subheadline)
-                    .foregroundStyle(.teal)
+                    .foregroundStyle(.green)
             }
         }
         .frame(maxWidth: .infinity)
@@ -236,23 +236,23 @@ struct CollectionView: View {
 
     private var progressHeader: some View {
         let unlocked = unlockedSpeciesCount
-        let progress = Double(unlocked) / Double(max(FishSpecies.allCases.count, 1))
+        let progress = Double(unlocked) / Double(max(FlowerSpecies.allCases.count, 1))
 
         return VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(.teal.opacity(0.16))
+                        .fill(.green.opacity(0.16))
                     Image(systemName: "book.closed.fill")
                         .font(.title2)
-                        .foregroundStyle(.teal)
+                        .foregroundStyle(.green)
                 }
                 .frame(width: 52, height: 52)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("魚のコレクション")
+                    Text("花のコレクション")
                         .font(.title3.weight(.bold))
-                    Text("\(unlocked) / \(FishSpecies.allCases.count) 種を発見")
+                    Text("\(unlocked) / \(FlowerSpecies.allCases.count) 種を発見")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
@@ -266,7 +266,7 @@ struct CollectionView: View {
                     Capsule()
                         .fill(.white.opacity(0.45))
                     Capsule()
-                        .fill(LinearGradient(colors: [.teal, .cyan], startPoint: .leading, endPoint: .trailing))
+                        .fill(LinearGradient(colors: [.green, .cyan], startPoint: .leading, endPoint: .trailing))
                         .frame(width: geo.size.width * progress)
                 }
             }
@@ -276,7 +276,7 @@ struct CollectionView: View {
         .background(.white.opacity(0.66), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
-    private func speciesCard(_ species: FishSpecies) -> some View {
+    private func speciesCard(_ species: FlowerSpecies) -> some View {
         let records = records(for: species)
         let best = records.map(\.waterRatio).max() ?? 0
         let unlocked = !records.isEmpty
@@ -289,10 +289,10 @@ struct CollectionView: View {
                     ZStack {
                         Circle()
                             .fill((unlocked ? WaterLevelTheme(waterRatio: best).tintColor : Color.gray).opacity(0.14))
-                        Text(species.emoji)
-                            .font(.system(size: 32))
-                            .grayscale(unlocked ? 0 : 1)
-                            .opacity(unlocked ? 1 : 0.45)
+                        Image(systemName: species.icon)
+                            .font(.system(size: 32, weight: .semibold))
+                            .foregroundStyle(unlocked ? WaterLevelTheme(waterRatio: best).tintColor : Color.gray.opacity(0.45))
+                            .symbolRenderingMode(.hierarchical)
                     }
                     .frame(width: 58, height: 58)
 
@@ -301,7 +301,7 @@ struct CollectionView: View {
                     if unlocked {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.subheadline)
-                            .foregroundStyle(.teal)
+                            .foregroundStyle(.green)
                     } else {
                         Text(species.difficultyLabel)
                             .font(.caption2.weight(.semibold))
@@ -354,25 +354,26 @@ struct CollectionView: View {
         .buttonStyle(.plain)
     }
 
-    private var latestFishes: some View {
+    private var latestFlowers: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("最近育った魚")
+            Text("最近咲いた花")
                 .font(.headline)
                 .padding(.horizontal)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
-                    ForEach(Array(collected.prefix(16))) { fish in
+                    ForEach(Array(flowers.prefix(16))) { flower in
                         Button {
-                            selectedFish = fish
+                            selectedFlower = flower
                         } label: {
                             VStack(spacing: 6) {
-                                Text(emoji(for: fish))
-                                    .font(.system(size: 28))
-                                    .grayscale(fish.succeeded ? 0 : 1)
-                                Text(fish.recordedAt, format: .dateTime.month().day())
+                                Image(systemName: flowerIcon(for: flower))
+                                    .font(.system(size: 28, weight: .semibold))
+                                    .foregroundStyle(flowerColor(for: flower))
+                                    .symbolRenderingMode(.hierarchical)
+                                Text(flower.recordedAt, format: .dateTime.month().day())
                                     .font(.caption2.weight(.semibold))
-                                Text("\(Int(fish.waterRatio * 100))%")
+                                Text("\(Int(flower.waterRatio * 100))%")
                                     .font(.caption2.bold())
                                     .monospacedDigit()
                                     .foregroundStyle(.secondary)
@@ -389,22 +390,28 @@ struct CollectionView: View {
     }
 
     private var unlockedSpeciesCount: Int {
-        FishSpecies.allCases.filter { !records(for: $0).isEmpty }.count
+        FlowerSpecies.allCases.filter { !records(for: $0).isEmpty }.count
     }
 
-    private func records(for species: FishSpecies) -> [CollectedFish] {
-        collected.filter { $0.speciesId == species.rawValue && $0.succeeded }
+    private func records(for species: FlowerSpecies) -> [PlantFlower] {
+        flowers.filter { $0.speciesId == species.rawValue && $0.succeeded }
     }
 
-    private func emoji(for fish: CollectedFish) -> String {
-        FishSpecies(rawValue: fish.speciesId)?.emoji ?? "🐟"
+    private func flowerIcon(for flower: PlantFlower) -> String {
+        if !flower.succeeded { return "leaf.fill" }
+        return FlowerSpecies(rawValue: flower.speciesId)?.icon ?? "sparkles"
+    }
+
+    private func flowerColor(for flower: PlantFlower) -> Color {
+        if !flower.succeeded { return .gray }
+        return WaterLevelTheme(waterRatio: flower.waterRatio).tintColor
     }
 }
 
 private struct SpeciesDetailSheet: View {
-    let species: FishSpecies
-    let fishes: [CollectedFish]
-    let onSelectFish: (CollectedFish) -> Void
+    let species: FlowerSpecies
+    let flowers: [PlantFlower]
+    let onSelectFlower: (PlantFlower) -> Void
 
     @Environment(\.dismiss) private var dismiss
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
@@ -430,15 +437,15 @@ private struct SpeciesDetailSheet: View {
                 VStack(spacing: 20) {
                     header
 
-                    if fishes.isEmpty {
+                    if flowers.isEmpty {
                         lockedState
                     } else {
                         LazyVGrid(columns: columns, spacing: 10) {
-                            ForEach(fishes) { fish in
+                            ForEach(flowers) { flower in
                                 Button {
-                                    onSelectFish(fish)
+                                    onSelectFlower(flower)
                                 } label: {
-                                    fishTile(fish)
+                                    flowerTile(flower)
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -451,30 +458,30 @@ private struct SpeciesDetailSheet: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom))
+                .fill(LinearGradient(colors: [.gardenTop, .gardenBottom], startPoint: .top, endPoint: .bottom))
                 .ignoresSafeArea()
         )
     }
 
     private var header: some View {
-        let best = fishes.map(\.waterRatio).max() ?? 0
-        let unlocked = !fishes.isEmpty
+        let best = flowers.map(\.waterRatio).max() ?? 0
+        let unlocked = !flowers.isEmpty
 
         return VStack(spacing: 10) {
             ZStack {
                 Circle()
                     .fill((unlocked ? WaterLevelTheme(waterRatio: best).tintColor : Color.gray).opacity(0.14))
-                Text(species.emoji)
-                    .font(.system(size: 58))
-                    .grayscale(unlocked ? 0 : 1)
-                    .opacity(unlocked ? 1 : 0.4)
+                Image(systemName: species.icon)
+                    .font(.system(size: 58, weight: .semibold))
+                    .foregroundStyle(unlocked ? WaterLevelTheme(waterRatio: best).tintColor : Color.gray.opacity(0.4))
+                    .symbolRenderingMode(.hierarchical)
             }
             .frame(width: 112, height: 112)
 
             Text(species.displayName)
                 .font(.title2.weight(.bold))
                 .foregroundStyle(unlocked ? .primary : Color.gray.opacity(0.55))
-            Text(unlocked ? "\(fishes.count)回育てました / 最高 \(Int(best * 100))%" : "未発見")
+            Text(unlocked ? "\(flowers.count)回咲きました / 最高 \(Int(best * 100))%" : "未発見")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
@@ -543,13 +550,15 @@ private struct SpeciesDetailSheet: View {
         .background(.white.opacity(0.5), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    private func fishTile(_ fish: CollectedFish) -> some View {
+    private func flowerTile(_ flower: PlantFlower) -> some View {
         VStack(spacing: 6) {
-            Text(species.emoji)
-                .font(.system(size: 28))
-            Text(fish.recordedAt, format: .dateTime.month().day())
+            Image(systemName: species.icon)
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundStyle(WaterLevelTheme(waterRatio: flower.waterRatio).tintColor)
+                .symbolRenderingMode(.hierarchical)
+            Text(flower.recordedAt, format: .dateTime.month().day())
                 .font(.caption2.weight(.semibold))
-            Text("\(Int(fish.waterRatio * 100))%")
+            Text("\(Int(flower.waterRatio * 100))%")
                 .font(.caption2.bold())
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
@@ -562,5 +571,5 @@ private struct SpeciesDetailSheet: View {
 
 #Preview {
     CollectionView()
-        .modelContainer(for: [UserSchedule.self, RoutineItem.self, CollectedFish.self, ActiveFish.self, FishCareRecord.self, Aquarium.self], inMemory: true)
+        .modelContainer(for: [UserSchedule.self, RoutineItem.self, PlantFlower.self, ActivePlant.self, PlantWateringRecord.self], inMemory: true)
 }

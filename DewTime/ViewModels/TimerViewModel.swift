@@ -12,12 +12,12 @@ final class TimerViewModel {
     private(set) var finalWaterLevel: Double = 1.0
     private(set) var finalDelaySeconds: Int = 0
     private(set) var saveError: String?
-    private(set) var selectedSpecies: FishSpecies
-    private(set) var activeFish: ActiveFish?
+    private(set) var selectedSpecies: FlowerSpecies
+    private(set) var activePlant: ActivePlant?
     private(set) var finalWaterAmount: Double = 0
     private(set) var finalTotalWaterAfter: Double = 0
     private(set) var finalRequiredTotalWater: Double = 1
-    private(set) var finalGrowthStage: GrowthStage = .egg
+    private(set) var finalGrowthStage: GrowthStage = .seed
     private(set) var finalCompletedGrowth: Bool = false
 
     private var timer: Timer?
@@ -108,11 +108,11 @@ final class TimerViewModel {
     }
 
     var currentReceivedWater: Double {
-        activeFish?.receivedWater ?? 0
+        activePlant?.receivedWater ?? 0
     }
 
     var currentRequiredTotalWater: Double {
-        activeFish?.requiredTotalWater ?? Double(selectedSpecies.requiredTotalWaterRange.upperBound)
+        activePlant?.requiredTotalWater ?? Double(selectedSpecies.requiredTotalWaterRange.upperBound)
     }
 
     var currentGrowthProgress: Double {
@@ -133,8 +133,8 @@ final class TimerViewModel {
         GrowthStage.stage(for: projectedGrowthProgress)
     }
 
-    var hasActiveFish: Bool {
-        activeFish != nil
+    var hasActivePlant: Bool {
+        activePlant != nil
     }
 
     // MARK: - Formatted strings
@@ -177,13 +177,13 @@ final class TimerViewModel {
         finalWaterLevel = waterLevel
         finalDelaySeconds = overdueSeconds
         finalWaterAmount = currentWaterAmount
-        let fish = activeFish ?? createActiveFish(for: selectedSpecies, in: context)
-        let species = fish.species
-        let totalAfter = min(fish.requiredTotalWater, fish.receivedWater + finalWaterAmount)
-        let growthStage = GrowthStage.stage(for: totalAfter / fish.requiredTotalWater)
-        let completedGrowth = totalAfter >= fish.requiredTotalWater
+        let plant = activePlant ?? createActivePlant(for: selectedSpecies, in: context)
+        let species = plant.species
+        let totalAfter = min(plant.requiredTotalWater, plant.receivedWater + finalWaterAmount)
+        let growthStage = GrowthStage.stage(for: totalAfter / plant.requiredTotalWater)
+        let completedGrowth = totalAfter >= plant.requiredTotalWater
         finalTotalWaterAfter = totalAfter
-        finalRequiredTotalWater = fish.requiredTotalWater
+        finalRequiredTotalWater = plant.requiredTotalWater
         finalGrowthStage = growthStage
         finalCompletedGrowth = completedGrowth
 
@@ -193,40 +193,35 @@ final class TimerViewModel {
         NotificationScheduler.cancelAll()
         saveState()
 
-        fish.receivedWater = totalAfter
-        fish.lastWateredAt = .now
-        fish.isCompleted = completedGrowth
+        plant.receivedWater = totalAfter
+        plant.lastWateredAt = .now
+        plant.isCompleted = completedGrowth
 
-        let record = FishCareRecord(
+        let record = PlantWateringRecord(
             speciesId: species.rawValue,
             recordedAt: .now,
             waterAmount: finalWaterAmount,
             totalWaterAfter: totalAfter,
-            requiredTotalWater: fish.requiredTotalWater,
+            requiredTotalWater: plant.requiredTotalWater,
             growthStage: growthStage,
             completedGrowth: completedGrowth
         )
         context.insert(record)
 
-        // 出発時に水槽へ注いだ水を累積し、水槽を成長させる（ゲーム要素の土台）。
-        let aquarium = fetchOrCreateAquarium(in: context)
-        aquarium.totalWaterCollected += finalWaterAmount
-        aquarium.updatedAt = .now
-
         if completedGrowth {
-            let collected = CollectedFish(
+            let flower = PlantFlower(
                 name: species.displayName,
                 speciesId: species.rawValue,
                 recordedAt: .now,
                 succeeded: true,
                 waterRatio: 1.0
             )
-            context.insert(collected)
+            context.insert(flower)
         }
 
         do {
             try context.save()
-            activeFish = completedGrowth ? nil : fish
+            activePlant = completedGrowth ? nil : plant
         } catch {
             saveError = "記録の保存に失敗しました"
             print("[DewTime] 水やり記録の保存に失敗しました: \(error)")
@@ -241,9 +236,9 @@ final class TimerViewModel {
         finalWaterLevel = 1.0
         finalDelaySeconds = 0
         finalWaterAmount = 0
-        finalTotalWaterAfter = activeFish?.receivedWater ?? 0
-        finalRequiredTotalWater = activeFish?.requiredTotalWater ?? 1
-        finalGrowthStage = activeFish?.growthStage ?? .egg
+        finalTotalWaterAfter = activePlant?.receivedWater ?? 0
+        finalRequiredTotalWater = activePlant?.requiredTotalWater ?? 1
+        finalGrowthStage = activePlant?.growthStage ?? .seed
         finalCompletedGrowth = false
         now = .now
         clearState()
@@ -252,29 +247,29 @@ final class TimerViewModel {
 
     func clearError() { saveError = nil }
 
-    func selectSpecies(_ species: FishSpecies, context: ModelContext) {
+    func selectSpecies(_ species: FlowerSpecies, context: ModelContext) {
         guard !isRunning, !departed else { return }
         selectedSpecies = species
         UserDefaults.standard.set(species.rawValue, forKey: PKey.selectedSpecies.rawValue)
-        activeFish = createActiveFish(for: species, in: context)
+        activePlant = createActivePlant(for: species, in: context)
         do {
             try context.save()
         } catch {
-            saveError = "魚の準備に失敗しました"
-            print("[DewTime] ActiveFish の保存に失敗しました: \(error)")
+            saveError = "植物の準備に失敗しました"
+            print("[DewTime] ActivePlant の保存に失敗しました: \(error)")
         }
     }
 
-    func syncActiveFish(_ fishes: [ActiveFish]) {
-        if let fish = fishes
+    func syncActivePlant(_ plants: [ActivePlant]) {
+        if let plant = plants
             .filter({ !$0.isCompleted })
             .sorted(by: { $0.startedAt > $1.startedAt })
             .first {
-            activeFish = fish
-            selectedSpecies = fish.species
+            activePlant = plant
+            selectedSpecies = plant.species
             return
         }
-        activeFish = nil
+        activePlant = nil
     }
 
     func updateDepartureTime(_ newTime: Date) {
@@ -340,37 +335,28 @@ final class TimerViewModel {
 
     // MARK: - Private helpers
 
-    private static func restoreSelectedSpecies() -> FishSpecies {
+    private static func restoreSelectedSpecies() -> FlowerSpecies {
         guard let rawValue = UserDefaults.standard.string(forKey: PKey.selectedSpecies.rawValue),
-              let species = FishSpecies(rawValue: rawValue) else {
-            return .medaka
+              let species = FlowerSpecies(rawValue: rawValue) else {
+            return .cactus
         }
         return species
     }
 
-    private func createActiveFish(for species: FishSpecies, in context: ModelContext) -> ActiveFish {
-        if let activeFish, !activeFish.isCompleted, activeFish.species == species {
-            return activeFish
+    private func createActivePlant(for species: FlowerSpecies, in context: ModelContext) -> ActivePlant {
+        if let activePlant, !activePlant.isCompleted, activePlant.species == species {
+            return activePlant
         }
 
-        activeFish?.isCompleted = true
-        let fish = ActiveFish(
+        activePlant?.isCompleted = true
+        let plant = ActivePlant(
             speciesId: species.rawValue,
             name: species.displayName,
             requiredTotalWater: species.makeRequiredTotalWater()
         )
-        context.insert(fish)
-        activeFish = fish
-        return fish
-    }
-
-    private func fetchOrCreateAquarium(in context: ModelContext) -> Aquarium {
-        if let existing = try? context.fetch(FetchDescriptor<Aquarium>()).first {
-            return existing
-        }
-        let aquarium = Aquarium()
-        context.insert(aquarium)
-        return aquarium
+        context.insert(plant)
+        activePlant = plant
+        return plant
     }
 
     private func startTicker() {

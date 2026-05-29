@@ -8,7 +8,7 @@ struct DewTimeApp: App {
     init() {
         do {
             let container = try ModelContainer(
-                for: UserSchedule.self, RoutineItem.self, CollectedFish.self, ActiveFish.self, FishCareRecord.self, Aquarium.self
+                for: UserSchedule.self, RoutineItem.self, PlantFlower.self, ActivePlant.self, PlantWateringRecord.self
             )
             SampleData.seedIfNeeded(context: container.mainContext)
             self.container = container

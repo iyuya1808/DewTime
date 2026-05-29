@@ -6,7 +6,7 @@ struct DepartureResultView: View {
     let totalSeconds: Int
     let delaySeconds: Int
     let scheduleName: String
-    let selectedSpecies: FishSpecies
+    let selectedSpecies: FlowerSpecies
     let waterAmount: Double
     let totalWaterAfter: Double
     let requiredTotalWater: Double
@@ -15,7 +15,7 @@ struct DepartureResultView: View {
     let onDismiss: () -> Void
 
     @State private var waterFill: Double = 0
-    @State private var fishScale: CGFloat = 0
+    @State private var plantScale: CGFloat = 0
 
     var body: some View {
         ZStack {
@@ -40,15 +40,17 @@ struct DepartureResultView: View {
                                 .multilineTextAlignment(.center)
                         }
 
-                        // 魚プレビュー
+                        // 植物プレビュー
                         ZStack {
                             Circle()
-                                .fill(fishBgColor.opacity(0.18))
+                                .fill(plantBgColor.opacity(0.18))
                                 .frame(width: 120, height: 120)
-                            Text(selectedSpecies.emoji)
-                                .font(.system(size: 62))
-                                .scaleEffect(fishScale)
-                                .animation(.spring(response: 0.5, dampingFraction: 0.5).delay(0.3), value: fishScale)
+                            Image(systemName: selectedSpecies.icon)
+                                .font(.system(size: 62, weight: .semibold))
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundStyle(plantColor)
+                                .scaleEffect(plantScale)
+                                .animation(.spring(response: 0.5, dampingFraction: 0.5).delay(0.3), value: plantScale)
                         }
 
                         // 水量ゲージ
@@ -86,17 +88,17 @@ struct DepartureResultView: View {
                         .padding(.horizontal, 4)
 
                         HStack(spacing: 10) {
-                            fishMetric(
+                            plantMetric(
                                 icon: selectedSpecies.icon,
                                 value: "\(Int(totalWaterAfter.rounded()))/\(Int(requiredTotalWater.rounded()))pt",
                                 label: "合計水量",
-                                tint: fishColor
+                                tint: plantColor
                             )
-                            fishMetric(
+                            plantMetric(
                                 icon: growthStage.icon,
                                 value: growthStage.displayName,
                                 label: "成長段階",
-                                tint: fishColor
+                                tint: plantColor
                             )
                         }
 
@@ -114,7 +116,7 @@ struct DepartureResultView: View {
                         Button {
                             onDismiss()
                         } label: {
-                            Text("また明日！ 🐟")
+                            Text("また明日！ 🌱")
                                 .font(AppFont.actionButton)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 18)
@@ -135,7 +137,7 @@ struct DepartureResultView: View {
                 waterFill = waterLevel
             }
             withAnimation(.spring(response: 0.5, dampingFraction: 0.5).delay(0.3)) {
-                fishScale = 1.0
+                plantScale = 1.0
             }
         }
     }
@@ -186,7 +188,7 @@ struct DepartureResultView: View {
         .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    private func fishMetric(icon: String, value: String, label: String, tint: Color) -> some View {
+    private func plantMetric(icon: String, value: String, label: String, tint: Color) -> some View {
         VStack(spacing: 6) {
             Image(systemName: icon)
                 .font(.title3)
@@ -216,23 +218,23 @@ struct DepartureResultView: View {
     }
 
     private var resultTitle: String {
-        if completedGrowth { return "\(selectedSpecies.displayName)が成魚になりました！" }
+        if completedGrowth { return "\(selectedSpecies.displayName)が咲きました！" }
         return growthStage.message
     }
 
-    private var fishBgColor: Color {
-        completedGrowth ? fishColor : .orange
+    private var plantBgColor: Color {
+        completedGrowth ? plantColor : .orange
     }
 
     private var theme: WaterLevelTheme { WaterLevelTheme(waterRatio: waterLevel) }
     private var gaugeColors: [Color] { theme.gradientColors }
-    private var fishColor: Color { completedGrowth ? theme.tintColor : .orange }
+    private var plantColor: Color { completedGrowth ? theme.tintColor : .orange }
 
     private var background: some View { LinearGradient.dewTimeSheet }
 
     private var motivationMessage: String {
         if completedGrowth {
-            return "今回 +\(Int(waterAmount.rounded()))pt で必要水量に届きました。図鑑に成魚として登録されます。"
+            return "今回 +\(Int(waterAmount.rounded()))pt で必要水量に届きました。図鑑に開花として登録されます。"
         }
         return "今回 +\(Int(waterAmount.rounded()))pt。合計 \(Int(totalWaterAfter.rounded()))/\(Int(requiredTotalWater.rounded()))pt まで育ちました。"
     }
@@ -247,11 +249,11 @@ struct DepartureResultView: View {
                 totalSeconds: 1320,
                 delaySeconds: 0,
                 scheduleName: "平日通常モード",
-                selectedSpecies: .dolphin,
+                selectedSpecies: .tulip,
                 waterAmount: 72,
                 totalWaterAfter: 240,
                 requiredTotalWater: 240,
-                growthStage: .adult,
+                growthStage: .bloom,
                 completedGrowth: true,
                 onDismiss: {}
             )
