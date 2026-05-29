@@ -2,34 +2,34 @@ import SwiftUI
 import SwiftData
 
 enum AppTab: CaseIterable, Identifiable {
-    case timer, garden, collection, settings
+    case timer, collection, aquarium, profile
 
     var id: Self { self }
 
     var title: String {
         switch self {
-        case .timer:    return "タイマー"
-        case .garden:   return "お庭"
+        case .timer:      return "タイマー"
         case .collection: return "図鑑"
-        case .settings: return "設定"
+        case .aquarium:   return "水槽"
+        case .profile:    return "プロフィール"
         }
     }
 
     var icon: String {
         switch self {
-        case .timer:    return "drop.fill"
-        case .garden:   return "leaf.fill"
+        case .timer:      return "drop.fill"
         case .collection: return "book.closed.fill"
-        case .settings: return "gear"
+        case .aquarium:   return "fish.fill"
+        case .profile:    return "person.fill"
         }
     }
 
     @ViewBuilder var destination: some View {
         switch self {
-        case .timer:    TimerView()
-        case .garden:   GardenView()
+        case .timer:      TimerView()
         case .collection: CollectionView()
-        case .settings: SettingsView()
+        case .aquarium:   LiveAquariumView()
+        case .profile:    ProfileView()
         }
     }
 }
@@ -47,5 +47,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [UserSchedule.self, RoutineItem.self, PlantFlower.self, ActivePlant.self, PlantWateringRecord.self], inMemory: true)
+        .modelContainer(for: [UserSchedule.self, RoutineItem.self, CollectedFish.self, ActiveFish.self, FishCareRecord.self, Aquarium.self], inMemory: true)
 }
