@@ -42,7 +42,11 @@ final class Aquarium {
 
     /// 水槽サイズ段階の表示名（暫定）。
     var sizeName: String {
-        switch sizeTier {
+        Self.sizeName(for: sizeTier)
+    }
+
+    static func sizeName(for tier: Int) -> String {
+        switch tier {
         case 0: return "ミニ水槽"
         case 1: return "小型水槽"
         case 2: return "中型水槽"

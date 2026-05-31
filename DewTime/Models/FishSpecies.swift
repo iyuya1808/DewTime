@@ -119,4 +119,32 @@ enum FishSpecies: String, CaseIterable, Identifiable {
         default: return "超むずかしい"
         }
     }
+
+    /// 飼育に必要な水槽サイズ段階。水槽が育つほど大型の魚が選べる。
+    var requiredAquariumTier: Int {
+        switch self {
+        case .medaka, .guppy, .shrimp:
+            return 0
+        case .pufferfish, .crab, .turtle:
+            return 1
+        case .squid, .octopus, .lobster:
+            return 2
+        case .jellyfish, .seal:
+            return 3
+        case .dolphin, .shark:
+            return 4
+        case .whale:
+            return 5
+        case .whaleShark:
+            return 6
+        }
+    }
+
+    var requiredAquariumName: String {
+        Aquarium.sizeName(for: requiredAquariumTier)
+    }
+
+    func isUnlocked(aquariumTier: Int) -> Bool {
+        aquariumTier >= requiredAquariumTier
+    }
 }

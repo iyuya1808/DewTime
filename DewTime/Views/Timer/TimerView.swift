@@ -6,6 +6,7 @@ struct TimerView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Query private var schedules: [UserSchedule]
     @Query(sort: \ActiveFish.startedAt, order: .reverse) private var activeFishes: [ActiveFish]
+    @Query private var aquariums: [Aquarium]
 
     @State private var viewModel: TimerViewModel?
     @State private var showConfirm = false
@@ -88,6 +89,11 @@ struct TimerView: View {
                 StartSheet(
                     scheduleName: vm.schedule.name,
                     currentTime: vm.schedule.targetDepartureTime,
+                    selectedSpecies: vm.selectedSpecies,
+                    aquariumTier: currentAquariumTier,
+                    onSelectSpecies: { species in
+                        vm.selectSpecies(species, context: modelContext)
+                    },
                     onStart: { newTime in
                         vm.updateDepartureTime(newTime)
                         try? modelContext.save()
@@ -131,6 +137,7 @@ struct TimerView: View {
             if let vm = viewModel {
                 FishPickerSheet(
                     selectedSpecies: vm.selectedSpecies,
+                    aquariumTier: currentAquariumTier,
                     onSelect: { species in
                         vm.selectSpecies(species, context: modelContext)
                         showFishPicker = false
@@ -158,39 +165,11 @@ struct TimerView: View {
             .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // トップ: 出発時刻カード or コンパクトヘッダー
-                Group {
-                    if !vm.isRunning && !vm.departed {
-                        VStack(spacing: 12) {
-                            departureCard(vm: vm)
-                            fishSelectionCard(vm: vm, isEditable: true)
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 20)
-                    } else {
-                        VStack(spacing: 10) {
-                            compactDepartureHeader(vm: vm)
-                            fishSelectionCard(vm: vm, isEditable: false)
-                                .padding(.horizontal, 24)
-                        }
-                        .padding(.top, 16)
-                    }
-                }
+                Spacer(minLength: 72)
 
-                Spacer()
-
-                // センター: カウントダウン + %
                 centerInfoDisplay(vm: vm)
 
                 Spacer()
-
-                // ボトム: ステータス + ボタン
-                currentTaskPanel(vm: vm)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 12)
-
-                statusLabel(vm: vm)
-                    .padding(.bottom, 12)
 
                 actionButton(vm: vm)
                     .padding(.horizontal, 28)
@@ -569,14 +548,19 @@ struct TimerView: View {
         UserSchedule.active(in: schedules)
     }
 
+    private var currentAquariumTier: Int {
+        aquariums.first?.sizeTier ?? 0
+    }
+
     private func ensureViewModel() {
         guard viewModel == nil, let schedule = activeSchedule else { return }
         viewModel = TimerViewModel(schedule: schedule)
     }
 }
 
-private struct FishPickerSheet: View {
+struct FishPickerSheet: View {
     let selectedSpecies: FishSpecies
+    let aquariumTier: Int
     let onSelect: (FishSpecies) -> Void
 
     var body: some View {
@@ -639,12 +623,14 @@ private struct FishPickerSheet: View {
                 ScrollView {
                     VStack(spacing: 8) {
                         ForEach(FishSpecies.allCases.sorted { $0.requiredTotalWaterRange.lowerBound < $1.requiredTotalWaterRange.lowerBound }) { species in
+                            let isUnlocked = species.isUnlocked(aquariumTier: aquariumTier)
                             Button {
-                                onSelect(species)
+                                if isUnlocked { onSelect(species) }
                             } label: {
-                                fishRow(species)
+                                fishRow(species, isUnlocked: isUnlocked)
                             }
                             .buttonStyle(.plain)
+                            .disabled(!isUnlocked)
                         }
                     }
                     .padding(.horizontal, 20)
@@ -665,14 +651,14 @@ private struct FishPickerSheet: View {
         }
     }
 
-    private func fishRow(_ species: FishSpecies) -> some View {
+    private func fishRow(_ species: FishSpecies, isUnlocked: Bool) -> some View {
         let isSelected = selectedSpecies == species
         let accent = isSelected ? Color.dewBlue : speciesAccentColor(species)
 
         return HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(accent.opacity(0.18))
+                    .fill(accent.opacity(isUnlocked ? 0.18 : 0.08))
                     .frame(width: 52, height: 52)
                 if isSelected {
                     Circle()
@@ -681,19 +667,21 @@ private struct FishPickerSheet: View {
                 }
                 Text(species.emoji)
                     .font(.system(size: 26))
+                    .opacity(isUnlocked ? 1 : 0.35)
             }
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(species.displayName)
                     .font(.headline.weight(.semibold))
+                    .foregroundStyle(isUnlocked ? .white : .white.opacity(0.45))
                 HStack(spacing: 6) {
                     Text(species.difficultyLabel)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(accent)
+                        .foregroundStyle(isUnlocked ? accent : .white.opacity(0.38))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
-                        .background(accent.opacity(0.15), in: Capsule())
-                    Text(species.requiredTotalWaterRangeText)
+                        .background((isUnlocked ? accent.opacity(0.15) : .white.opacity(0.07)), in: Capsule())
+                    Text(isUnlocked ? species.requiredTotalWaterRangeText : "\(species.requiredAquariumName)で解放")
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.42))
                 }
@@ -701,9 +689,9 @@ private struct FishPickerSheet: View {
 
             Spacer()
 
-            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+            Image(systemName: isUnlocked ? (isSelected ? "checkmark.circle.fill" : "circle") : "lock.fill")
                 .font(.title3)
-                .foregroundStyle(isSelected ? accent : .white.opacity(0.22))
+                .foregroundStyle(isSelected ? accent : .white.opacity(isUnlocked ? 0.22 : 0.34))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)

@@ -10,11 +10,15 @@ struct StartSheet: View {
     // MARK: - Props
     let scheduleName: String
     let currentTime: Date
+    let aquariumTier: Int
+    let onSelectSpecies: (FishSpecies) -> Void
     let onStart: (Date) -> Void
     let onCancel: () -> Void
 
     // MARK: - State
     @State private var selectedTime: Date
+    @State private var selectedSpecies: FishSpecies
+    @State private var showFishPicker = false
     @State private var selectedChip: Int?         // 選択中のクイックオフセット(分)
     @State private var suppressChipClear = false  // チップ変更によるpicker更新でチップ選択を消さないフラグ
     @State private var appear = false             // 入場アニメ用
@@ -28,14 +32,20 @@ struct StartSheet: View {
     init(
         scheduleName: String,
         currentTime: Date,
+        selectedSpecies: FishSpecies,
+        aquariumTier: Int,
+        onSelectSpecies: @escaping (FishSpecies) -> Void,
         onStart: @escaping (Date) -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.scheduleName = scheduleName
         self.currentTime = currentTime
+        self.aquariumTier = aquariumTier
+        self.onSelectSpecies = onSelectSpecies
         self.onStart = onStart
         self.onCancel = onCancel
         _selectedTime = State(initialValue: currentTime)
+        _selectedSpecies = State(initialValue: selectedSpecies)
     }
 
     // MARK: - Derived
@@ -70,9 +80,15 @@ struct StartSheet: View {
                     .opacity(appear ? 1 : 0)
                     .offset(y: appear ? 0 : 12)
 
+                fishSelectionSection
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
+                    .opacity(appear ? 1 : 0)
+                    .offset(y: appear ? 0 : 14)
+
                 quickChipsSection
                     .padding(.horizontal, 24)
-                    .padding(.top, 26)
+                    .padding(.top, 18)
                     .opacity(appear ? 1 : 0)
                     .offset(y: appear ? 0 : 16)
 
@@ -103,6 +119,20 @@ struct StartSheet: View {
         .onChange(of: selectedTime) { _, _ in
             guard !suppressChipClear else { return }
             selectedChip = nil
+        }
+        .sheet(isPresented: $showFishPicker) {
+            FishPickerSheet(
+                selectedSpecies: selectedSpecies,
+                aquariumTier: aquariumTier,
+                onSelect: { species in
+                    selectedSpecies = species
+                    onSelectSpecies(species)
+                    showFishPicker = false
+                }
+            )
+            .presentationDetents([.fraction(0.72), .large])
+            .presentationBackground(.clear)
+            .presentationDragIndicator(.hidden)
         }
     }
 
@@ -245,6 +275,61 @@ struct StartSheet: View {
         .background(tint.opacity(0.20), in: Capsule())
         .overlay(Capsule().strokeBorder(tint.opacity(0.60), lineWidth: 1.5))
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: minutesFromNow)
+    }
+
+    // MARK: - Fish Selection
+    private var fishSelectionSection: some View {
+        Button {
+            showFishPicker = true
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(speciesAccentColor(selectedSpecies).opacity(0.18))
+                    Text(selectedSpecies.emoji)
+                        .font(.system(size: 26))
+                }
+                .frame(width: 48, height: 48)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("今日育てる魚")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.52))
+                    Text(selectedSpecies.displayName)
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.white)
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(selectedSpecies.requiredTotalWaterRangeText)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.58))
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white.opacity(0.38))
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func speciesAccentColor(_ species: FishSpecies) -> Color {
+        switch species.difficultyLabel {
+        case "かんたん":   return Color(hex: "#4ADE80")
+        case "やさしい":   return Color(hex: "#34D399")
+        case "ふつう":     return Color(hex: "#60A5FA")
+        case "むずかしい": return Color(hex: "#A78BFA")
+        default:           return Color(hex: "#F472B6")
+        }
     }
 
     // MARK: - Quick Chips
@@ -433,6 +518,9 @@ struct StartSheet: View {
     StartSheet(
         scheduleName: "朝の通勤",
         currentTime: Calendar.current.date(bySettingHour: 8, minute: 0, second: 0, of: .now)!,
+        selectedSpecies: .medaka,
+        aquariumTier: 0,
+        onSelectSpecies: { _ in },
         onStart: { _ in },
         onCancel: {}
     )

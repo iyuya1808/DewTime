@@ -21,11 +21,15 @@ final class TimerViewModel {
     private(set) var finalCompletedGrowth: Bool = false
 
     private var timer: Timer?
+    private var lastRoutineItemID: UUID?
+    private var didPlayOverdueWarning = false
 
     init(schedule: UserSchedule) {
         self.schedule = schedule
         self.selectedSpecies = Self.restoreSelectedSpecies()
         restoreState()
+        lastRoutineItemID = currentRoutineItem?.id
+        didPlayOverdueWarning = isOverdue
     }
 
     // MARK: - Derived state
@@ -167,6 +171,9 @@ final class TimerViewModel {
         guard startedAt == nil else { return }
         startedAt = .now
         now = .now
+        lastRoutineItemID = currentRoutineItem?.id
+        didPlayOverdueWarning = isOverdue
+        ScheduleHaptics.prepare()
         startTicker()
         saveState()
         NotificationScheduler.schedule(departureAt: schedule.targetDepartureTime, scheduleName: schedule.name)
@@ -246,6 +253,8 @@ final class TimerViewModel {
         finalGrowthStage = activeFish?.growthStage ?? .egg
         finalCompletedGrowth = false
         now = .now
+        lastRoutineItemID = nil
+        didPlayOverdueWarning = false
         clearState()
         NotificationScheduler.cancelAll()
     }
@@ -287,6 +296,7 @@ final class TimerViewModel {
     func resume() {
         guard startedAt != nil, !departed else { return }
         now = .now
+        handleScheduleKnocks()
         if timer == nil { startTicker() }
     }
 
@@ -376,8 +386,27 @@ final class TimerViewModel {
     private func startTicker() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.now = .now }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.now = .now
+                self.handleScheduleKnocks()
+            }
         }
         RunLoop.main.add(timer!, forMode: .common)
+    }
+
+    private func handleScheduleKnocks() {
+        guard isRunning else { return }
+
+        let currentID = currentRoutineItem?.id
+        if let currentID, let lastRoutineItemID, currentID != lastRoutineItemID {
+            ScheduleHaptics.playPhaseKnock()
+        }
+        lastRoutineItemID = currentID
+
+        if isOverdue, !didPlayOverdueWarning {
+            didPlayOverdueWarning = true
+            ScheduleHaptics.playOverdueWarning()
+        }
     }
 }
