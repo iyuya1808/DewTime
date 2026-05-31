@@ -58,6 +58,30 @@ struct DewTimeTests {
         #expect(GrowthStage.stage(for: 1.0) == .adult)
     }
 
+    @Test func defaultDepartureTimeStartsFifteenMinutesFromNextMinute() async throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = try #require(calendar.date(from: DateComponents(
+            year: 2026,
+            month: 5,
+            day: 31,
+            hour: 10,
+            minute: 7,
+            second: 34
+        )))
+
+        let result = DepartureTimeDefaults.fifteenMinutesFromNow(now: now, calendar: calendar)
+        let expected = try #require(calendar.date(from: DateComponents(
+            year: 2026,
+            month: 5,
+            day: 31,
+            hour: 10,
+            minute: 23,
+            second: 0
+        )))
+
+        #expect(result == expected)
+    }
+
     @MainActor
     @Test func timerViewModelCreatesAndPersistsSelectedSpecies() async throws {
         UserDefaults.standard.removeObject(forKey: "dew.timer.selectedSpecies")

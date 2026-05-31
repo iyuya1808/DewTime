@@ -7,15 +7,9 @@ enum SampleData {
         let existing = (try? context.fetch(descriptor)) ?? []
         guard existing.isEmpty else { return }
 
-        let calendar = Calendar.current
-        var components = calendar.dateComponents([.year, .month, .day], from: .now)
-        components.hour = 8
-        components.minute = 0
-        let departureTime = calendar.date(from: components) ?? .now
-
         let schedule = UserSchedule(
             name: "平日通常モード",
-            targetDepartureTime: departureTime,
+            targetDepartureTime: DepartureTimeDefaults.fifteenMinutesFromNow(),
             isActive: true
         )
         context.insert(schedule)

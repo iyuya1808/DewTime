@@ -139,9 +139,7 @@ struct SettingsView: View {
     }
 
     private func defaultTime() -> Date {
-        var c = Calendar.current.dateComponents([.year, .month, .day], from: .now)
-        c.hour = 8; c.minute = 0
-        return Calendar.current.date(from: c) ?? .now
+        DepartureTimeDefaults.fifteenMinutesFromNow()
     }
 }
 

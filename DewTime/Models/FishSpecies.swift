@@ -110,6 +110,15 @@ enum FishSpecies: String, CaseIterable, Identifiable {
         "\(requiredTotalWaterRange.lowerBound)-\(requiredTotalWaterRange.upperBound)pt"
     }
 
+    var averageRequiredTotalWater: Double {
+        Double(requiredTotalWaterRange.lowerBound + requiredTotalWaterRange.upperBound) / 2
+    }
+
+    func targetWaterAmount(for stage: GrowthStage, requiredTotalWater: Double? = nil) -> Double {
+        let total = requiredTotalWater ?? averageRequiredTotalWater
+        return total * stage.thresholdProgress
+    }
+
     var difficultyLabel: String {
         switch requiredWaterRatio {
         case ..<0.25: return "かんたん"

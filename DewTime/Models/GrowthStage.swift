@@ -5,6 +5,15 @@ enum GrowthStage: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var thresholdProgress: Double {
+        switch self {
+        case .egg: return 0.0
+        case .fry: return 0.25
+        case .juvenile: return 0.55
+        case .adult: return 1.0
+        }
+    }
+
     var displayName: String {
         switch self {
         case .egg: return "卵"
@@ -37,5 +46,9 @@ enum GrowthStage: String, CaseIterable, Identifiable {
         if progress >= 0.55 { return .juvenile }
         if progress >= 0.25 { return .fry }
         return .egg
+    }
+
+    static func nextStage(after progress: Double) -> GrowthStage? {
+        allCases.first { $0.thresholdProgress > progress }
     }
 }

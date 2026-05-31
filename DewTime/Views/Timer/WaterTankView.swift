@@ -37,27 +37,26 @@ struct WaterTankView: View {
             TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
                 Canvas { context, size in
                     let level = max(0, min(1, waterLevel))
-                    let waterTop = max(size.height * 0.015, size.height * (1 - level))
+                    let visualLevel = level * 0.95
                     let time = timeline.date.timeIntervalSinceReferenceDate
                     let colors = tankColors
-                    let tilt = TankTilt(
+                    let surface = TankSurface(
                         gravity: motion.gravity,
                         size: size,
-                        waterLevel: level
+                        waterLevel: visualLevel
                     )
 
                     drawWaterBody(
                         context: context,
                         size: size,
-                        waterTop: waterTop,
-                        level: level,
+                        level: visualLevel,
                         time: time,
                         colors: colors,
-                        tilt: tilt
+                        surface: surface
                     )
-                    drawCaustics(context: context, size: size, waterTop: waterTop, time: time, tilt: tilt)
-                    drawBubbles(context: context, size: size, waterTop: waterTop, level: level, time: time, tilt: tilt)
-                    drawFoam(context: context, size: size, waterTop: waterTop, level: level, time: time, tilt: tilt)
+                    drawCaustics(context: context, size: size, time: time, surface: surface)
+                    drawBubbles(context: context, size: size, level: visualLevel, time: time, surface: surface)
+                    drawFoam(context: context, size: size, level: visualLevel, time: time, surface: surface)
                     drawGlassShine(context: context, size: size)
                 }
             }
@@ -97,37 +96,19 @@ struct WaterTankView: View {
         )
     }
 
-    private func waveY(
-        x: CGFloat,
-        waterTop: CGFloat,
-        width: CGFloat,
-        amplitude: CGFloat,
-        time: TimeInterval,
-        tilt: TankTilt
-    ) -> CGFloat {
-        let primary = sin((x / max(width, 1)) * .pi * 2.1 + time * 1.45)
-        let secondary = sin((x / max(width, 1)) * .pi * 5.4 - time * 1.0)
-        return waterTop + tilt.surfaceOffset(x: x) - amplitude * primary - amplitude * 0.38 * secondary
-    }
-
-    private func waterPath(size: CGSize, waterTop: CGFloat, level: Double, time: TimeInterval, tilt: TankTilt) -> Path {
+    private func waterPath(size: CGSize, level: Double, time: TimeInterval, surface: TankSurface) -> Path {
         var path = Path()
-        let amplitude = max(2, min(18, size.height * 0.025) * CGFloat(level))
-        path.move(to: CGPoint(x: 0, y: waveY(x: 0, waterTop: waterTop, width: size.width, amplitude: amplitude, time: time, tilt: tilt)))
+        let samples = surface.sampledSurface(level: level, time: time)
+        guard let first = samples.first, let last = samples.last else { return path }
 
-        var x: CGFloat = 0
-        while x <= size.width {
-            path.addLine(
-                to: CGPoint(
-                    x: x,
-                    y: waveY(x: x, waterTop: waterTop, width: size.width, amplitude: amplitude, time: time, tilt: tilt)
-                )
-            )
-            x += 4
+        path.move(to: first)
+        for point in samples.dropFirst() {
+            path.addLine(to: point)
         }
 
-        path.addLine(to: CGPoint(x: size.width, y: size.height))
-        path.addLine(to: CGPoint(x: 0, y: size.height))
+        let far = surface.down * (surface.extent * 2.4)
+        path.addLine(to: last + far)
+        path.addLine(to: first + far)
         path.closeSubpath()
         return path
     }
@@ -135,21 +116,20 @@ struct WaterTankView: View {
     private func drawWaterBody(
         context: GraphicsContext,
         size: CGSize,
-        waterTop: CGFloat,
         level: Double,
         time: TimeInterval,
         colors: (top: Color, middle: Color, bottom: Color, glow: Color),
-        tilt: TankTilt
+        surface: TankSurface
     ) {
-        let path = waterPath(size: size, waterTop: waterTop, level: level, time: time, tilt: tilt)
-        let leftSurface = waterTop + tilt.surfaceOffset(x: 0)
-        let rightSurface = waterTop + tilt.surfaceOffset(x: size.width)
+        let path = waterPath(size: size, level: level, time: time, surface: surface)
+        let surfaceCenter = surface.centerPoint
+        let deepPoint = surfaceCenter + surface.down * surface.extent
         context.fill(
             path,
             with: .linearGradient(
                 Gradient(colors: [colors.top.opacity(0.94), colors.middle.opacity(0.92), colors.bottom]),
-                startPoint: CGPoint(x: size.width / 2, y: min(leftSurface, rightSurface)),
-                endPoint: CGPoint(x: size.width / 2, y: size.height)
+                startPoint: surfaceCenter,
+                endPoint: deepPoint
             )
         )
 
@@ -157,68 +137,69 @@ struct WaterTankView: View {
         glowContext.clip(to: path)
         glowContext.fill(
             Path(ellipseIn: CGRect(
-                x: -size.width * 0.18,
-                y: waterTop - size.height * 0.08,
+                x: surfaceCenter.x - size.width * 0.68,
+                y: surfaceCenter.y - size.height * 0.18,
                 width: size.width * 1.36,
-                height: size.height * 0.35
+                height: size.height * 0.36
             )),
             with: .color(colors.glow.opacity(0.16))
         )
     }
 
-    private func drawFoam(context: GraphicsContext, size: CGSize, waterTop: CGFloat, level: Double, time: TimeInterval, tilt: TankTilt) {
+    private func drawFoam(context: GraphicsContext, size: CGSize, level: Double, time: TimeInterval, surface: TankSurface) {
         guard level > 0.02 else { return }
-        let amplitude = max(2, min(18, size.height * 0.025) * CGFloat(level))
+        let samples = surface.sampledSurface(level: level, time: time)
+        guard let first = samples.first else { return }
+
         var highlight = Path()
         var shadow = Path()
+        highlight.move(to: first)
+        shadow.move(to: first + surface.down * 8)
 
-        var x: CGFloat = 0
-        highlight.move(to: CGPoint(x: 0, y: waveY(x: 0, waterTop: waterTop, width: size.width, amplitude: amplitude, time: time, tilt: tilt)))
-        shadow.move(to: CGPoint(x: 0, y: waveY(x: 0, waterTop: waterTop + 8, width: size.width, amplitude: amplitude * 0.7, time: time + 0.8, tilt: tilt)))
-
-        while x <= size.width {
-            highlight.addLine(to: CGPoint(x: x, y: waveY(x: x, waterTop: waterTop, width: size.width, amplitude: amplitude, time: time, tilt: tilt)))
-            shadow.addLine(to: CGPoint(x: x, y: waveY(x: x, waterTop: waterTop + 8, width: size.width, amplitude: amplitude * 0.7, time: time + 0.8, tilt: tilt)))
-            x += 4
+        for point in samples.dropFirst() {
+            highlight.addLine(to: point)
+            shadow.addLine(to: point + surface.down * 8)
         }
 
         context.stroke(highlight, with: .color(.white.opacity(0.62)), lineWidth: max(2, size.height * 0.004))
         context.stroke(shadow, with: .color(.white.opacity(0.18)), lineWidth: max(1, size.height * 0.002))
     }
 
-    private func drawCaustics(context: GraphicsContext, size: CGSize, waterTop: CGFloat, time: TimeInterval, tilt: TankTilt) {
+    private func drawCaustics(context: GraphicsContext, size: CGSize, time: TimeInterval, surface: TankSurface) {
         let lineCount = 9
         for index in 0..<lineCount {
             let progress = CGFloat(index) / CGFloat(max(1, lineCount - 1))
-            let y = waterTop + tilt.surfaceOffset(x: size.width * 0.5) + 36 + progress * max(0, size.height - waterTop - 60)
+            let distance = 36 + progress * max(40, surface.extent * 0.55)
+            let center = surface.centerPoint + surface.down * distance
             var path = Path()
-            var x: CGFloat = -40
-            path.move(to: CGPoint(x: x, y: y))
-            while x <= size.width + 40 {
-                let drift = sin(x / 34 + time * 0.8 + Double(index)) * 8
-                path.addLine(to: CGPoint(x: x, y: y + CGFloat(drift)))
-                x += 18
+            var s = -surface.extent
+            let start = center + surface.tangent * s
+            path.move(to: start)
+            while s <= surface.extent {
+                let drift = CGFloat(sin(Double(s / 34) + time * 0.8 + Double(index))) * 8
+                path.addLine(to: center + surface.tangent * s + surface.down * drift)
+                s += 18
             }
             context.stroke(path, with: .color(.white.opacity(0.035 + Double(progress) * 0.025)), lineWidth: 1.2)
         }
     }
 
-    private func drawBubbles(context: GraphicsContext, size: CGSize, waterTop: CGFloat, level: Double, time: TimeInterval, tilt: TankTilt) {
+    private func drawBubbles(context: GraphicsContext, size: CGSize, level: Double, time: TimeInterval, surface: TankSurface) {
         guard level > 0.06 else { return }
         let count = 26
-        let waterHeight = max(1, size.height - waterTop)
+        let depthLimit = surface.extent * 0.95
 
         for index in 0..<count {
             let seed = CGFloat(index)
-            let xBase = CGFloat((index * 47) % max(1, Int(size.width)))
+            let sBase = -surface.extent * 0.76 + CGFloat((index * 47) % 100) / 100 * surface.extent * 1.52
             let cycle = CGFloat((time * (0.08 + Double(index % 5) * 0.018)).truncatingRemainder(dividingBy: 1))
-            let y = size.height - cycle * waterHeight
+            let depth = max(10, (1 - cycle) * depthLimit)
             let sway = sin(CGFloat(time) * (0.7 + seed * 0.03) + seed) * (8 + seed.truncatingRemainder(dividingBy: 9))
-            let x = xBase + sway - tilt.normalizedX * cycle * size.width * 0.22
+            let point = surface.pointOnSurface(s: sBase + sway, level: level, time: time, base: surface.centerPoint) + surface.down * depth
             let radius = CGFloat(2 + (index % 5)) * (size.width > 220 ? 1.0 : 0.75)
 
-            guard y > waterTop + tilt.surfaceOffset(x: x) + radius, x > -radius, x < size.width + radius else { continue }
-            let rect = CGRect(x: x - radius, y: y - radius, width: radius * 2, height: radius * 2)
+            guard point.x > -radius, point.x < size.width + radius, point.y > -radius, point.y < size.height + radius else { continue }
+            let rect = CGRect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2)
             context.stroke(Path(ellipseIn: rect), with: .color(.white.opacity(0.16)), lineWidth: 1)
             context.fill(Path(ellipseIn: rect.insetBy(dx: radius * 0.62, dy: radius * 0.62)), with: .color(.white.opacity(0.22)))
         }
@@ -239,27 +220,150 @@ struct WaterTankView: View {
     }
 }
 
-private struct TankTilt {
+private struct TankSurface {
     let gravity: CGVector
     let size: CGSize
     let waterLevel: Double
 
-    var normalizedX: CGFloat {
-        let screenDown = max(0.30, abs(gravity.dy))
-        return max(-1, min(1, gravity.dx / screenDown))
+    var down: CGVector {
+        let raw = CGVector(dx: gravity.dx, dy: -gravity.dy)
+        let length = max(0.001, hypot(raw.dx, raw.dy))
+        return CGVector(dx: raw.dx / length, dy: raw.dy / length)
     }
 
-    private var maxRise: CGFloat {
-        let waterHeight = size.height * CGFloat(waterLevel)
-        let airHeight = size.height - waterHeight
-        let availableSpace = max(10, min(waterHeight, airHeight + size.height * 0.12))
-        return min(size.height * 0.16, availableSpace * 0.55)
+    var tangent: CGVector {
+        CGVector(dx: -down.dy, dy: down.dx)
     }
 
-    func surfaceOffset(x: CGFloat) -> CGFloat {
-        let centeredX = (x / max(size.width, 1)) - 0.5
-        return -normalizedX * centeredX * maxRise * 2
+    var extent: CGFloat {
+        hypot(size.width, size.height)
     }
+
+    var centerPoint: CGPoint {
+        center + down * threshold
+    }
+
+    private var center: CGPoint {
+        CGPoint(x: size.width / 2, y: size.height / 2)
+    }
+
+    private var threshold: CGFloat {
+        let target = CGFloat(waterLevel) * size.width * size.height
+        let corners = [
+            CGPoint(x: 0, y: 0),
+            CGPoint(x: size.width, y: 0),
+            CGPoint(x: size.width, y: size.height),
+            CGPoint(x: 0, y: size.height)
+        ].map { projection($0) }
+        var low = (corners.min() ?? -extent) - extent
+        var high = (corners.max() ?? extent) + extent
+
+        for _ in 0..<26 {
+            let mid = (low + high) / 2
+            let area = waterArea(threshold: mid)
+            if area > target {
+                low = mid
+            } else {
+                high = mid
+            }
+        }
+
+        return (low + high) / 2
+    }
+
+    private func projection(_ point: CGPoint) -> CGFloat {
+        let relative = point - center
+        return relative.dx * down.dx + relative.dy * down.dy
+    }
+
+    private func waterArea(threshold: CGFloat) -> CGFloat {
+        let polygon = clippedRectangle(threshold: threshold)
+        guard polygon.count >= 3 else { return 0 }
+
+        var sum: CGFloat = 0
+        for index in polygon.indices {
+            let next = polygon[(index + 1) % polygon.count]
+            sum += polygon[index].x * next.y - next.x * polygon[index].y
+        }
+        return abs(sum) * 0.5
+    }
+
+    private func clippedRectangle(threshold: CGFloat) -> [CGPoint] {
+        let corners = [
+            CGPoint(x: 0, y: 0),
+            CGPoint(x: size.width, y: 0),
+            CGPoint(x: size.width, y: size.height),
+            CGPoint(x: 0, y: size.height)
+        ]
+        var output: [CGPoint] = []
+
+        for index in corners.indices {
+            let current = corners[index]
+            let next = corners[(index + 1) % corners.count]
+            let currentValue = projection(current) - threshold
+            let nextValue = projection(next) - threshold
+            let currentInside = currentValue >= 0
+            let nextInside = nextValue >= 0
+
+            if currentInside && nextInside {
+                output.append(next)
+            } else if currentInside && !nextInside {
+                output.append(intersection(from: current, to: next, currentValue: currentValue, nextValue: nextValue))
+            } else if !currentInside && nextInside {
+                output.append(intersection(from: current, to: next, currentValue: currentValue, nextValue: nextValue))
+                output.append(next)
+            }
+        }
+
+        return output
+    }
+
+    private func intersection(from current: CGPoint, to next: CGPoint, currentValue: CGFloat, nextValue: CGFloat) -> CGPoint {
+        let denominator = currentValue - nextValue
+        let amount = abs(denominator) > 0.0001 ? currentValue / denominator : 0
+        return CGPoint(
+            x: current.x + (next.x - current.x) * amount,
+            y: current.y + (next.y - current.y) * amount
+        )
+    }
+
+    func waveOffset(s: CGFloat, level: Double, time: TimeInterval) -> CGFloat {
+        let amplitude = max(2, min(18, size.height * 0.025) * CGFloat(level))
+        let primary = sin((s / max(extent, 1)) * .pi * 3.4 + time * 1.45)
+        let secondary = sin((s / max(extent, 1)) * .pi * 8.2 - time * 1.0)
+        return -amplitude * primary - amplitude * 0.38 * secondary
+    }
+
+    func pointOnSurface(s: CGFloat, level: Double, time: TimeInterval, base: CGPoint) -> CGPoint {
+        base + tangent * s + down * waveOffset(s: s, level: level, time: time)
+    }
+
+    func sampledSurface(level: Double, time: TimeInterval) -> [CGPoint] {
+        let step: CGFloat = 4
+        let base = centerPoint
+        var points: [CGPoint] = []
+        var s = -extent
+
+        while s <= extent {
+            points.append(pointOnSurface(s: s, level: level, time: time, base: base))
+            s += step
+        }
+
+        points.append(pointOnSurface(s: extent, level: level, time: time, base: base))
+        return points
+    }
+}
+
+private func + (lhs: CGPoint, rhs: CGVector) -> CGPoint {
+    CGPoint(x: lhs.x + rhs.dx, y: lhs.y + rhs.dy)
+}
+
+private func - (lhs: CGPoint, rhs: CGPoint) -> CGVector {
+    CGVector(dx: lhs.x - rhs.x, dy: lhs.y - rhs.y)
+}
+
+private func * (lhs: CGVector, rhs: CGFloat) -> CGVector {
+    CGVector(dx: lhs.dx * rhs, dy: lhs.dy * rhs)
 }
 
 @MainActor

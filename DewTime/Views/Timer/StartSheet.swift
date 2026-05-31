@@ -67,50 +67,66 @@ struct StartSheet: View {
                 .allowsHitTesting(false)
 
             VStack(spacing: 0) {
-                dragHandle
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        dragHandle
 
-                headerSection
-                    .padding(.top, 4)
-                    .opacity(appear ? 1 : 0)
-                    .offset(y: appear ? 0 : 8)
+                        headerSection
+                            .padding(.top, 4)
+                            .opacity(appear ? 1 : 0)
+                            .offset(y: appear ? 0 : 8)
 
-                heroCard
-                    .padding(.horizontal, 24)
-                    .padding(.top, 24)
-                    .opacity(appear ? 1 : 0)
-                    .offset(y: appear ? 0 : 12)
+                        heroCard
+                            .padding(.horizontal, 24)
+                            .padding(.top, 24)
+                            .opacity(appear ? 1 : 0)
+                            .offset(y: appear ? 0 : 12)
 
-                fishSelectionSection
-                    .padding(.horizontal, 24)
-                    .padding(.top, 16)
-                    .opacity(appear ? 1 : 0)
-                    .offset(y: appear ? 0 : 14)
+                        fishSelectionSection
+                            .padding(.horizontal, 24)
+                            .padding(.top, 16)
+                            .opacity(appear ? 1 : 0)
+                            .offset(y: appear ? 0 : 14)
 
-                quickChipsSection
-                    .padding(.horizontal, 24)
-                    .padding(.top, 18)
-                    .opacity(appear ? 1 : 0)
-                    .offset(y: appear ? 0 : 16)
+                        quickChipsSection
+                            .padding(.horizontal, 24)
+                            .padding(.top, 18)
+                            .opacity(appear ? 1 : 0)
+                            .offset(y: appear ? 0 : 16)
 
-                orDivider
-                    .padding(.horizontal, 32)
-                    .padding(.top, 20)
-                    .opacity(appear ? 1 : 0)
+                        orDivider
+                            .padding(.horizontal, 32)
+                            .padding(.top, 20)
+                            .opacity(appear ? 1 : 0)
 
-                wheelPickerSection
-                    .padding(.top, 0)
-                    .opacity(appear ? 1 : 0)
-
-                Spacer(minLength: 0)
+                        wheelPickerSection
+                            .padding(.top, 8)
+                            .padding(.bottom, 20)
+                            .opacity(appear ? 1 : 0)
+                    }
+                }
 
                 actionButtons
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 36)
-                    .opacity(appear ? 1 : 0)
-                    .offset(y: appear ? 0 : 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 20)
+                    .background(.black.opacity(0.001))
             }
         }
         .foregroundStyle(.white)
+        .safeAreaPadding(.bottom, 12)
+        .overlay(alignment: .bottom) {
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    Color.black.opacity(0.06),
+                    Color.black.opacity(0.14)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 120)
+            .allowsHitTesting(false)
+        }
         .onAppear {
             withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
                 appear = true
@@ -134,6 +150,72 @@ struct StartSheet: View {
             .presentationBackground(.clear)
             .presentationDragIndicator(.hidden)
         }
+    }
+
+    private var actionButtons: some View {
+        VStack(spacing: 10) {
+            // Start
+            Button {
+                let impact = UIImpactFeedbackGenerator(style: .medium)
+                impact.impactOccurred()
+                onStart(selectedTime)
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "play.fill")
+                        .font(.body.weight(.semibold))
+                    Text("スタート！")
+                        .font(.title3.weight(.bold))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
+                .background(
+                    LinearGradient(
+                        colors: [Color.dewBlue, Color(red: 0.22, green: 0.47, blue: 0.90), Color(red: 0.18, green: 0.28, blue: 0.80)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [.white.opacity(0.10), .clear],
+                                startPoint: .topLeading,
+                                endPoint: .center
+                            )
+                        )
+                )
+                .shadow(color: Color.dewBlue.opacity(0.18), radius: 8, y: 3)
+            }
+
+            // Cancel
+            Button {
+                onCancel()
+            } label: {
+                Text("キャンセル")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.45))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 12)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    Color.black.opacity(0.08),
+                    Color.black.opacity(0.18)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .opacity(appear ? 1 : 0)
+        .offset(y: appear ? 0 : 20)
     }
 
     // MARK: - Aurora Layer
@@ -459,57 +541,6 @@ struct StartSheet: View {
         .clipped()
     }
 
-    // MARK: - Action Buttons
-    private var actionButtons: some View {
-        VStack(spacing: 10) {
-            // Start
-            Button {
-                let impact = UIImpactFeedbackGenerator(style: .medium)
-                impact.impactOccurred()
-                onStart(selectedTime)
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "play.fill")
-                        .font(.body.weight(.semibold))
-                    Text("スタート！")
-                        .font(.title3.weight(.bold))
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
-                .background(
-                    LinearGradient(
-                        colors: [Color.dewBlue, Color(red: 0.22, green: 0.47, blue: 0.90), Color(red: 0.18, green: 0.28, blue: 0.80)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [.white.opacity(0.10), .clear],
-                                startPoint: .topLeading,
-                                endPoint: .center
-                            )
-                        )
-                )
-                .shadow(color: Color.dewBlue.opacity(0.18), radius: 8, y: 3)
-            }
-
-            // Cancel
-            Button {
-                onCancel()
-            } label: {
-                Text("キャンセル")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.45))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-            }
-            .buttonStyle(.plain)
-        }
-    }
 }
 
 // MARK: - Preview

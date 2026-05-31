@@ -88,7 +88,7 @@ struct TimerView: View {
             if let vm = viewModel {
                 StartSheet(
                     scheduleName: vm.schedule.name,
-                    currentTime: vm.schedule.targetDepartureTime,
+                    currentTime: DepartureTimeDefaults.fifteenMinutesFromNow(),
                     selectedSpecies: vm.selectedSpecies,
                     aquariumTier: currentAquariumTier,
                     onSelectSpecies: { species in
@@ -102,7 +102,7 @@ struct TimerView: View {
                     },
                     onCancel: { showStartSheet = false }
                 )
-                .presentationDetents([.fraction(0.88)])
+                .presentationDetents([.fraction(0.88), .large])
                 .presentationBackground(.clear)
                 .presentationDragIndicator(.hidden)
                 .presentationCornerRadius(32)
