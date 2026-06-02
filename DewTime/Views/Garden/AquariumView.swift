@@ -1,13 +1,16 @@
 import SwiftUI
-import SwiftData
 
 struct AquariumView: View {
-    @Query(sort: \FishCareRecord.recordedAt, order: .reverse) private var records: [FishCareRecord]
+    @Environment(AppDataStore.self) private var store
 
     @State private var selectedRecord: FishCareRecord?
 
     private let calendar = Calendar.current
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 7)
+
+    private var records: [FishCareRecord] {
+        store.careRecords.sorted { $0.recordedAt > $1.recordedAt }
+    }
 
     var body: some View {
         NavigationStack {
@@ -44,11 +47,13 @@ struct AquariumView: View {
                     .ignoresSafeArea()
             )
         }
+        .environment(\.colorScheme, .light)
         .sheet(item: $selectedRecord) { record in
             FishCareDetailSheet(record: record)
-                .presentationDetents([.medium])
+                .presentationDetents([.fraction(0.68), .large])
                 .presentationBackground(.clear)
-                .presentationDragIndicator(.hidden)
+                .presentationDragIndicator(.visible)
+                .environment(\.colorScheme, .light)
         }
     }
 
@@ -388,59 +393,58 @@ struct FishCareDetailSheet: View {
     let record: FishCareRecord
 
     var body: some View {
-        VStack(spacing: 18) {
-            DragHandle()
-
-            ZStack {
-                Circle()
-                    .fill(recordColor.opacity(0.16))
-                    .frame(width: 112, height: 112)
-                if record.completedGrowth {
-                    Text(record.species.emoji)
-                        .font(.system(size: 58))
-                } else {
-                    Image(systemName: record.growthStage.icon)
-                        .font(.system(size: 58, weight: .semibold))
-                        .foregroundStyle(recordColor)
-                        .symbolRenderingMode(.hierarchical)
-                }
-            }
-
-            VStack(spacing: 6) {
-                Text(record.completedGrowth ? "\(record.species.displayName)が成魚になりました" : record.growthStage.message)
-                    .font(.title2.weight(.bold))
-                    .multilineTextAlignment(.center)
-                Text(record.recordedAt, format: .dateTime.year().month().day().hour().minute())
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            HStack(spacing: 10) {
-                metric(icon: "drop.fill", value: "+\(Int(record.waterAmount.rounded()))pt", label: "今回", tint: .cyan)
-                metric(
-                    icon: "chart.line.uptrend.xyaxis",
-                    value: "\(Int(record.totalWaterAfter.rounded()))/\(Int(record.requiredTotalWater.rounded()))pt",
-                    label: "合計",
-                    tint: recordColor
-                )
-            }
-
-            Text(record.completedGrowth ? "成魚になった魚は図鑑に登録されています。" : "次の朝も水を残して、この魚を育てましょう。")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 24)
-        .padding(.top, 14)
-        .padding(.bottom, 24)
-        .background(
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom))
+        ZStack {
+            LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
-        )
+
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 18) {
+
+                    ZStack {
+                        Circle()
+                            .fill(recordColor.opacity(0.16))
+                            .frame(width: 112, height: 112)
+                        if record.completedGrowth {
+                            Text(record.species.emoji)
+                                .font(.system(size: 58))
+                        } else {
+                            Image(systemName: record.growthStage.icon)
+                                .font(.system(size: 58, weight: .semibold))
+                                .foregroundStyle(recordColor)
+                                .symbolRenderingMode(.hierarchical)
+                        }
+                    }
+
+                    VStack(spacing: 6) {
+                        Text(record.completedGrowth ? "\(record.species.displayName)が成魚になりました" : record.growthStage.message)
+                            .font(.title2.weight(.bold))
+                            .multilineTextAlignment(.center)
+                        Text(record.recordedAt, format: .dateTime.year().month().day().hour().minute())
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack(spacing: 10) {
+                        metric(icon: "drop.fill", value: "+\(Int(record.waterAmount.rounded()))pt", label: "今回", tint: .cyan)
+                        metric(
+                            icon: "chart.line.uptrend.xyaxis",
+                            value: "\(Int(record.totalWaterAfter.rounded()))/\(Int(record.requiredTotalWater.rounded()))pt",
+                            label: "合計",
+                            tint: recordColor
+                        )
+                    }
+
+                    Text(record.completedGrowth ? "成魚になった魚は図鑑に登録されています。" : "次の朝も水を残して、この魚を育てましょう。")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                        .padding(.bottom, 24)
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 24)
+            }
+        }
     }
 
     private func metric(icon: String, value: String, label: String, tint: Color) -> some View {
@@ -469,5 +473,5 @@ struct FishCareDetailSheet: View {
 
 #Preview {
     AquariumView()
-        .modelContainer(for: [UserSchedule.self, RoutineItem.self, CollectedFish.self, ActiveFish.self, FishCareRecord.self, Aquarium.self], inMemory: true)
+        .environment(AppDataStore())
 }

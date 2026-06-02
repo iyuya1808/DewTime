@@ -1,27 +1,31 @@
 import SwiftUI
-import SwiftData
+import FirebaseCore
+
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        if Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil {
+            FirebaseApp.configure()
+        }
+        return true
+    }
+}
 
 @main
 struct DewTimeApp: App {
-    let container: ModelContainer
-
-    init() {
-        do {
-            let container = try ModelContainer(
-                for: UserSchedule.self, RoutineItem.self, CollectedFish.self, ActiveFish.self, FishCareRecord.self, Aquarium.self
-            )
-            SampleData.seedIfNeeded(context: container.mainContext)
-            self.container = container
-        } catch {
-            fatalError("ModelContainer initialization failed: \(error)")
-        }
-        NotificationScheduler.requestPermission()
-    }
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    @State private var dataStore = AppDataStore()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(dataStore)
+                .task {
+                    NotificationScheduler.requestPermission()
+                    await dataStore.load()
+                }
         }
-        .modelContainer(container)
     }
 }

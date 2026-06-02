@@ -1,9 +1,9 @@
 import Foundation
-import SwiftData
+import Observation
 
-@Model
-final class FishCareRecord {
-    @Attribute(.unique) var id: UUID
+@Observable
+final class FishCareRecord: Identifiable {
+    var id: UUID
     var speciesId: String
     var recordedAt: Date
     var waterAmount: Double

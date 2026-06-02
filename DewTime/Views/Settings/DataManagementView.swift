@@ -1,13 +1,7 @@
 import SwiftUI
-import SwiftData
 
 struct DataManagementView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \UserSchedule.name) private var schedules: [UserSchedule]
-    @Query private var activeFishes: [ActiveFish]
-    @Query private var collectedFishes: [CollectedFish]
-    @Query private var careRecords: [FishCareRecord]
-    @Query private var aquariums: [Aquarium]
+    @Environment(AppDataStore.self) private var store
 
     @State private var showResetAllConfirm = false
     @State private var showResetSchedulesConfirm = false
@@ -16,6 +10,29 @@ struct DataManagementView: View {
 
     var body: some View {
         List {
+            Section {
+                if store.isSaving || store.isLoading {
+                    HStack {
+                        ProgressView()
+                        Text(store.isLoading ? "Firestoreから読み込み中..." : "Firestoreへ保存中...")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Label("Firestore接続中", systemImage: "checkmark.icloud")
+                        .foregroundStyle(.secondary)
+                }
+
+                if let message = store.errorMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            } header: {
+                Text("Firestore")
+            } footer: {
+                Text("このアプリのスケジュール・魚・図鑑・水やり履歴はFirestoreに保存されます。")
+            }
+
             Section {
                 Button {
                     showResetSchedulesConfirm = true
@@ -89,33 +106,15 @@ struct DataManagementView: View {
     // MARK: - Actions
 
     private func resetSchedules() {
-        schedules.forEach { modelContext.delete($0) }
-        save()
-        SampleData.seedIfNeeded(context: modelContext)
+        Task { await store.resetSchedules() }
     }
 
     private func resetAquarium() {
-        activeFishes.forEach { modelContext.delete($0) }
-        collectedFishes.forEach { modelContext.delete($0) }
-        careRecords.forEach { modelContext.delete($0) }
-        aquariums.forEach { modelContext.delete($0) }
-        save()
+        Task { await store.resetAquarium() }
     }
 
     private func resetAll() {
-        resetAquarium()
-        schedules.forEach { modelContext.delete($0) }
-        save()
-        SampleData.seedIfNeeded(context: modelContext)
-    }
-
-    private func save() {
-        do {
-            try modelContext.save()
-        } catch {
-            saveError = "データの保存に失敗しました"
-            print("[DewTime] DataManagementView の保存に失敗しました: \(error)")
-        }
+        Task { await store.resetAll() }
     }
 }
 
@@ -123,5 +122,5 @@ struct DataManagementView: View {
     NavigationStack {
         DataManagementView()
     }
-    .modelContainer(for: [UserSchedule.self, RoutineItem.self, CollectedFish.self, ActiveFish.self, FishCareRecord.self, Aquarium.self], inMemory: true)
+    .environment(AppDataStore())
 }

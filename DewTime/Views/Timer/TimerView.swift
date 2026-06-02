@@ -1,12 +1,8 @@
 import SwiftUI
-import SwiftData
 
 struct TimerView: View {
-    @Environment(\.modelContext) private var modelContext
+    @Environment(AppDataStore.self) private var store
     @Environment(\.scenePhase) private var scenePhase
-    @Query private var schedules: [UserSchedule]
-    @Query(sort: \ActiveFish.startedAt, order: .reverse) private var activeFishes: [ActiveFish]
-    @Query private var aquariums: [Aquarium]
 
     @State private var viewModel: TimerViewModel?
     @State private var showConfirm = false
@@ -27,15 +23,15 @@ struct TimerView: View {
         }
         .onAppear {
             ensureViewModel()
-            viewModel?.syncActiveFish(activeFishes)
+            viewModel?.syncActiveFish(store.activeFishes)
         }
         .onChange(of: activeSchedule?.id) { _, _ in
             viewModel = nil
             ensureViewModel()
-            viewModel?.syncActiveFish(activeFishes)
+            viewModel?.syncActiveFish(store.activeFishes)
         }
-        .onChange(of: activeFishes.map(\.id)) { _, _ in
-            viewModel?.syncActiveFish(activeFishes)
+        .onChange(of: store.activeFishes.map(\.id)) { _, _ in
+            viewModel?.syncActiveFish(store.activeFishes)
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
@@ -71,17 +67,19 @@ struct TimerView: View {
                     growthStage: vm.projectedGrowthStage,
                     completesGrowth: vm.meetsSelectedRequirement,
                     onConfirm: {
-                        vm.depart(context: modelContext)
-                        showConfirm = false
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            showResult = true
+                        Task {
+                            await vm.depart(store: store)
+                            showConfirm = false
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                showResult = true
+                            }
                         }
                     },
                     onCancel: { showConfirm = false }
                 )
-                .presentationDetents([.medium])
+                .presentationDetents([.fraction(0.75), .large])
                 .presentationBackground(.clear)
-                .presentationDragIndicator(.hidden)
+                .presentationDragIndicator(.visible)
             }
         }
         .sheet(isPresented: $showStartSheet) {
@@ -92,13 +90,15 @@ struct TimerView: View {
                     selectedSpecies: vm.selectedSpecies,
                     aquariumTier: currentAquariumTier,
                     onSelectSpecies: { species in
-                        vm.selectSpecies(species, context: modelContext)
+                        Task { await vm.selectSpecies(species, store: store) }
                     },
                     onStart: { newTime in
                         vm.updateDepartureTime(newTime)
-                        try? modelContext.save()
-                        vm.start()
-                        showStartSheet = false
+                        Task {
+                            await store.saveAll()
+                            vm.start()
+                            showStartSheet = false
+                        }
                     },
                     onCancel: { showStartSheet = false }
                 )
@@ -139,8 +139,10 @@ struct TimerView: View {
                     selectedSpecies: vm.selectedSpecies,
                     aquariumTier: currentAquariumTier,
                     onSelect: { species in
-                        vm.selectSpecies(species, context: modelContext)
-                        showFishPicker = false
+                        Task {
+                            await vm.selectSpecies(species, store: store)
+                            showFishPicker = false
+                        }
                     }
                 )
                 .presentationDetents([.fraction(0.72), .large])
@@ -545,11 +547,11 @@ struct TimerView: View {
     // MARK: - Helpers
 
     private var activeSchedule: UserSchedule? {
-        UserSchedule.active(in: schedules)
+        store.activeSchedule
     }
 
     private var currentAquariumTier: Int {
-        aquariums.first?.sizeTier ?? 0
+        store.aquariums.first?.sizeTier ?? 0
     }
 
     private func ensureViewModel() {
@@ -723,5 +725,5 @@ private struct DepartureCardButtonStyle: ButtonStyle {
 
 #Preview {
     TimerView()
-        .modelContainer(for: [UserSchedule.self, RoutineItem.self, CollectedFish.self, ActiveFish.self, FishCareRecord.self, Aquarium.self], inMemory: true)
+        .environment(AppDataStore())
 }

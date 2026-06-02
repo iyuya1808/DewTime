@@ -1,5 +1,5 @@
 import Foundation
-import SwiftData
+import Observation
 
 /// 水槽成長の土台モデル。
 ///
@@ -8,9 +8,9 @@ import SwiftData
 /// というゲーム要素の基盤となる。サイズ拡大の視覚化や大型魚の解放ロジックは次フェーズ。
 ///
 /// アプリ内で 1 レコードのみ存在する想定（初回の出発時に lazy 生成）。
-@Model
-final class Aquarium {
-    @Attribute(.unique) var id: UUID
+@Observable
+final class Aquarium: Identifiable {
+    var id: UUID
     /// 累積で水槽に注がれた水（永続成長メトリック）。
     var totalWaterCollected: Double
     var createdAt: Date

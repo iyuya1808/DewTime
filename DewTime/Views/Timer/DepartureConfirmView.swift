@@ -16,101 +16,101 @@ struct DepartureConfirmView: View {
     @State private var emojiScale: CGFloat = 0.8
 
     var body: some View {
-        VStack(spacing: 0) {
-            DragHandle()
-                .padding(.bottom, 28)
+        ZStack {
+            LinearGradient.dewTimeSheet
+                .ignoresSafeArea()
 
-            // メインメッセージ
-            VStack(spacing: 12) {
-                Text(selectedSpecies.emoji)
-                    .font(.system(size: 58))
-                    .scaleEffect(emojiScale)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.5), value: emojiScale)
-                    .onAppear {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { emojiScale = 1.0 }
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    // メインメッセージ
+                    VStack(spacing: 12) {
+                        Text(selectedSpecies.emoji)
+                            .font(.system(size: 58))
+                            .scaleEffect(emojiScale)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.5), value: emojiScale)
+                            .onAppear {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { emojiScale = 1.0 }
+                            }
+
+                        Text(headline)
+                            .font(AppFont.confirmTitle)
+                            .multilineTextAlignment(.center)
+
+                        Text(subtext)
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.6))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 20)
                     }
+                    .padding(.top, 16)
+                    .padding(.bottom, 24)
 
-                Text(headline)
-                    .font(AppFont.confirmTitle)
-                    .multilineTextAlignment(.center)
-
-                Text(subtext)
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.6))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
-            }
-            .padding(.bottom, 32)
-
-            // 水量バッジ
-            HStack(spacing: 12) {
-                badgeView(
-                    value: "\(Int(waterLevel * 100))%",
-                    label: "タンク残量",
-                    icon: "drop.fill",
-                    color: waterLevelColor
-                )
-                badgeView(
-                    value: isOnTime ? "オンタイム" : "遅延あり",
-                    label: "スケジュール",
-                    icon: isOnTime ? "checkmark.circle.fill" : "exclamationmark.circle.fill",
-                    color: isOnTime ? .teal : .orange
-                )
-            }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 12)
-
-            HStack(spacing: 12) {
-                badgeView(
-                    value: "\(Int(totalWaterBefore.rounded()))/\(Int(requiredTotalWater.rounded()))pt",
-                    label: "現在の育成水量",
-                    icon: selectedSpecies.icon,
-                    color: stageColor
-                )
-                badgeView(
-                    value: "+\(Int(waterAmount.rounded()))pt",
-                    label: "今回の水やり",
-                    icon: "drop.fill",
-                    color: waterLevelColor
-                )
-            }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 32)
-
-            // ボタン
-            VStack(spacing: 10) {
-                Button(action: onConfirm) {
-                    HStack(spacing: 10) {
-                        Text("いってきます！")
-                            .font(AppFont.actionButton)
-                        Image(systemName: "figure.walk.departure")
+                    // 水量バッジ
+                    HStack(spacing: 12) {
+                        badgeView(
+                            value: "\(Int(waterLevel * 100))%",
+                            label: "タンク残量",
+                            icon: "drop.fill",
+                            color: waterLevelColor
+                        )
+                        badgeView(
+                            value: isOnTime ? "オンタイム" : "遅延あり",
+                            label: "スケジュール",
+                            icon: isOnTime ? "checkmark.circle.fill" : "exclamationmark.circle.fill",
+                            color: isOnTime ? .teal : .orange
+                        )
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
-                    .background(
-                        LinearGradient(colors: confirmColors, startPoint: .leading, endPoint: .trailing)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .shadow(color: confirmColors.first!.opacity(0.4), radius: 10, y: 4)
-                }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 12)
 
-                Button(action: onCancel) {
-                    Text("まだもう少し…戻る")
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.45))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                    HStack(spacing: 12) {
+                        badgeView(
+                            value: "\(Int(totalWaterBefore.rounded()))/\(Int(requiredTotalWater.rounded()))pt",
+                            label: "現在の育成水量",
+                            icon: selectedSpecies.icon,
+                            color: stageColor
+                        )
+                        badgeView(
+                            value: "+\(Int(waterAmount.rounded()))pt",
+                            label: "今回の水やり",
+                            icon: "drop.fill",
+                            color: waterLevelColor
+                        )
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
+
+                    // ボタン
+                    VStack(spacing: 10) {
+                        Button(action: onConfirm) {
+                            HStack(spacing: 10) {
+                                Text("いってきます！")
+                                    .font(AppFont.actionButton)
+                                Image(systemName: "figure.walk.departure")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 18)
+                            .background(
+                                LinearGradient(colors: confirmColors, startPoint: .leading, endPoint: .trailing)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .shadow(color: confirmColors.first!.opacity(0.4), radius: 10, y: 4)
+                        }
+
+                        Button(action: onCancel) {
+                            Text("まだもう少し…戻る")
+                                .font(.subheadline)
+                                .foregroundStyle(.white.opacity(0.45))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 8)
         }
         .foregroundStyle(.white)
-        .background(
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(LinearGradient.dewTimeSheet)
-                .ignoresSafeArea()
-        )
     }
 
     private func badgeView(value: String, label: String, icon: String, color: Color) -> some View {

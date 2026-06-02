@@ -1,9 +1,9 @@
 import Foundation
-import SwiftData
+import Observation
 
-@Model
-final class CollectedFish {
-    @Attribute(.unique) var id: UUID
+@Observable
+final class CollectedFish: Identifiable {
+    var id: UUID
     var name: String
     var speciesId: String
     var recordedAt: Date

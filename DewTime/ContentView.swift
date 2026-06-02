@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 
 enum AppTab: CaseIterable, Identifiable {
     case timer, collection, aquarium, profile
@@ -47,5 +46,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [UserSchedule.self, RoutineItem.self, CollectedFish.self, ActiveFish.self, FishCareRecord.self, Aquarium.self], inMemory: true)
+        .environment(AppDataStore())
 }

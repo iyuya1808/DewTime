@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 
 // MARK: - シミュレーション要素
 
@@ -239,17 +238,20 @@ private final class AquariumEngine {
 // MARK: - 水槽画面
 
 struct LiveAquariumView: View {
-    @Query(sort: \CollectedFish.recordedAt, order: .reverse) private var collected: [CollectedFish]
-    @Query private var aquariums: [Aquarium]
+    @Environment(AppDataStore.self) private var store
 
     @State private var engine = AquariumEngine()
     @State private var showRecords = false
     @State private var canvasSize: CGSize = .zero
 
-    private var aquarium: Aquarium? { aquariums.first }
+    private var collected: [CollectedFish] {
+        store.collectedFishes.sorted { $0.recordedAt > $1.recordedAt }
+    }
+
+    private var aquarium: Aquarium? { store.aquariums.first }
 
     /// コレクション済みの魚（成功記録のある種）を遊泳メンバーに変換する。
-    /// 1種につき最大3匹、合計18匹まで。未取得なら薄いサンプル魚を3匹泳がせる。
+    /// 1種につき最大3匹、合計18匹まで。
     private var specs: [FishSpec] {
         let succeeded = collected.filter(\.succeeded)
         var counts: [String: Int] = [:]
@@ -265,9 +267,6 @@ struct LiveAquariumView: View {
             if result.count >= 18 { break }
         }
 
-        if result.isEmpty {
-            return (0..<3).map { _ in spec(for: .medaka, ghost: true) }
-        }
         return result
     }
 
@@ -285,6 +284,9 @@ struct LiveAquariumView: View {
         NavigationStack {
             ZStack {
                 aquariumScene
+                if activeFishCount == 0 {
+                    emptyAquariumHint
+                }
                 topBar
             }
             .navigationBarHidden(true)
@@ -505,13 +507,35 @@ struct LiveAquariumView: View {
         }
     }
 
+    private var emptyAquariumHint: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "fish")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.9))
+            Text("まだ魚はいません")
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.white)
+            Text("成魚になった魚がここで泳ぎます")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.78))
+        }
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 16)
+        .background(.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(.white.opacity(0.22), lineWidth: 1)
+        }
+    }
+
     private var activeFishCount: Int {
         let succeeded = collected.filter(\.succeeded).count
-        return succeeded == 0 ? 0 : min(succeeded, 18)
+        return min(succeeded, 18)
     }
 }
 
 #Preview {
     LiveAquariumView()
-        .modelContainer(for: [UserSchedule.self, RoutineItem.self, CollectedFish.self, ActiveFish.self, FishCareRecord.self, Aquarium.self], inMemory: true)
+        .environment(AppDataStore())
 }

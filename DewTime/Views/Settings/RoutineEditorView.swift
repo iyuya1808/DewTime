@@ -1,9 +1,7 @@
 import SwiftUI
-import SwiftData
 
 struct RoutineEditorView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \UserSchedule.name) private var schedules: [UserSchedule]
+    @Environment(AppDataStore.self) private var store
     @Bindable var schedule: UserSchedule
 
     @State private var showAddSheet = false
@@ -108,8 +106,8 @@ struct RoutineEditorView: View {
             get: { schedule.isActive },
             set: { isActive in
                 if isActive {
-                    UserSchedule.setActive(schedule, in: schedules)
-                } else if schedules.filter(\.isActive).count > 1 {
+                    UserSchedule.setActive(schedule, in: store.schedules)
+                } else if store.schedules.filter(\.isActive).count > 1 {
                     schedule.isActive = false
                 } else {
                     schedule.isActive = true
@@ -129,11 +127,7 @@ struct RoutineEditorView: View {
     }
 
     private func deleteItems(at offsets: IndexSet) {
-        let items = schedule.orderedItems
-        for index in offsets {
-            modelContext.delete(items[index])
-        }
-        save()
+        Task { await store.deleteRoutineItems(from: schedule, at: offsets) }
     }
 
     private func addItem() {
@@ -145,18 +139,12 @@ struct RoutineEditorView: View {
             orderIndex: nextOrder,
             schedule: schedule
         )
-        modelContext.insert(item)
-        save()
+        Task { await store.addRoutineItem(to: schedule, item: item) }
         newName = ""
         newMinutes = 5
     }
 
     private func save() {
-        do {
-            try modelContext.save()
-        } catch {
-            saveError = "データの保存に失敗しました"
-            print("[DewTime] RoutineEditorView の保存に失敗しました: \(error)")
-        }
+        Task { await store.saveAll() }
     }
 }

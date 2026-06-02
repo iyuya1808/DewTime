@@ -1,5 +1,4 @@
 import Foundation
-import SwiftData
 import Observation
 
 @Observable
@@ -179,12 +178,12 @@ final class TimerViewModel {
         NotificationScheduler.schedule(departureAt: schedule.targetDepartureTime, scheduleName: schedule.name)
     }
 
-    func depart(context: ModelContext) {
+    func depart(store: AppDataStore) async {
         guard !departed else { return }
         finalWaterLevel = waterLevel
         finalDelaySeconds = overdueSeconds
         finalWaterAmount = currentWaterAmount
-        let fish = activeFish ?? createActiveFish(for: selectedSpecies, in: context)
+        let fish = activeFish ?? createActiveFish(for: selectedSpecies, in: store)
         let species = fish.species
         let totalAfter = min(fish.requiredTotalWater, fish.receivedWater + finalWaterAmount)
         let growthStage = GrowthStage.stage(for: totalAfter / fish.requiredTotalWater)
@@ -200,43 +199,20 @@ final class TimerViewModel {
         NotificationScheduler.cancelAll()
         saveState()
 
-        fish.receivedWater = totalAfter
-        fish.lastWateredAt = .now
-        fish.isCompleted = completedGrowth
-
-        let record = FishCareRecord(
-            speciesId: species.rawValue,
-            recordedAt: .now,
+        await store.recordDeparture(
+            species: species,
+            fish: fish,
             waterAmount: finalWaterAmount,
             totalWaterAfter: totalAfter,
-            requiredTotalWater: fish.requiredTotalWater,
             growthStage: growthStage,
             completedGrowth: completedGrowth
         )
-        context.insert(record)
 
-        // 出発時に水槽へ注いだ水を累積し、水槽を成長させる（ゲーム要素の土台）。
-        let aquarium = fetchOrCreateAquarium(in: context)
-        aquarium.totalWaterCollected += finalWaterAmount
-        aquarium.updatedAt = .now
-
-        if completedGrowth {
-            let collected = CollectedFish(
-                name: species.displayName,
-                speciesId: species.rawValue,
-                recordedAt: .now,
-                succeeded: true,
-                waterRatio: 1.0
-            )
-            context.insert(collected)
-        }
-
-        do {
-            try context.save()
-            activeFish = completedGrowth ? nil : fish
-        } catch {
+        if let error = store.errorMessage {
             saveError = "記録の保存に失敗しました"
             print("[DewTime] 水やり記録の保存に失敗しました: \(error)")
+        } else {
+            activeFish = completedGrowth ? nil : fish
         }
     }
 
@@ -261,14 +237,13 @@ final class TimerViewModel {
 
     func clearError() { saveError = nil }
 
-    func selectSpecies(_ species: FishSpecies, context: ModelContext) {
+    func selectSpecies(_ species: FishSpecies, store: AppDataStore) async {
         guard !isRunning, !departed else { return }
         selectedSpecies = species
         UserDefaults.standard.set(species.rawValue, forKey: PKey.selectedSpecies.rawValue)
-        activeFish = createActiveFish(for: species, in: context)
-        do {
-            try context.save()
-        } catch {
+        activeFish = createActiveFish(for: species, in: store)
+        await store.saveAll()
+        if let error = store.errorMessage {
             saveError = "魚の準備に失敗しました"
             print("[DewTime] ActiveFish の保存に失敗しました: \(error)")
         }
@@ -358,29 +333,14 @@ final class TimerViewModel {
         return species
     }
 
-    private func createActiveFish(for species: FishSpecies, in context: ModelContext) -> ActiveFish {
+    private func createActiveFish(for species: FishSpecies, in store: AppDataStore) -> ActiveFish {
         if let activeFish, !activeFish.isCompleted, activeFish.species == species {
             return activeFish
         }
 
-        activeFish?.isCompleted = true
-        let fish = ActiveFish(
-            speciesId: species.rawValue,
-            name: species.displayName,
-            requiredTotalWater: species.makeRequiredTotalWater()
-        )
-        context.insert(fish)
+        let fish = store.createActiveFish(for: species)
         activeFish = fish
         return fish
-    }
-
-    private func fetchOrCreateAquarium(in context: ModelContext) -> Aquarium {
-        if let existing = try? context.fetch(FetchDescriptor<Aquarium>()).first {
-            return existing
-        }
-        let aquarium = Aquarium()
-        context.insert(aquarium)
-        return aquarium
     }
 
     private func startTicker() {

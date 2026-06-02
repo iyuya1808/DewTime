@@ -1,8 +1,7 @@
 import SwiftUI
-import SwiftData
 
 struct MonthlyAquariumView: View {
-    @Query(sort: \FishCareRecord.recordedAt, order: .reverse) private var records: [FishCareRecord]
+    @Environment(AppDataStore.self) private var store
 
     @State private var displayedMonth = Date()
     @State private var selectedRecord: FishCareRecord?
@@ -10,6 +9,10 @@ struct MonthlyAquariumView: View {
     private let calendar = Calendar.current
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 7)
     private let weekdaySymbols = Calendar.current.shortStandaloneWeekdaySymbols
+
+    private var records: [FishCareRecord] {
+        store.careRecords.sorted { $0.recordedAt > $1.recordedAt }
+    }
 
     var body: some View {
         ScrollView {
@@ -51,11 +54,13 @@ struct MonthlyAquariumView: View {
             LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
         )
+        .environment(\.colorScheme, .light)
         .sheet(item: $selectedRecord) { record in
             FishCareDetailSheet(record: record)
-                .presentationDetents([.medium])
+                .presentationDetents([.fraction(0.68), .large])
                 .presentationBackground(.clear)
-                .presentationDragIndicator(.hidden)
+                .presentationDragIndicator(.visible)
+                .environment(\.colorScheme, .light)
         }
     }
 
@@ -421,6 +426,6 @@ private struct AquariumCalendarDay: Identifiable {
 #Preview {
     NavigationStack {
         MonthlyAquariumView()
-            .modelContainer(for: [UserSchedule.self, RoutineItem.self, CollectedFish.self, ActiveFish.self, FishCareRecord.self, Aquarium.self], inMemory: true)
     }
+    .environment(AppDataStore())
 }

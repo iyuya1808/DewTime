@@ -1,9 +1,7 @@
 import SwiftUI
-import SwiftData
 
 struct SettingsView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \UserSchedule.name) private var schedules: [UserSchedule]
+    @Environment(AppDataStore.self) private var store
 
     @State private var showAddSheet = false
     @State private var newName = ""
@@ -14,7 +12,7 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section {
-                    ForEach(schedules) { schedule in
+                    ForEach(store.schedules) { schedule in
                         NavigationLink(destination: RoutineEditorView(schedule: schedule)) {
                             ScheduleRow(schedule: schedule)
                         }
@@ -48,10 +46,10 @@ struct SettingsView: View {
             }
             .navigationTitle("設定")
             .onAppear {
-                let activeCount = schedules.filter(\.isActive).count
-                if !schedules.isEmpty, activeCount != 1 {
-                    UserSchedule.ensureSingleActive(in: schedules)
-                    save()
+                let activeCount = store.schedules.filter(\.isActive).count
+                if !store.schedules.isEmpty, activeCount != 1 {
+                    UserSchedule.ensureSingleActive(in: store.schedules)
+                    Task { await store.saveAll() }
                 }
             }
             .sheet(isPresented: $showAddSheet) {
@@ -103,39 +101,17 @@ struct SettingsView: View {
     // MARK: - Actions
 
     private func activate(_ schedule: UserSchedule) {
-        UserSchedule.setActive(schedule, in: schedules)
-        save()
+        UserSchedule.setActive(schedule, in: store.schedules)
+        Task { await store.saveAll() }
     }
 
     private func delete(at offsets: IndexSet) {
-        let deleting = offsets.map { schedules[$0] }
-        let deletingIDs = Set(deleting.map(\.id))
-        let shouldPickNextActive = deleting.contains(where: \.isActive)
-        deleting.forEach { modelContext.delete($0) }
-
-        if shouldPickNextActive, let next = schedules.first(where: { !deletingIDs.contains($0.id) }) {
-            UserSchedule.setActive(next, in: schedules)
-        }
-        save()
+        let deleting = offsets.map { store.schedules[$0] }
+        Task { await store.deleteSchedules(deleting) }
     }
 
     private func addSchedule() {
-        let s = UserSchedule(
-            name: newName,
-            targetDepartureTime: newTime,
-            isActive: schedules.isEmpty
-        )
-        modelContext.insert(s)
-        save()
-    }
-
-    private func save() {
-        do {
-            try modelContext.save()
-        } catch {
-            saveError = "データの保存に失敗しました"
-            print("[DewTime] SettingsView の保存に失敗しました: \(error)")
-        }
+        Task { await store.addSchedule(name: newName, targetDepartureTime: newTime) }
     }
 
     private func defaultTime() -> Date {
@@ -171,5 +147,5 @@ private struct ScheduleRow: View {
 
 #Preview {
     SettingsView()
-        .modelContainer(for: [UserSchedule.self, RoutineItem.self, CollectedFish.self, ActiveFish.self, FishCareRecord.self, Aquarium.self], inMemory: true)
+        .environment(AppDataStore())
 }

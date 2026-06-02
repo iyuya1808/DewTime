@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 
 private enum UnlockFilter: String, CaseIterable {
     case all = "すべて"
@@ -105,11 +104,26 @@ private struct SpeciesGrowthSnapshot {
         }
         return "成魚目安 \(Int(requiredTotalWater.rounded()))pt"
     }
+
+    var isVisible: Bool {
+        isUnlocked || activeFish != nil
+    }
+
+    var statusTitle: String {
+        if activeFish != nil { return "育成中" }
+        if isUnlocked { return "\(unlockedRecordCount)回" }
+        return "未解放"
+    }
+
+    var statusIcon: String {
+        if activeFish != nil { return "drop.fill" }
+        if isUnlocked { return "checkmark.seal.fill" }
+        return "lock.fill"
+    }
 }
 
 struct CollectionView: View {
-    @Query(sort: \CollectedFish.recordedAt, order: .reverse) private var collected: [CollectedFish]
-    @Query(sort: \ActiveFish.startedAt, order: .reverse) private var activeFishes: [ActiveFish]
+    @Environment(AppDataStore.self) private var store
 
     @State private var selectedSpecies: FishSpecies?
     @State private var selectedFish: CollectedFish?
@@ -155,16 +169,21 @@ struct CollectionView: View {
         unlockFilter != .all || difficultyFilter != .all || sortOrder != .default
     }
 
+    private var collected: [CollectedFish] {
+        store.collectedFishes.sorted { $0.recordedAt > $1.recordedAt }
+    }
+
+    private var activeFishes: [ActiveFish] {
+        store.activeFishes.sorted { $0.startedAt > $1.startedAt }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    progressHeader
-                        .padding(.horizontal)
-                        .padding(.top, 12)
-
                     filterBar
                         .padding(.horizontal)
+                        .padding(.top, 12)
 
                     if filteredSpecies.isEmpty {
                         emptyFilterResult
@@ -209,6 +228,7 @@ struct CollectionView: View {
                 .ignoresSafeArea()
             )
         }
+        .environment(\.colorScheme, .light)
         .sheet(item: $selectedSpecies) { species in
             SpeciesDetailSheet(
                 species: species,
@@ -224,12 +244,14 @@ struct CollectionView: View {
             .presentationDetents([.large])
             .presentationBackground(.clear)
             .presentationDragIndicator(.hidden)
+            .environment(\.colorScheme, .light)
         }
         .sheet(item: $selectedFish) { fish in
             FishDetailSheet(fish: fish)
                 .presentationDetents([.medium])
                 .presentationBackground(.clear)
                 .presentationDragIndicator(.hidden)
+                .environment(\.colorScheme, .light)
         }
     }
 
@@ -322,212 +344,252 @@ struct CollectionView: View {
         .padding(.vertical, 40)
     }
 
-    private var progressHeader: some View {
-        let unlocked = unlockedSpeciesCount
-        let progress = Double(unlocked) / Double(max(FishSpecies.allCases.count, 1))
-        let activeCount = activeFishes.filter { !$0.isCompleted }.count
-
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(.teal.opacity(0.16))
-                    Image(systemName: "book.closed.fill")
-                        .font(.title2)
-                        .foregroundStyle(.teal)
-                }
-                .frame(width: 52, height: 52)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("魚のコレクション")
-                        .font(.title3.weight(.bold))
-                    Text("\(unlocked) / \(FishSpecies.allCases.count) 種を発見")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-
-                Spacer()
-
-                if activeCount > 0 {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("育成中")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                        Text("\(activeCount)匹")
-                            .font(.subheadline.weight(.bold))
-                            .monospacedDigit()
-                            .foregroundStyle(.teal)
-                    }
-                }
-            }
-
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(.white.opacity(0.45))
-                    Capsule()
-                        .fill(LinearGradient(colors: [.teal, .cyan], startPoint: .leading, endPoint: .trailing))
-                        .frame(width: geo.size.width * progress)
-                }
-            }
-            .frame(height: 10)
-        }
-        .padding(16)
-        .background(.white.opacity(0.66), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
     private func speciesCard(_ species: FishSpecies) -> some View {
         let snapshot = snapshot(for: species)
+        let isUnlocked = snapshot.isUnlocked
+        let isGrowing = snapshot.activeFish != nil
 
         return Button {
             selectedSpecies = species
         } label: {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top, spacing: 10) {
-                    ZStack {
-                        Circle()
-                            .fill(snapshot.accentColor.opacity(snapshot.isUnlocked || snapshot.activeFish != nil ? 0.16 : 0.10))
-                        Text(species.emoji)
-                            .font(.system(size: 32))
-                            .grayscale(snapshot.isUnlocked || snapshot.activeFish != nil ? 0 : 1)
-                            .opacity(snapshot.isUnlocked || snapshot.activeFish != nil ? 1 : 0.5)
-                    }
-                    .frame(width: 58, height: 58)
-
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(species.displayName)
-                            .font(.headline)
-                            .foregroundStyle(snapshot.isUnlocked || snapshot.activeFish != nil ? .primary : Color.gray.opacity(0.58))
-                            .lineLimit(1)
-
-                        HStack(spacing: 6) {
-                            stageBadge(stage: snapshot.currentStage, tint: snapshot.accentColor)
-                            if snapshot.activeFish != nil {
-                                Text("育成中")
-                                    .font(.caption2.weight(.bold))
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 3)
-                                    .background(snapshot.accentColor.opacity(0.14), in: Capsule())
-                                    .foregroundStyle(snapshot.accentColor)
-                            } else if snapshot.isUnlocked {
-                                Image(systemName: "checkmark.seal.fill")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.teal)
-                            } else {
-                                Text(species.difficultyLabel)
-                                    .font(.caption2.weight(.semibold))
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 3)
-                                    .background(.gray.opacity(0.14), in: Capsule())
-                                    .foregroundStyle(.secondary)
-                            }
+            VStack(alignment: .leading, spacing: 14) {
+                ZStack(alignment: .topTrailing) {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(
+                            isUnlocked
+                                ? snapshot.accentColor.opacity(0.15)
+                                : isGrowing
+                                    ? Color.blue.opacity(0.12)
+                                    : Color.black.opacity(0.06)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .strokeBorder(
+                                    isUnlocked
+                                        ? snapshot.accentColor.opacity(0.48)
+                                        : isGrowing
+                                            ? Color.blue.opacity(0.32)
+                                            : Color.white.opacity(0.18),
+                                    lineWidth: 0.8
+                                )
                         }
+
+                    Text(species.emoji)
+                        .font(.system(size: 42))
+                        .grayscale(isUnlocked || isGrowing ? 0 : 1)
+                        .opacity(isUnlocked || isGrowing ? 1 : 0.22)
+                        .shadow(color: isUnlocked ? snapshot.accentColor.opacity(0.45) : isGrowing ? .blue.opacity(0.25) : .clear, radius: isUnlocked ? 8 : 0)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    statusPill(snapshot: snapshot, species: species)
+                        .padding(8)
+                }
+                .frame(height: 94)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(species.displayName)
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(isUnlocked || isGrowing ? .primary : .secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+
+                        Spacer(minLength: 4)
+
+                        if isUnlocked || isGrowing {
+                            Text("\(Int((snapshot.progress * 100).rounded()))%")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(isGrowing ? Color.blue : snapshot.accentColor)
+                                .monospacedDigit()
+                        } else {
+                            Image(systemName: "lock.fill")
+                                .font(.caption)
+                                .foregroundStyle(.secondary.opacity(0.72))
+                        }
+                    }
+
+                    if isUnlocked || isGrowing {
+                        compactGrowthLane(snapshot: snapshot)
+                    } else {
+                        HStack(spacing: 4) {
+                            Image(systemName: "drop.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text("目安 \(Int(snapshot.requiredTotalWater.rounded()))pt")
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.secondary)
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chart.bar.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text(species.difficultyLabel)
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.top, 4)
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    if isUnlocked || isGrowing {
+                        Image(systemName: snapshot.currentStage.icon)
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(isGrowing ? Color.blue : snapshot.accentColor)
+
+                        Text(snapshot.progressSummary)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                    } else {
+                        Image(systemName: "info.circle")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary.opacity(0.8))
+                        Text("朝の出発で成魚になると解放")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary.opacity(0.8))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
                     }
 
                     Spacer(minLength: 0)
                 }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(snapshot.progressSummary)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(snapshot.accentColor)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.82)
-
-                    compactGrowthLane(snapshot: snapshot)
-
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(snapshot.helperText)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-
-                        Spacer(minLength: 4)
-
-                        Text("\(Int((snapshot.progress * 100).rounded()))%")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(snapshot.accentColor.opacity(0.9))
-                            .monospacedDigit()
-                    }
-                }
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, minHeight: 168, alignment: .leading)
+            .padding(10)
+            .frame(maxWidth: .infinity, minHeight: 190, alignment: .topLeading)
             .background(
-                LinearGradient(
-                    colors: [
-                        .white.opacity(snapshot.activeFish != nil ? 0.84 : 0.76),
-                        snapshot.accentColor.opacity(snapshot.activeFish != nil ? 0.10 : 0.04)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(isUnlocked || isGrowing ? .ultraThinMaterial : .thinMaterial)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(snapshot.accentColor.opacity(snapshot.activeFish != nil ? 0.28 : 0.16), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(
+                        isUnlocked
+                            ? snapshot.accentColor.opacity(0.3)
+                            : isGrowing
+                                ? Color.blue.opacity(0.25)
+                                : Color.white.opacity(0.15),
+                        lineWidth: 1
+                    )
             }
-            .shadow(color: snapshot.accentColor.opacity(snapshot.activeFish != nil ? 0.15 : 0.08), radius: 18, y: 10)
-            .opacity(snapshot.isUnlocked || snapshot.activeFish != nil ? 1.0 : 0.92)
+            .shadow(color: .black.opacity(isUnlocked || isGrowing ? 0.08 : 0.03), radius: 20, y: 10)
+            .shadow(color: isUnlocked
+                        ? snapshot.accentColor.opacity(0.18)
+                        : isGrowing
+                            ? Color.blue.opacity(0.12)
+                            : .clear,
+                    radius: 14, y: 8)
+            .opacity(isUnlocked || isGrowing ? 1.0 : 0.65)
         }
         .buttonStyle(.plain)
     }
 
-    private func stageBadge(stage: GrowthStage, tint: Color) -> some View {
-        Label(stage.displayName, systemImage: stage.icon)
-            .font(.caption2.weight(.semibold))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(tint.opacity(0.12), in: Capsule())
-            .foregroundStyle(tint)
+    private func statusPill(snapshot: SpeciesGrowthSnapshot, species: FishSpecies) -> some View {
+        let isUnlocked = snapshot.isUnlocked
+        let isGrowing = snapshot.activeFish != nil
+
+        return Group {
+            if isUnlocked {
+                HStack(spacing: 3) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 10, weight: .bold))
+                    Text("\(snapshot.unlockedRecordCount)回")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(
+                    LinearGradient(
+                        colors: [snapshot.accentColor, snapshot.accentColor.opacity(0.8)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    in: Capsule()
+                )
+                .shadow(color: snapshot.accentColor.opacity(0.3), radius: 3, y: 1)
+            } else if isGrowing {
+                HStack(spacing: 4) {
+                    Image(systemName: "drop.fill")
+                        .font(.system(size: 10, weight: .bold))
+                    Text("育成中")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(
+                    LinearGradient(
+                        colors: [Color.blue, Color.blue.opacity(0.8)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    in: Capsule()
+                )
+                .shadow(color: Color.blue.opacity(0.3), radius: 3, y: 1)
+            } else {
+                HStack(spacing: 4) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 10, weight: .bold))
+                    Text(species.difficultyLabel)
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(.white.opacity(0.15), in: Capsule())
+                .overlay {
+                    Capsule()
+                        .strokeBorder(Color.secondary.opacity(0.24), lineWidth: 0.8)
+                }
+            }
+        }
     }
 
     private func compactGrowthLane(snapshot: SpeciesGrowthSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 7) {
             GeometryReader { geo in
                 let width = geo.size.width
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(snapshot.accentColor.opacity(0.10))
-                        .frame(height: 8)
+                        .fill(Color.primary.opacity(0.07))
+                        .frame(height: 6)
 
                     Capsule()
                         .fill(snapshot.progressGradient)
-                        .frame(width: snapshot.progress > 0 ? max(18, width * snapshot.progress) : 0, height: 8)
+                        .frame(width: snapshot.progress > 0 ? max(14, width * snapshot.progress) : 0, height: 6)
 
                     ForEach(Array(GrowthStage.allCases.enumerated()), id: \.offset) { _, stage in
                         Circle()
-                            .fill(stage.thresholdProgress <= snapshot.progress ? AnyShapeStyle(snapshot.accentColor) : AnyShapeStyle(.white.opacity(0.95)))
-                            .frame(width: 10, height: 10)
+                            .fill(stage.thresholdProgress <= snapshot.progress ? AnyShapeStyle(snapshot.accentColor) : AnyShapeStyle(.white.opacity(0.9)))
+                            .frame(width: 8, height: 8)
                             .overlay {
                                 Circle()
                                     .strokeBorder(snapshot.accentColor.opacity(stage.thresholdProgress <= snapshot.progress ? 0 : 0.26), lineWidth: 1)
                             }
-                            .position(x: width * stage.thresholdProgress, y: 4)
+                            .position(x: width * stage.thresholdProgress, y: 3)
                     }
                 }
             }
-            .frame(height: 8)
+            .frame(height: 6)
 
             HStack(spacing: 6) {
                 Text(snapshot.currentStage.displayName)
-                    .font(.caption2.weight(.semibold))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(snapshot.accentColor)
 
                 Spacer(minLength: 0)
 
-                if let nextStage = snapshot.nextStage {
-                    Text("次: \(nextStage.displayName)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("成魚")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
+                Text(snapshot.helperText)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
             }
         }
     }
@@ -564,10 +626,6 @@ struct CollectionView: View {
                 .padding(.horizontal)
             }
         }
-    }
-
-    private var unlockedSpeciesCount: Int {
-        FishSpecies.allCases.filter { !records(for: $0).isEmpty }.count
     }
 
     private func records(for species: FishSpecies) -> [CollectedFish] {
@@ -622,19 +680,26 @@ private struct SpeciesDetailSheet: View {
             ScrollView {
                 VStack(spacing: 20) {
                     header
-                    growthGuideCard
 
                     if fishes.isEmpty {
                         lockedState
+                        growthGuideCard
+                            .opacity(0.55)
                     } else {
-                        LazyVGrid(columns: columns, spacing: 10) {
-                            ForEach(fishes) { fish in
-                                Button {
-                                    onSelectFish(fish)
-                                } label: {
-                                    fishTile(fish)
+                        growthGuideCard
+
+                        VStack(spacing: 12) {
+                            unlockedStateHeader
+
+                            LazyVGrid(columns: columns, spacing: 10) {
+                                ForEach(fishes) { fish in
+                                    Button {
+                                        onSelectFish(fish)
+                                    } label: {
+                                        fishTile(fish)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -652,21 +717,120 @@ private struct SpeciesDetailSheet: View {
 
     private var header: some View {
         let unlocked = !fishes.isEmpty
+        let isGrowing = snapshot.activeFish != nil
 
-        return VStack(spacing: 10) {
+        return VStack(spacing: 12) {
             ZStack {
+                if unlocked {
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [snapshot.accentColor.opacity(0.4), snapshot.accentColor.opacity(0.0)],
+                                center: .center,
+                                startRadius: 10,
+                                endRadius: 70
+                            )
+                        )
+                        .blur(radius: 8)
+                }
+
                 Circle()
-                    .fill(snapshot.accentColor.opacity(unlocked || snapshot.activeFish != nil ? 0.14 : 0.10))
+                    .fill(
+                        unlocked
+                            ? AnyShapeStyle(snapshot.accentColor.opacity(0.24))
+                            : isGrowing
+                                ? AnyShapeStyle(Color.blue.opacity(0.18))
+                                : AnyShapeStyle(Color.white.opacity(0.08))
+                    )
+                    .overlay {
+                        Circle()
+                            .strokeBorder(
+                                unlocked
+                                    ? snapshot.accentColor.opacity(0.48)
+                                    : isGrowing
+                                        ? Color.blue.opacity(0.32)
+                                        : Color.white.opacity(0.15),
+                                lineWidth: 1
+                            )
+                    }
+
                 Text(species.emoji)
                     .font(.system(size: 58))
-                    .grayscale(unlocked || snapshot.activeFish != nil ? 0 : 1)
-                    .opacity(unlocked || snapshot.activeFish != nil ? 1 : 0.4)
+                    .grayscale(unlocked || isGrowing ? 0 : 1)
+                    .opacity(unlocked || isGrowing ? 1 : 0.3)
+                    .shadow(color: unlocked ? snapshot.accentColor.opacity(0.5) : .clear, radius: unlocked ? 12 : 0)
+
+                if !unlocked && !isGrowing {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(8)
+                        .background(Color.black.opacity(0.4), in: Circle())
+                        .offset(x: 36, y: 36)
+                }
             }
             .frame(width: 112, height: 112)
 
-            Text(species.displayName)
-                .font(.title2.weight(.bold))
-                .foregroundStyle(unlocked || snapshot.activeFish != nil ? .primary : Color.gray.opacity(0.55))
+            VStack(spacing: 6) {
+                Text(species.displayName)
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(unlocked || isGrowing ? .primary : .secondary)
+
+                if unlocked {
+                    HStack(spacing: 3) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 9, weight: .bold))
+                        Text("登録済")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3.5)
+                    .background(
+                        LinearGradient(
+                            colors: [snapshot.accentColor, snapshot.accentColor.opacity(0.85)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        in: Capsule()
+                    )
+                    .shadow(color: snapshot.accentColor.opacity(0.25), radius: 3, y: 1.5)
+                } else if isGrowing {
+                    HStack(spacing: 4) {
+                        Image(systemName: "drop.fill")
+                            .font(.caption.weight(.bold))
+                        Text("現在育成中")
+                            .font(.caption2.weight(.bold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.blue, Color.blue.opacity(0.75)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        in: Capsule()
+                    )
+                    .shadow(color: Color.blue.opacity(0.2), radius: 4, y: 2)
+                } else {
+                    HStack(spacing: 4) {
+                        Image(systemName: "lock.fill")
+                            .font(.caption.weight(.bold))
+                        Text("未解放")
+                            .font(.caption2.weight(.bold))
+                    }
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(0.12), in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 0.8)
+                    }
+                }
+            }
 
             Text(snapshot.helperText)
                 .font(.caption)
@@ -741,23 +905,65 @@ private struct SpeciesDetailSheet: View {
         .background(.white.opacity(0.6), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
-    private var lockedState: some View {
-        VStack(spacing: 20) {
-            VStack(spacing: 6) {
-                Image(systemName: "lock.shield.fill")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
-                Text("まだ解放されていません")
-                    .font(.headline)
-                Text("条件を満たすと図鑑に登録されます")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+    private var unlockedStateHeader: some View {
+        VStack(spacing: 14) {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(snapshot.accentColor.opacity(0.12))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(snapshot.accentColor)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("解放した記録")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.primary)
+                    Text("これまでに育成して図鑑に登録された記録の一覧です。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
             }
+            .padding(.horizontal, 4)
+
+            Divider()
+                .background(Color.white.opacity(0.25))
+        }
+    }
+
+    private var lockedState: some View {
+        VStack(spacing: 18) {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(Color.secondary.opacity(0.12))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(.secondary)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("未解放の魚")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.primary)
+                    Text("条件をクリアして朝の出発を行うと解放されます。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 4)
+
+            Divider()
+                .background(Color.white.opacity(0.25))
 
             VStack(spacing: 10) {
                 Text("解放条件")
-                    .font(.caption.weight(.semibold))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -765,58 +971,84 @@ private struct SpeciesDetailSheet: View {
                     unlockConditionBadge(
                         icon: "drop.fill",
                         label: "必要水量",
-                        value: species.requiredWaterPercentText + " 以上"
+                        value: species.requiredWaterPercentText + " 以上",
+                        tint: .cyan
                     )
                     unlockConditionBadge(
                         icon: "chart.bar.fill",
                         label: "難易度",
-                        value: species.difficultyLabel
+                        value: species.difficultyLabel,
+                        tint: .orange
                     )
                 }
             }
 
-            Text("朝のルーティンを頑張って\n水タンクをいっぱいにしよう！")
-                .font(.caption)
-                .foregroundStyle(.secondary.opacity(0.8))
+            Text("朝の準備をスムーズに進めて\n水タンクに十分な水を残して出発しましょう！")
+                .font(.caption2)
+                .foregroundStyle(.secondary.opacity(0.85))
                 .multilineTextAlignment(.center)
+                .lineSpacing(3)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
-        .padding(.horizontal, 20)
-        .background(.white.opacity(0.56), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(.white.opacity(0.58))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.42), lineWidth: 0.8)
+        }
     }
 
-    private func unlockConditionBadge(icon: String, label: String, value: String) -> some View {
+    private func unlockConditionBadge(icon: String, label: String, value: String, tint: Color) -> some View {
         VStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(tint)
             Text(label)
-                .font(.caption2)
+                .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.caption.weight(.semibold))
-                .monospacedDigit()
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .background(.white.opacity(0.5), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private func fishTile(_ fish: CollectedFish) -> some View {
-        VStack(spacing: 6) {
-            Text(species.emoji)
-                .font(.system(size: 28))
-            Text(fish.recordedAt, format: .dateTime.month().day())
-                .font(.caption2.weight(.semibold))
-            Text("\(Int(fish.waterRatio * 100))%")
-                .font(.caption2.bold())
-                .foregroundStyle(.secondary)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.primary)
                 .monospacedDigit()
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background(.white.opacity(0.62), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(tint.opacity(0.08))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(tint.opacity(0.18), lineWidth: 0.8)
+        }
+    }
+
+    private func fishTile(_ fish: CollectedFish) -> some View {
+        let theme = WaterLevelTheme(waterRatio: fish.waterRatio)
+        return VStack(spacing: 6) {
+            Text(species.emoji)
+                .font(.system(size: 28))
+                .shadow(color: theme.tintColor.opacity(0.3), radius: 4)
+            Text(fish.recordedAt, format: .dateTime.month().day())
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.primary.opacity(0.8))
+            Text("\(Int(fish.waterRatio * 100))%")
+                .font(.caption2.bold())
+                .foregroundStyle(theme.tintColor)
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(theme.tintColor.opacity(0.1))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(theme.tintColor.opacity(0.32), lineWidth: 0.8)
+        }
     }
 
     private func stageDetailText(_ stage: GrowthStage) -> String {
@@ -833,5 +1065,5 @@ private struct SpeciesDetailSheet: View {
 
 #Preview {
     CollectionView()
-        .modelContainer(for: [UserSchedule.self, RoutineItem.self, CollectedFish.self, ActiveFish.self, FishCareRecord.self, Aquarium.self], inMemory: true)
+        .environment(AppDataStore())
 }
