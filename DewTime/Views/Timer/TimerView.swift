@@ -1,18 +1,15 @@
 import SwiftUI
-import SwiftData
 
 struct TimerView: View {
-    @Environment(\.modelContext) private var modelContext
+    @Environment(AppDataStore.self) private var store
     @Environment(\.scenePhase) private var scenePhase
-    @Query private var schedules: [UserSchedule]
-    @Query(sort: \ActivePlant.startedAt, order: .reverse) private var activePlants: [ActivePlant]
 
     @State private var viewModel: TimerViewModel?
     @State private var showConfirm = false
     @State private var showResult = false
     @State private var showCancelConfirm = false
     @State private var showStartSheet = false
-    @State private var showPlantPicker = false
+    @State private var showFishPicker = false
 
     var body: some View {
         ZStack {
@@ -26,15 +23,15 @@ struct TimerView: View {
         }
         .onAppear {
             ensureViewModel()
-            viewModel?.syncActivePlant(activePlants)
+            viewModel?.syncActiveFish(store.activeFishes)
         }
         .onChange(of: activeSchedule?.id) { _, _ in
             viewModel = nil
             ensureViewModel()
-            viewModel?.syncActivePlant(activePlants)
+            viewModel?.syncActiveFish(store.activeFishes)
         }
-        .onChange(of: activePlants.map(\.id)) { _, _ in
-            viewModel?.syncActivePlant(activePlants)
+        .onChange(of: store.activeFishes.map(\.id)) { _, _ in
+            viewModel?.syncActiveFish(store.activeFishes)
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
@@ -70,33 +67,42 @@ struct TimerView: View {
                     growthStage: vm.projectedGrowthStage,
                     completesGrowth: vm.meetsSelectedRequirement,
                     onConfirm: {
-                        vm.depart(context: modelContext)
-                        showConfirm = false
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            showResult = true
+                        Task {
+                            await vm.depart(store: store)
+                            showConfirm = false
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                showResult = true
+                            }
                         }
                     },
                     onCancel: { showConfirm = false }
                 )
-                .presentationDetents([.medium])
+                .presentationDetents([.fraction(0.75), .large])
                 .presentationBackground(.clear)
-                .presentationDragIndicator(.hidden)
+                .presentationDragIndicator(.visible)
             }
         }
         .sheet(isPresented: $showStartSheet) {
             if let vm = viewModel {
                 StartSheet(
                     scheduleName: vm.schedule.name,
-                    currentTime: vm.schedule.targetDepartureTime,
+                    currentTime: DepartureTimeDefaults.fifteenMinutesFromNow(),
+                    selectedSpecies: vm.selectedSpecies,
+                    aquariumTier: currentAquariumTier,
+                    onSelectSpecies: { species in
+                        Task { await vm.selectSpecies(species, store: store) }
+                    },
                     onStart: { newTime in
                         vm.updateDepartureTime(newTime)
-                        try? modelContext.save()
-                        vm.start()
-                        showStartSheet = false
+                        Task {
+                            await store.saveAll()
+                            vm.start()
+                            showStartSheet = false
+                        }
                     },
                     onCancel: { showStartSheet = false }
                 )
-                .presentationDetents([.fraction(0.88)])
+                .presentationDetents([.fraction(0.88), .large])
                 .presentationBackground(.clear)
                 .presentationDragIndicator(.hidden)
                 .presentationCornerRadius(32)
@@ -127,13 +133,16 @@ struct TimerView: View {
                 .interactiveDismissDisabled()
             }
         }
-        .sheet(isPresented: $showPlantPicker) {
+        .sheet(isPresented: $showFishPicker) {
             if let vm = viewModel {
-                PlantPickerSheet(
+                FishPickerSheet(
                     selectedSpecies: vm.selectedSpecies,
+                    aquariumTier: currentAquariumTier,
                     onSelect: { species in
-                        vm.selectSpecies(species, context: modelContext)
-                        showPlantPicker = false
+                        Task {
+                            await vm.selectSpecies(species, store: store)
+                            showFishPicker = false
+                        }
                     }
                 )
                 .presentationDetents([.fraction(0.72), .large])
@@ -158,39 +167,11 @@ struct TimerView: View {
             .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // トップ: 出発時刻カード or コンパクトヘッダー
-                Group {
-                    if !vm.isRunning && !vm.departed {
-                        VStack(spacing: 12) {
-                            departureCard(vm: vm)
-                            plantSelectionCard(vm: vm, isEditable: true)
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 20)
-                    } else {
-                        VStack(spacing: 10) {
-                            compactDepartureHeader(vm: vm)
-                            plantSelectionCard(vm: vm, isEditable: false)
-                                .padding(.horizontal, 24)
-                        }
-                        .padding(.top, 16)
-                    }
-                }
+                Spacer(minLength: 72)
 
-                Spacer()
-
-                // センター: カウントダウン + %
                 centerInfoDisplay(vm: vm)
 
                 Spacer()
-
-                // ボトム: ステータス + ボタン
-                currentTaskPanel(vm: vm)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 12)
-
-                statusLabel(vm: vm)
-                    .padding(.bottom, 12)
 
                 actionButton(vm: vm)
                     .padding(.horizontal, 28)
@@ -255,30 +236,28 @@ struct TimerView: View {
         .buttonStyle(DepartureCardButtonStyle())
     }
 
-    private func plantSelectionCard(vm: TimerViewModel, isEditable: Bool) -> some View {
+    private func fishSelectionCard(vm: TimerViewModel, isEditable: Bool) -> some View {
         Button {
-            if isEditable { showPlantPicker = true }
+            if isEditable { showFishPicker = true }
         } label: {
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
                     ZStack {
                         Circle()
-                            .fill(plantStatusColor(vm: vm).opacity(0.18))
-                        Image(systemName: vm.selectedSpecies.icon)
-                            .font(.system(size: isEditable ? 30 : 22, weight: .semibold))
-                            .foregroundStyle(plantStatusColor(vm: vm))
-                            .symbolRenderingMode(.hierarchical)
+                            .fill(fishStatusColor(vm: vm).opacity(0.18))
+                        Text(vm.selectedSpecies.emoji)
+                            .font(.system(size: isEditable ? 30 : 22))
                     }
                     .frame(width: isEditable ? 54 : 42, height: isEditable ? 54 : 42)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("今日育てる植物")
+                        Text("今日育てる魚")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.white.opacity(0.68))
                         Text(vm.selectedSpecies.displayName)
                             .font(isEditable ? .headline : .subheadline.weight(.semibold))
                             .foregroundStyle(.white)
-                        Text(vm.hasActivePlant ? vm.currentGrowthStage.message : "種を選んで育てましょう")
+                        Text(vm.hasActiveFish ? vm.currentGrowthStage.message : "魚を選んで育てましょう")
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.54))
                             .lineLimit(1)
@@ -303,16 +282,16 @@ struct TimerView: View {
                     }
                 }
 
-                progressBar(value: vm.growthProgress, color: plantStatusColor(vm: vm), trackOpacity: 0.14)
+                progressBar(value: vm.growthProgress, color: fishStatusColor(vm: vm), trackOpacity: 0.14)
 
                 HStack {
                     Label(vm.currentGrowthStage.displayName, systemImage: vm.currentGrowthStage.icon)
                     Spacer()
-                    Text(vm.meetsSelectedRequirement ? "今回で開花" : "今回 +\(Int(vm.currentWaterAmount.rounded()))pt")
+                    Text(vm.meetsSelectedRequirement ? "今回で成魚に" : "今回 +\(Int(vm.currentWaterAmount.rounded()))pt")
                         .monospacedDigit()
                 }
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(plantStatusColor(vm: vm).opacity(0.92))
+                .foregroundStyle(fishStatusColor(vm: vm).opacity(0.92))
             }
             .padding(.horizontal, isEditable ? 18 : 14)
             .padding(.vertical, isEditable ? 16 : 12)
@@ -537,8 +516,8 @@ struct TimerView: View {
         WaterLevelTheme(waterRatio: level).gradientColors
     }
 
-    private func plantStatusColor(vm: TimerViewModel) -> Color {
-        vm.projectedGrowthStage == .bloom ? WaterLevelTheme(waterRatio: vm.waterLevel).tintColor : .orange
+    private func fishStatusColor(vm: TimerViewModel) -> Color {
+        vm.projectedGrowthStage == .adult ? WaterLevelTheme(waterRatio: vm.waterLevel).tintColor : .orange
     }
 
     // MARK: - Empty state
@@ -568,7 +547,11 @@ struct TimerView: View {
     // MARK: - Helpers
 
     private var activeSchedule: UserSchedule? {
-        UserSchedule.active(in: schedules)
+        store.activeSchedule
+    }
+
+    private var currentAquariumTier: Int {
+        store.aquariums.first?.sizeTier ?? 0
     }
 
     private func ensureViewModel() {
@@ -577,9 +560,10 @@ struct TimerView: View {
     }
 }
 
-private struct PlantPickerSheet: View {
-    let selectedSpecies: FlowerSpecies
-    let onSelect: (FlowerSpecies) -> Void
+struct FishPickerSheet: View {
+    let selectedSpecies: FishSpecies
+    let aquariumTier: Int
+    let onSelect: (FishSpecies) -> Void
 
     var body: some View {
         ZStack {
@@ -622,12 +606,12 @@ private struct PlantPickerSheet: View {
                         Circle()
                             .strokeBorder(Color(hex: "#52D9A4").opacity(0.30), lineWidth: 1)
                             .frame(width: 36, height: 36)
-                        Image(systemName: "leaf.circle.fill")
+                        Image(systemName: "fish.circle.fill")
                             .font(.title3)
                             .foregroundStyle(Color(hex: "#52D9A4"))
                     }
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("今日育てる植物")
+                        Text("今日育てる魚")
                             .font(AppFont.sheetTitle)
                         Text("難易度が高いほど多くの水が必要です")
                             .font(.caption)
@@ -640,13 +624,15 @@ private struct PlantPickerSheet: View {
 
                 ScrollView {
                     VStack(spacing: 8) {
-                        ForEach(FlowerSpecies.allCases.sorted { $0.requiredTotalWaterRange.lowerBound < $1.requiredTotalWaterRange.lowerBound }) { species in
+                        ForEach(FishSpecies.allCases.sorted { $0.requiredTotalWaterRange.lowerBound < $1.requiredTotalWaterRange.lowerBound }) { species in
+                            let isUnlocked = species.isUnlocked(aquariumTier: aquariumTier)
                             Button {
-                                onSelect(species)
+                                if isUnlocked { onSelect(species) }
                             } label: {
-                                plantRow(species)
+                                fishRow(species, isUnlocked: isUnlocked)
                             }
                             .buttonStyle(.plain)
+                            .disabled(!isUnlocked)
                         }
                     }
                     .padding(.horizontal, 20)
@@ -657,7 +643,7 @@ private struct PlantPickerSheet: View {
         .foregroundStyle(.white)
     }
 
-    private func speciesAccentColor(_ species: FlowerSpecies) -> Color {
+    private func speciesAccentColor(_ species: FishSpecies) -> Color {
         switch species.difficultyLabel {
         case "かんたん":   return Color(hex: "#4ADE80")
         case "やさしい":   return Color(hex: "#34D399")
@@ -667,37 +653,37 @@ private struct PlantPickerSheet: View {
         }
     }
 
-    private func plantRow(_ species: FlowerSpecies) -> some View {
+    private func fishRow(_ species: FishSpecies, isUnlocked: Bool) -> some View {
         let isSelected = selectedSpecies == species
         let accent = isSelected ? Color.dewBlue : speciesAccentColor(species)
 
         return HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(accent.opacity(0.18))
+                    .fill(accent.opacity(isUnlocked ? 0.18 : 0.08))
                     .frame(width: 52, height: 52)
                 if isSelected {
                     Circle()
                         .strokeBorder(accent.opacity(0.45), lineWidth: 1.5)
                         .frame(width: 52, height: 52)
                 }
-                Image(systemName: species.icon)
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(accent)
-                    .symbolRenderingMode(.hierarchical)
+                Text(species.emoji)
+                    .font(.system(size: 26))
+                    .opacity(isUnlocked ? 1 : 0.35)
             }
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(species.displayName)
                     .font(.headline.weight(.semibold))
+                    .foregroundStyle(isUnlocked ? .white : .white.opacity(0.45))
                 HStack(spacing: 6) {
                     Text(species.difficultyLabel)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(accent)
+                        .foregroundStyle(isUnlocked ? accent : .white.opacity(0.38))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
-                        .background(accent.opacity(0.15), in: Capsule())
-                    Text(species.requiredTotalWaterRangeText)
+                        .background((isUnlocked ? accent.opacity(0.15) : .white.opacity(0.07)), in: Capsule())
+                    Text(isUnlocked ? species.requiredTotalWaterRangeText : "\(species.requiredAquariumName)で解放")
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.42))
                 }
@@ -705,9 +691,9 @@ private struct PlantPickerSheet: View {
 
             Spacer()
 
-            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+            Image(systemName: isUnlocked ? (isSelected ? "checkmark.circle.fill" : "circle") : "lock.fill")
                 .font(.title3)
-                .foregroundStyle(isSelected ? accent : .white.opacity(0.22))
+                .foregroundStyle(isSelected ? accent : .white.opacity(isUnlocked ? 0.22 : 0.34))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -739,5 +725,5 @@ private struct DepartureCardButtonStyle: ButtonStyle {
 
 #Preview {
     TimerView()
-        .modelContainer(for: [UserSchedule.self, RoutineItem.self, PlantFlower.self, ActivePlant.self, PlantWateringRecord.self], inMemory: true)
+        .environment(AppDataStore())
 }

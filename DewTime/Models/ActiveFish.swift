@@ -1,9 +1,9 @@
 import Foundation
-import SwiftData
+import Observation
 
-@Model
-final class ActivePlant {
-    @Attribute(.unique) var id: UUID
+@Observable
+final class ActiveFish: Identifiable {
+    var id: UUID
     var speciesId: String
     var name: String
     var startedAt: Date
@@ -32,8 +32,8 @@ final class ActivePlant {
         self.isCompleted = isCompleted
     }
 
-    var species: FlowerSpecies {
-        FlowerSpecies(rawValue: speciesId) ?? .cactus
+    var species: FishSpecies {
+        FishSpecies(rawValue: speciesId) ?? .medaka
     }
 
     var progress: Double {

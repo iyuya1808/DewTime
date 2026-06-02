@@ -1,5 +1,4 @@
 import Foundation
-import SwiftData
 import Observation
 
 @Observable
@@ -12,20 +11,24 @@ final class TimerViewModel {
     private(set) var finalWaterLevel: Double = 1.0
     private(set) var finalDelaySeconds: Int = 0
     private(set) var saveError: String?
-    private(set) var selectedSpecies: FlowerSpecies
-    private(set) var activePlant: ActivePlant?
+    private(set) var selectedSpecies: FishSpecies
+    private(set) var activeFish: ActiveFish?
     private(set) var finalWaterAmount: Double = 0
     private(set) var finalTotalWaterAfter: Double = 0
     private(set) var finalRequiredTotalWater: Double = 1
-    private(set) var finalGrowthStage: GrowthStage = .seed
+    private(set) var finalGrowthStage: GrowthStage = .egg
     private(set) var finalCompletedGrowth: Bool = false
 
     private var timer: Timer?
+    private var lastRoutineItemID: UUID?
+    private var didPlayOverdueWarning = false
 
     init(schedule: UserSchedule) {
         self.schedule = schedule
         self.selectedSpecies = Self.restoreSelectedSpecies()
         restoreState()
+        lastRoutineItemID = currentRoutineItem?.id
+        didPlayOverdueWarning = isOverdue
     }
 
     // MARK: - Derived state
@@ -108,11 +111,11 @@ final class TimerViewModel {
     }
 
     var currentReceivedWater: Double {
-        activePlant?.receivedWater ?? 0
+        activeFish?.receivedWater ?? 0
     }
 
     var currentRequiredTotalWater: Double {
-        activePlant?.requiredTotalWater ?? Double(selectedSpecies.requiredTotalWaterRange.upperBound)
+        activeFish?.requiredTotalWater ?? Double(selectedSpecies.requiredTotalWaterRange.upperBound)
     }
 
     var currentGrowthProgress: Double {
@@ -133,8 +136,8 @@ final class TimerViewModel {
         GrowthStage.stage(for: projectedGrowthProgress)
     }
 
-    var hasActivePlant: Bool {
-        activePlant != nil
+    var hasActiveFish: Bool {
+        activeFish != nil
     }
 
     // MARK: - Formatted strings
@@ -167,23 +170,26 @@ final class TimerViewModel {
         guard startedAt == nil else { return }
         startedAt = .now
         now = .now
+        lastRoutineItemID = currentRoutineItem?.id
+        didPlayOverdueWarning = isOverdue
+        ScheduleHaptics.prepare()
         startTicker()
         saveState()
         NotificationScheduler.schedule(departureAt: schedule.targetDepartureTime, scheduleName: schedule.name)
     }
 
-    func depart(context: ModelContext) {
+    func depart(store: AppDataStore) async {
         guard !departed else { return }
         finalWaterLevel = waterLevel
         finalDelaySeconds = overdueSeconds
         finalWaterAmount = currentWaterAmount
-        let plant = activePlant ?? createActivePlant(for: selectedSpecies, in: context)
-        let species = plant.species
-        let totalAfter = min(plant.requiredTotalWater, plant.receivedWater + finalWaterAmount)
-        let growthStage = GrowthStage.stage(for: totalAfter / plant.requiredTotalWater)
-        let completedGrowth = totalAfter >= plant.requiredTotalWater
+        let fish = activeFish ?? createActiveFish(for: selectedSpecies, in: store)
+        let species = fish.species
+        let totalAfter = min(fish.requiredTotalWater, fish.receivedWater + finalWaterAmount)
+        let growthStage = GrowthStage.stage(for: totalAfter / fish.requiredTotalWater)
+        let completedGrowth = totalAfter >= fish.requiredTotalWater
         finalTotalWaterAfter = totalAfter
-        finalRequiredTotalWater = plant.requiredTotalWater
+        finalRequiredTotalWater = fish.requiredTotalWater
         finalGrowthStage = growthStage
         finalCompletedGrowth = completedGrowth
 
@@ -193,38 +199,20 @@ final class TimerViewModel {
         NotificationScheduler.cancelAll()
         saveState()
 
-        plant.receivedWater = totalAfter
-        plant.lastWateredAt = .now
-        plant.isCompleted = completedGrowth
-
-        let record = PlantWateringRecord(
-            speciesId: species.rawValue,
-            recordedAt: .now,
+        await store.recordDeparture(
+            species: species,
+            fish: fish,
             waterAmount: finalWaterAmount,
             totalWaterAfter: totalAfter,
-            requiredTotalWater: plant.requiredTotalWater,
             growthStage: growthStage,
             completedGrowth: completedGrowth
         )
-        context.insert(record)
 
-        if completedGrowth {
-            let flower = PlantFlower(
-                name: species.displayName,
-                speciesId: species.rawValue,
-                recordedAt: .now,
-                succeeded: true,
-                waterRatio: 1.0
-            )
-            context.insert(flower)
-        }
-
-        do {
-            try context.save()
-            activePlant = completedGrowth ? nil : plant
-        } catch {
+        if let error = store.errorMessage {
             saveError = "記録の保存に失敗しました"
             print("[DewTime] 水やり記録の保存に失敗しました: \(error)")
+        } else {
+            activeFish = completedGrowth ? nil : fish
         }
     }
 
@@ -236,40 +224,41 @@ final class TimerViewModel {
         finalWaterLevel = 1.0
         finalDelaySeconds = 0
         finalWaterAmount = 0
-        finalTotalWaterAfter = activePlant?.receivedWater ?? 0
-        finalRequiredTotalWater = activePlant?.requiredTotalWater ?? 1
-        finalGrowthStage = activePlant?.growthStage ?? .seed
+        finalTotalWaterAfter = activeFish?.receivedWater ?? 0
+        finalRequiredTotalWater = activeFish?.requiredTotalWater ?? 1
+        finalGrowthStage = activeFish?.growthStage ?? .egg
         finalCompletedGrowth = false
         now = .now
+        lastRoutineItemID = nil
+        didPlayOverdueWarning = false
         clearState()
         NotificationScheduler.cancelAll()
     }
 
     func clearError() { saveError = nil }
 
-    func selectSpecies(_ species: FlowerSpecies, context: ModelContext) {
+    func selectSpecies(_ species: FishSpecies, store: AppDataStore) async {
         guard !isRunning, !departed else { return }
         selectedSpecies = species
         UserDefaults.standard.set(species.rawValue, forKey: PKey.selectedSpecies.rawValue)
-        activePlant = createActivePlant(for: species, in: context)
-        do {
-            try context.save()
-        } catch {
-            saveError = "植物の準備に失敗しました"
-            print("[DewTime] ActivePlant の保存に失敗しました: \(error)")
+        activeFish = createActiveFish(for: species, in: store)
+        await store.saveAll()
+        if let error = store.errorMessage {
+            saveError = "魚の準備に失敗しました"
+            print("[DewTime] ActiveFish の保存に失敗しました: \(error)")
         }
     }
 
-    func syncActivePlant(_ plants: [ActivePlant]) {
-        if let plant = plants
+    func syncActiveFish(_ fishes: [ActiveFish]) {
+        if let fish = fishes
             .filter({ !$0.isCompleted })
             .sorted(by: { $0.startedAt > $1.startedAt })
             .first {
-            activePlant = plant
-            selectedSpecies = plant.species
+            activeFish = fish
+            selectedSpecies = fish.species
             return
         }
-        activePlant = nil
+        activeFish = nil
     }
 
     func updateDepartureTime(_ newTime: Date) {
@@ -282,6 +271,7 @@ final class TimerViewModel {
     func resume() {
         guard startedAt != nil, !departed else { return }
         now = .now
+        handleScheduleKnocks()
         if timer == nil { startTicker() }
     }
 
@@ -335,35 +325,48 @@ final class TimerViewModel {
 
     // MARK: - Private helpers
 
-    private static func restoreSelectedSpecies() -> FlowerSpecies {
+    private static func restoreSelectedSpecies() -> FishSpecies {
         guard let rawValue = UserDefaults.standard.string(forKey: PKey.selectedSpecies.rawValue),
-              let species = FlowerSpecies(rawValue: rawValue) else {
-            return .cactus
+              let species = FishSpecies(rawValue: rawValue) else {
+            return .medaka
         }
         return species
     }
 
-    private func createActivePlant(for species: FlowerSpecies, in context: ModelContext) -> ActivePlant {
-        if let activePlant, !activePlant.isCompleted, activePlant.species == species {
-            return activePlant
+    private func createActiveFish(for species: FishSpecies, in store: AppDataStore) -> ActiveFish {
+        if let activeFish, !activeFish.isCompleted, activeFish.species == species {
+            return activeFish
         }
 
-        activePlant?.isCompleted = true
-        let plant = ActivePlant(
-            speciesId: species.rawValue,
-            name: species.displayName,
-            requiredTotalWater: species.makeRequiredTotalWater()
-        )
-        context.insert(plant)
-        activePlant = plant
-        return plant
+        let fish = store.createActiveFish(for: species)
+        activeFish = fish
+        return fish
     }
 
     private func startTicker() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.now = .now }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.now = .now
+                self.handleScheduleKnocks()
+            }
         }
         RunLoop.main.add(timer!, forMode: .common)
+    }
+
+    private func handleScheduleKnocks() {
+        guard isRunning else { return }
+
+        let currentID = currentRoutineItem?.id
+        if let currentID, let lastRoutineItemID, currentID != lastRoutineItemID {
+            ScheduleHaptics.playPhaseKnock()
+        }
+        lastRoutineItemID = currentID
+
+        if isOverdue, !didPlayOverdueWarning {
+            didPlayOverdueWarning = true
+            ScheduleHaptics.playOverdueWarning()
+        }
     }
 }

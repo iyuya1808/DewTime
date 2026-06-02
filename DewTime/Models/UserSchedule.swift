@@ -1,14 +1,13 @@
 import Foundation
-import SwiftData
+import Observation
 
-@Model
-final class UserSchedule {
-    @Attribute(.unique) var id: UUID
+@Observable
+final class UserSchedule: Identifiable {
+    var id: UUID
     var name: String
     var targetDepartureTime: Date
     var isActive: Bool
 
-    @Relationship(deleteRule: .cascade, inverse: \RoutineItem.schedule)
     var items: [RoutineItem] = []
 
     init(

@@ -1,9 +1,9 @@
 import Foundation
-import SwiftData
+import Observation
 
-@Model
-final class PlantWateringRecord {
-    @Attribute(.unique) var id: UUID
+@Observable
+final class FishCareRecord: Identifiable {
+    var id: UUID
     var speciesId: String
     var recordedAt: Date
     var waterAmount: Double
@@ -32,12 +32,12 @@ final class PlantWateringRecord {
         self.completedGrowth = completedGrowth
     }
 
-    var species: FlowerSpecies {
-        FlowerSpecies(rawValue: speciesId) ?? .cactus
+    var species: FishSpecies {
+        FishSpecies(rawValue: speciesId) ?? .medaka
     }
 
     var growthStage: GrowthStage {
-        GrowthStage(rawValue: growthStageRawValue) ?? .seed
+        GrowthStage(rawValue: growthStageRawValue) ?? .egg
     }
 
     var progress: Double {

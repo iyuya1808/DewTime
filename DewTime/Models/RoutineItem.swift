@@ -1,9 +1,9 @@
 import Foundation
-import SwiftData
+import Observation
 
-@Model
-final class RoutineItem {
-    @Attribute(.unique) var id: UUID
+@Observable
+final class RoutineItem: Identifiable {
+    var id: UUID
     var name: String
     var durationSeconds: Int
     var colorHex: String

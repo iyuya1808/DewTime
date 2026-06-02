@@ -1,20 +1,38 @@
 import SwiftUI
-import SwiftData
 
 struct DataManagementView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \UserSchedule.name) private var schedules: [UserSchedule]
-    @Query private var activePlants: [ActivePlant]
-    @Query private var plantFlowers: [PlantFlower]
-    @Query private var wateringRecords: [PlantWateringRecord]
+    @Environment(AppDataStore.self) private var store
 
     @State private var showResetAllConfirm = false
     @State private var showResetSchedulesConfirm = false
-    @State private var showResetGardenConfirm = false
+    @State private var showResetAquariumConfirm = false
     @State private var saveError: String?
 
     var body: some View {
         List {
+            Section {
+                if store.isSaving || store.isLoading {
+                    HStack {
+                        ProgressView()
+                        Text(store.isLoading ? "Firestoreから読み込み中..." : "Firestoreへ保存中...")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Label("Firestore接続中", systemImage: "checkmark.icloud")
+                        .foregroundStyle(.secondary)
+                }
+
+                if let message = store.errorMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            } header: {
+                Text("Firestore")
+            } footer: {
+                Text("このアプリのスケジュール・魚・図鑑・水やり履歴はFirestoreに保存されます。")
+            }
+
             Section {
                 Button {
                     showResetSchedulesConfirm = true
@@ -23,13 +41,13 @@ struct DataManagementView: View {
                 }
                 .tint(.primary)
                 Button {
-                    showResetGardenConfirm = true
+                    showResetAquariumConfirm = true
                 } label: {
-                    Label("植物データを初期化", systemImage: "leaf.arrow.circlepath")
+                    Label("水槽データを初期化", systemImage: "fish")
                 }
                 .tint(.primary)
             } footer: {
-                Text("スケジュール・ルーティン、または植物・開花記録・水やり履歴のみを初期化します")
+                Text("スケジュール・ルーティン、または魚・コレクション・水やり履歴のみを初期化します")
             }
 
             Section {
@@ -64,14 +82,14 @@ struct DataManagementView: View {
             Text("すべてのスケジュールとルーティンが削除され、サンプルデータに戻ります。")
         }
         .confirmationDialog(
-            "植物データを初期化",
-            isPresented: $showResetGardenConfirm,
+            "水槽データを初期化",
+            isPresented: $showResetAquariumConfirm,
             titleVisibility: .visible
         ) {
-            Button("初期化する", role: .destructive) { resetGarden() }
+            Button("初期化する", role: .destructive) { resetAquarium() }
             Button("キャンセル", role: .cancel) {}
         } message: {
-            Text("育成中の植物・開花記録・水やり履歴がすべて削除されます。")
+            Text("育成中の魚・コレクション・水やり履歴・水槽がすべて削除されます。")
         }
         .confirmationDialog(
             "すべてのデータを初期化",
@@ -81,39 +99,22 @@ struct DataManagementView: View {
             Button("すべて初期化する", role: .destructive) { resetAll() }
             Button("キャンセル", role: .cancel) {}
         } message: {
-            Text("スケジュール・植物・記録など、アプリのすべてのデータが削除されます。")
+            Text("スケジュール・魚・記録など、アプリのすべてのデータが削除されます。")
         }
     }
 
     // MARK: - Actions
 
     private func resetSchedules() {
-        schedules.forEach { modelContext.delete($0) }
-        save()
-        SampleData.seedIfNeeded(context: modelContext)
+        Task { await store.resetSchedules() }
     }
 
-    private func resetGarden() {
-        activePlants.forEach { modelContext.delete($0) }
-        plantFlowers.forEach { modelContext.delete($0) }
-        wateringRecords.forEach { modelContext.delete($0) }
-        save()
+    private func resetAquarium() {
+        Task { await store.resetAquarium() }
     }
 
     private func resetAll() {
-        resetGarden()
-        schedules.forEach { modelContext.delete($0) }
-        save()
-        SampleData.seedIfNeeded(context: modelContext)
-    }
-
-    private func save() {
-        do {
-            try modelContext.save()
-        } catch {
-            saveError = "データの保存に失敗しました"
-            print("[DewTime] DataManagementView の保存に失敗しました: \(error)")
-        }
+        Task { await store.resetAll() }
     }
 }
 
@@ -121,5 +122,5 @@ struct DataManagementView: View {
     NavigationStack {
         DataManagementView()
     }
-    .modelContainer(for: [UserSchedule.self, RoutineItem.self, PlantFlower.self, ActivePlant.self, PlantWateringRecord.self], inMemory: true)
+    .environment(AppDataStore())
 }
