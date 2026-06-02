@@ -1,25 +1,13 @@
 import Foundation
-import FirebaseAuth
-import FirebaseCore
-import FirebaseFirestore
 import Observation
 
 enum AppDataStoreError: LocalizedError {
-    case firebaseNotConfigured
-    case authenticationFailed
-    case noUser
-    case invalidCloudData(String)
+    case invalidLocalData(String)
 
     var errorDescription: String? {
         switch self {
-        case .firebaseNotConfigured:
-            return "Firebaseが未設定です。GoogleService-Info.plistをDewTimeターゲットに追加してください。"
-        case .authenticationFailed:
-            return "Firebaseの匿名ログインに失敗しました。"
-        case .noUser:
-            return "Firebaseユーザーを取得できませんでした。"
-        case .invalidCloudData(let name):
-            return "Firestoreデータが壊れています: \(name)"
+        case .invalidLocalData(let name):
+            return "ローカルデータが壊れています: \(name)"
         }
     }
 }
@@ -40,7 +28,7 @@ final class AppDataStore {
     private let schemaVersion = 1
 
     var isConfigured: Bool {
-        FirebaseApp.app() != nil
+        return true
     }
 
     var activeSchedule: UserSchedule? {
@@ -54,10 +42,10 @@ final class AppDataStore {
         defer { isLoading = false }
 
         do {
-            try await loadFromFirestore()
+            try loadFromLocal()
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Firestoreからの読み込みに失敗しました"
-            print("[DewTime] Firestore load failed: \(error)")
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? "ローカルデータの読み込みに失敗しました"
+            print("[DewTime] Local load failed: \(error)")
             if schedules.isEmpty {
                 seedSampleDataLocally()
             }
@@ -71,10 +59,10 @@ final class AppDataStore {
         defer { isSaving = false }
 
         do {
-            try await saveToFirestore()
+            try saveToLocal()
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Firestoreへの保存に失敗しました"
-            print("[DewTime] Firestore save failed: \(error)")
+            errorMessage = "ローカルデータの保存に失敗しました"
+            print("[DewTime] Local save failed: \(error)")
         }
     }
 
@@ -246,162 +234,96 @@ final class AppDataStore {
         await saveAll()
     }
 
-    // MARK: - Firestore
+    // MARK: - Local Save / Load
 
-    private func loadFromFirestore() async throws {
-        let userRef = try await userDocument()
-        let schedulesSnapshot = try await documents(in: userRef.collection("schedules"))
-        let routineItemsSnapshot = try await documents(in: userRef.collection("routineItems"))
-        let activeFishesSnapshot = try await documents(in: userRef.collection("activeFishes"))
-        let collectedFishesSnapshot = try await documents(in: userRef.collection("collectedFishes"))
-        let careRecordsSnapshot = try await documents(in: userRef.collection("careRecords"))
-        let aquariumsSnapshot = try await documents(in: userRef.collection("aquariums"))
-        let profilesSnapshot = try await documents(in: userRef.collection("profiles"))
+    private func loadFromLocal() throws {
+        let defaults = UserDefaults.standard
 
-        var schedulesById: [String: UserSchedule] = [:]
-        let decodedSchedules = try schedulesSnapshot.map { document in
-            let schedule = try decodeSchedule(id: document.documentID, data: document.data())
-            schedulesById[schedule.id.uuidString] = schedule
-            return schedule
+        // schedules
+        if let schedulesData = defaults.array(forKey: "local_schedules") as? [[String: Any]] {
+            var schedulesById: [String: UserSchedule] = [:]
+            let decodedSchedules = try schedulesData.map { data in
+                let id = data["id"] as? String ?? UUID().uuidString
+                let schedule = try decodeSchedule(id: id, data: data)
+                schedulesById[schedule.id.uuidString] = schedule
+                return schedule
+            }
+
+            // routineItems
+            if let routineData = defaults.array(forKey: "local_routine_items") as? [[String: Any]] {
+                let decodedRoutineItems = try routineData.map { data in
+                    let id = data["id"] as? String ?? UUID().uuidString
+                    return try decodeRoutineItem(id: id, data: data, schedulesById: schedulesById)
+                }
+                for schedule in decodedSchedules {
+                    schedule.items = decodedRoutineItems.filter { $0.schedule?.id == schedule.id }
+                }
+            }
+
+            schedules = decodedSchedules.sorted { $0.name < $1.name }
         }
 
-        let decodedRoutineItems = try routineItemsSnapshot.map { document in
-            try decodeRoutineItem(id: document.documentID, data: document.data(), schedulesById: schedulesById)
+        // activeFishes
+        if let activeFishesData = defaults.array(forKey: "local_active_fishes") as? [[String: Any]] {
+            activeFishes = try activeFishesData.map { data in
+                let id = data["id"] as? String ?? UUID().uuidString
+                return try decodeActiveFish(id: id, data: data)
+            }.sorted { $0.startedAt > $1.startedAt }
         }
 
-        for schedule in decodedSchedules {
-            schedule.items = decodedRoutineItems.filter { $0.schedule?.id == schedule.id }
+        // collectedFishes
+        if let collectedFishesData = defaults.array(forKey: "local_collected_fishes") as? [[String: Any]] {
+            collectedFishes = try collectedFishesData.map { data in
+                let id = data["id"] as? String ?? UUID().uuidString
+                return try decodeCollectedFish(id: id, data: data)
+            }.sorted { $0.recordedAt > $1.recordedAt }
         }
 
-        schedules = decodedSchedules.sorted { $0.name < $1.name }
-        activeFishes = try activeFishesSnapshot.map { try decodeActiveFish(id: $0.documentID, data: $0.data()) }
-            .sorted { $0.startedAt > $1.startedAt }
-        collectedFishes = try collectedFishesSnapshot.map { try decodeCollectedFish(id: $0.documentID, data: $0.data()) }
-            .sorted { $0.recordedAt > $1.recordedAt }
-        careRecords = try careRecordsSnapshot.map { try decodeCareRecord(id: $0.documentID, data: $0.data()) }
-            .sorted { $0.recordedAt > $1.recordedAt }
-        aquariums = try aquariumsSnapshot.map { try decodeAquarium(id: $0.documentID, data: $0.data()) }
-        profiles = try profilesSnapshot.map { try decodeProfile(id: $0.documentID, data: $0.data()) }
+        // careRecords
+        if let careRecordsData = defaults.array(forKey: "local_care_records") as? [[String: Any]] {
+            careRecords = try careRecordsData.map { data in
+                let id = data["id"] as? String ?? UUID().uuidString
+                return try decodeCareRecord(id: id, data: data)
+            }.sorted { $0.recordedAt > $1.recordedAt }
+        }
+
+        // aquariums
+        if let aquariumsData = defaults.array(forKey: "local_aquariums") as? [[String: Any]] {
+            aquariums = try aquariumsData.map { data in
+                let id = data["id"] as? String ?? UUID().uuidString
+                return try decodeAquarium(id: id, data: data)
+            }
+        }
+
+        // profiles
+        if let profilesData = defaults.array(forKey: "local_profiles") as? [[String: Any]] {
+            profiles = try profilesData.map { data in
+                let id = data["id"] as? String ?? UUID().uuidString
+                return try decodeProfile(id: id, data: data)
+            }
+        }
 
         if schedules.isEmpty {
             seedSampleSchedules()
-            try await saveToFirestore()
+            try saveToLocal()
         } else {
             UserSchedule.ensureSingleActive(in: schedules)
         }
     }
 
-    private func saveToFirestore() async throws {
-        let userRef = try await userDocument()
+    private func saveToLocal() throws {
+        let defaults = UserDefaults.standard
 
-        try await replaceCollection(
-            userRef.collection("schedules"),
-            with: schedules.map { ($0.id.uuidString, encode(schedule: $0)) }
-        )
+        defaults.set(schedules.map { encode(schedule: $0) }, forKey: "local_schedules")
 
         let routineItems = schedules.flatMap(\.items)
-        try await replaceCollection(
-            userRef.collection("routineItems"),
-            with: routineItems.map { ($0.id.uuidString, encode(routineItem: $0)) }
-        )
-        try await replaceCollection(
-            userRef.collection("activeFishes"),
-            with: activeFishes.map { ($0.id.uuidString, encode(activeFish: $0)) }
-        )
-        try await replaceCollection(
-            userRef.collection("collectedFishes"),
-            with: collectedFishes.map { ($0.id.uuidString, encode(collectedFish: $0)) }
-        )
-        try await replaceCollection(
-            userRef.collection("careRecords"),
-            with: careRecords.map { ($0.id.uuidString, encode(careRecord: $0)) }
-        )
-        try await replaceCollection(
-            userRef.collection("aquariums"),
-            with: aquariums.map { ($0.id.uuidString, encode(aquarium: $0)) }
-        )
-        try await replaceCollection(
-            userRef.collection("profiles"),
-            with: profiles.map { ($0.id.uuidString, encode(profile: $0)) }
-        )
+        defaults.set(routineItems.map { encode(routineItem: $0) }, forKey: "local_routine_items")
 
-        try await setData([
-            "schemaVersion": schemaVersion,
-            "updatedAt": Date(),
-            "bundleId": Bundle.main.bundleIdentifier ?? "unknown"
-        ], at: userRef, merge: true)
-    }
-
-    private func userDocument() async throws -> DocumentReference {
-        guard isConfigured else { throw AppDataStoreError.firebaseNotConfigured }
-        let user = try await authenticatedUser()
-        return Firestore.firestore().collection("users").document(user.uid)
-    }
-
-    private func authenticatedUser() async throws -> User {
-        if let current = Auth.auth().currentUser {
-            return current
-        }
-
-        return try await withCheckedThrowingContinuation { continuation in
-            Auth.auth().signInAnonymously { result, error in
-                if let user = result?.user {
-                    continuation.resume(returning: user)
-                } else {
-                    continuation.resume(throwing: error ?? AppDataStoreError.authenticationFailed)
-                }
-            }
-        }
-    }
-
-    private func replaceCollection(_ collection: CollectionReference, with entries: [(String, [String: Any])]) async throws {
-        let existing = try await documents(in: collection)
-        let batch = Firestore.firestore().batch()
-
-        for document in existing {
-            batch.deleteDocument(document.reference)
-        }
-        for (id, data) in entries {
-            batch.setData(data, forDocument: collection.document(id))
-        }
-
-        try await commit(batch)
-    }
-
-    private func documents(in collection: CollectionReference) async throws -> [QueryDocumentSnapshot] {
-        try await withCheckedThrowingContinuation { continuation in
-            collection.getDocuments { snapshot, error in
-                if let snapshot {
-                    continuation.resume(returning: snapshot.documents)
-                } else {
-                    continuation.resume(throwing: error ?? AppDataStoreError.invalidCloudData(collection.path))
-                }
-            }
-        }
-    }
-
-    private func setData(_ data: [String: Any], at document: DocumentReference, merge: Bool) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            document.setData(data, merge: merge) { error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume()
-                }
-            }
-        }
-    }
-
-    private func commit(_ batch: WriteBatch) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            batch.commit { error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume()
-                }
-            }
-        }
+        defaults.set(activeFishes.map { encode(activeFish: $0) }, forKey: "local_active_fishes")
+        defaults.set(collectedFishes.map { encode(collectedFish: $0) }, forKey: "local_collected_fishes")
+        defaults.set(careRecords.map { encode(careRecord: $0) }, forKey: "local_care_records")
+        defaults.set(aquariums.map { encode(aquarium: $0) }, forKey: "local_aquariums")
+        defaults.set(profiles.map { encode(profile: $0) }, forKey: "local_profiles")
     }
 
     // MARK: - Seed
@@ -446,6 +368,7 @@ final class AppDataStore {
 
     private func encode(schedule: UserSchedule) -> [String: Any] {
         [
+            "id": schedule.id.uuidString,
             "name": schedule.name,
             "targetDepartureTime": schedule.targetDepartureTime,
             "isActive": schedule.isActive
@@ -454,6 +377,7 @@ final class AppDataStore {
 
     private func encode(routineItem: RoutineItem) -> [String: Any] {
         [
+            "id": routineItem.id.uuidString,
             "name": routineItem.name,
             "durationSeconds": routineItem.durationSeconds,
             "colorHex": routineItem.colorHex,
@@ -464,6 +388,7 @@ final class AppDataStore {
 
     private func encode(activeFish: ActiveFish) -> [String: Any] {
         [
+            "id": activeFish.id.uuidString,
             "speciesId": activeFish.speciesId,
             "name": activeFish.name,
             "startedAt": activeFish.startedAt,
@@ -476,6 +401,7 @@ final class AppDataStore {
 
     private func encode(collectedFish: CollectedFish) -> [String: Any] {
         [
+            "id": collectedFish.id.uuidString,
             "name": collectedFish.name,
             "speciesId": collectedFish.speciesId,
             "recordedAt": collectedFish.recordedAt,
@@ -486,6 +412,7 @@ final class AppDataStore {
 
     private func encode(careRecord: FishCareRecord) -> [String: Any] {
         [
+            "id": careRecord.id.uuidString,
             "speciesId": careRecord.speciesId,
             "recordedAt": careRecord.recordedAt,
             "waterAmount": careRecord.waterAmount,
@@ -498,6 +425,7 @@ final class AppDataStore {
 
     private func encode(aquarium: Aquarium) -> [String: Any] {
         [
+            "id": aquarium.id.uuidString,
             "totalWaterCollected": aquarium.totalWaterCollected,
             "createdAt": aquarium.createdAt,
             "updatedAt": aquarium.updatedAt
@@ -506,6 +434,7 @@ final class AppDataStore {
 
     private func encode(profile: UserProfile) -> [String: Any] {
         [
+            "id": profile.id.uuidString,
             "nickname": profile.nickname,
             "avatarEmoji": profile.avatarEmoji,
             "createdAt": profile.createdAt
@@ -598,7 +527,7 @@ final class AppDataStore {
 
     private func uuid(_ value: String, label: String) throws -> UUID {
         guard let uuid = UUID(uuidString: value) else {
-            throw AppDataStoreError.invalidCloudData(label)
+            throw AppDataStoreError.invalidLocalData(label)
         }
         return uuid
     }
@@ -625,13 +554,12 @@ final class AppDataStore {
 
     private func date(_ value: Any?, label: String) throws -> Date {
         if let date = optionalDate(value) { return date }
-        throw AppDataStoreError.invalidCloudData(label)
+        throw AppDataStoreError.invalidLocalData(label)
     }
 
     private func optionalDate(_ value: Any?) -> Date? {
         if value is NSNull { return nil }
         if let date = value as? Date { return date }
-        if let timestamp = value as? Timestamp { return timestamp.dateValue() }
         if let seconds = value as? TimeInterval { return Date(timeIntervalSince1970: seconds) }
         if let number = value as? NSNumber { return Date(timeIntervalSince1970: number.doubleValue) }
         return nil
