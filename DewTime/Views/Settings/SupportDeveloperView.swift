@@ -228,10 +228,11 @@ struct SupportDeveloperView: View {
         let name = product.displayName
         
         // 1. お菓子判定 (IDか表示名に snack/cookie/お菓子/クッキー が含まれる)
+        // アイコンはiOS 16未満との互換性のために gift.fill を使用
         if id.contains("snack") || id.contains("cookie") || id.contains("tip1") || id.contains("small") || id.contains("tier1") ||
            name.contains("お菓子") || name.contains("スナック") || name.contains("クッキー") {
             return CardStyleInfo(
-                icon: "cookie",
+                icon: "gift.fill",
                 gradient: LinearGradient(
                     colors: [Color(hex: "#4FC3F7"), Color(hex: "#0EC5FF")],
                     startPoint: .topLeading,
@@ -241,6 +242,7 @@ struct SupportDeveloperView: View {
             )
         } 
         // 2. コーヒー判定 (IDか表示名に coffee/drink/コーヒー/珈琲 が含まれる)
+        // cup.and.saucer.fill は iOS 14+ で動作
         else if id.contains("coffee") || id.contains("drink") || id.contains("tip2") || id.contains("medium") || id.contains("tier2") ||
                 name.contains("コーヒー") || name.contains("珈琲") || name.contains("カフェ") {
             return CardStyleInfo(
@@ -254,10 +256,11 @@ struct SupportDeveloperView: View {
             )
         } 
         // 3. ピザ判定 (IDか表示名に pizza/meal/ピザ/夜食 が含まれる)
+        // アイコンはiOS 16未満との互換性のために flame.fill (温かいエネルギーのイメージ) を使用
         else if id.contains("pizza") || id.contains("meal") || id.contains("tip3") || id.contains("large") || id.contains("tier3") ||
                 name.contains("ピザ") || name.contains("食事") || name.contains("夜食") {
             return CardStyleInfo(
-                icon: "pizza",
+                icon: "flame.fill",
                 gradient: LinearGradient(
                     colors: [Color(hex: "#f953c6"), Color(hex: "#b91d73")],
                     startPoint: .topLeading,
