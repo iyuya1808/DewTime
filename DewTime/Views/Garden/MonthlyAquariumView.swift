@@ -50,17 +50,12 @@ struct MonthlyAquariumView: View {
         }
         .navigationTitle("月間カレンダー")
         .navigationBarTitleDisplayMode(.inline)
-        .background(
-            LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
-        )
-        .environment(\.colorScheme, .light)
+        .dewAppBackground()
         .sheet(item: $selectedRecord) { record in
             FishCareDetailSheet(record: record)
                 .presentationDetents([.fraction(0.68), .large])
                 .presentationBackground(.clear)
                 .presentationDragIndicator(.visible)
-                .environment(\.colorScheme, .light)
         }
     }
 
@@ -104,7 +99,7 @@ struct MonthlyAquariumView: View {
         .foregroundStyle(.primary)
         .padding(.horizontal, 6)
         .padding(.vertical, 8)
-        .background(.white.opacity(0.62), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var weekdayHeader: some View {
@@ -159,7 +154,12 @@ struct MonthlyAquariumView: View {
             .padding(7)
             .frame(maxWidth: .infinity)
             .aspectRatio(0.82, contentMode: .fit)
-            .background(day.record == nil ? .white.opacity(day.isCurrentMonth ? 0.46 : 0.22) : .white.opacity(day.isCurrentMonth ? 0.82 : 0.42), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(
+                day.record == nil
+                    ? Color.dewSurfaceSoft.opacity(day.isCurrentMonth ? 1 : 0.55)
+                    : Color.dewSurface.opacity(day.isCurrentMonth ? 1 : 0.58),
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
             .overlay {
                 if day.isToday {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -227,13 +227,13 @@ struct MonthlyAquariumView: View {
                             .foregroundStyle(.secondary)
                     }
                     .padding(12)
-                    .background(.white.opacity(0.52), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Color.dewSurfaceSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(14)
-        .background(.white.opacity(0.66), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private var monthlyRecords: some View {
@@ -258,7 +258,7 @@ struct MonthlyAquariumView: View {
                                     .foregroundStyle(.secondary)
                             }
                             .frame(width: 78, height: 86)
-                            .background(.white.opacity(0.68), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                         .buttonStyle(.plain)
                     }
@@ -288,7 +288,7 @@ struct MonthlyAquariumView: View {
                     .font(.subheadline.weight(.semibold))
                     .padding(.horizontal, 14)
                     .padding(.vertical, 9)
-                    .background(.white.opacity(0.62), in: Capsule())
+                    .background(Color.dewSurface, in: Capsule())
             }
             .buttonStyle(.plain)
             .padding(.top, 4)
@@ -296,7 +296,7 @@ struct MonthlyAquariumView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 28)
         .padding(.horizontal)
-        .background(.white.opacity(0.56), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.dewSurfaceSoft, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     /// 成魚なら魚の絵文字、それ以外は成長段階の SF Symbol を表示する。
@@ -327,7 +327,7 @@ struct MonthlyAquariumView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
-        .background(.white.opacity(0.68), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func insightRow(icon: String, title: String, value: String, tint: Color) -> some View {

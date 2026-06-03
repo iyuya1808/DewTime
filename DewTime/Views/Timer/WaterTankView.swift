@@ -11,21 +11,24 @@ struct WaterTankView: View {
     var startDate: Date? = nil
     var targetDate: Date? = nil
 
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(AppPreferences.Key.aquariumTheme.rawValue) private var aquariumTheme = AquariumTheme.dewBlue.rawValue
     @StateObject private var motion = TankMotionManager()
+
+    private var backgroundGradient: LinearGradient {
+        let theme = AquariumTheme(rawValue: aquariumTheme) ?? .dewBlue
+        let colors = theme.tankBackgroundColors(isDark: colorScheme == .dark)
+        return LinearGradient(
+            colors: colors,
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.02, green: 0.07, blue: 0.18),
-                            Color(red: 0.03, green: 0.14, blue: 0.27)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
+                .fill(backgroundGradient)
 
             if showBorder {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -97,20 +100,8 @@ struct WaterTankView: View {
     }
 
     private var tankColors: (top: Color, middle: Color, bottom: Color, glow: Color) {
-        if isOverdue {
-            return (
-                Color.dewTankOverdueTop,
-                Color(red: 0.98, green: 0.24, blue: 0.20),
-                Color.dewTankOverdueBottom,
-                Color.orange
-            )
-        }
-        return (
-            Color(red: 0.42, green: 0.94, blue: 1.0),
-            Color.dewTankWaterTop,
-            Color.dewTankWaterBottom,
-            Color.dewBlue
-        )
+        let theme = AquariumTheme(rawValue: aquariumTheme) ?? .dewBlue
+        return theme.tankColors(isDark: colorScheme == .dark, isOverdue: isOverdue)
     }
 
     private func waterPath(size: CGSize, level: Double, time: TimeInterval, surface: TankSurface) -> Path {

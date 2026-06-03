@@ -7,9 +7,10 @@
 
 import Testing
 import Foundation
-import SwiftData
 @testable import DewTime
 
+@MainActor
+@Suite(.serialized)
 struct DewTimeTests {
 
     @Test func setActiveKeepsOnlySelectedScheduleActive() async throws {
@@ -84,91 +85,82 @@ struct DewTimeTests {
 
     @MainActor
     @Test func timerViewModelCreatesAndPersistsSelectedSpecies() async throws {
-        UserDefaults.standard.removeObject(forKey: "dew.timer.selectedSpecies")
-        let container = try makeInMemoryContainer()
+        resetLocalTestState()
+        defer { resetLocalTestState() }
+
+        let store = AppDataStore()
         let schedule = UserSchedule(name: "平日", targetDepartureTime: .now.addingTimeInterval(600), isActive: true)
 
         let vm = TimerViewModel(schedule: schedule)
-        vm.selectSpecies(.dolphin, context: container.mainContext)
+        await vm.selectSpecies(.dolphin, store: store)
 
-        let fishes = try container.mainContext.fetch(FetchDescriptor<ActiveFish>())
-        #expect(fishes.count == 1)
-        #expect(fishes.first?.speciesId == FishSpecies.dolphin.rawValue)
-        #expect(fishes.first?.receivedWater == 0)
-        #expect(FishSpecies.dolphin.requiredTotalWaterRange.contains(Int(fishes.first?.requiredTotalWater ?? 0)))
+        #expect(store.activeFishes.count == 1)
+        #expect(store.activeFishes.first?.speciesId == FishSpecies.dolphin.rawValue)
+        #expect(store.activeFishes.first?.receivedWater == 0)
+        #expect(FishSpecies.dolphin.requiredTotalWaterRange.contains(Int(store.activeFishes.first?.requiredTotalWater ?? 0)))
 
         let restored = TimerViewModel(schedule: schedule)
         #expect(restored.selectedSpecies == .dolphin)
-
-        UserDefaults.standard.removeObject(forKey: "dew.timer.selectedSpecies")
     }
 
     @MainActor
     @Test func departAddsWateringRecordWithoutCompletingWhenShort() async throws {
-        UserDefaults.standard.removeObject(forKey: "dew.timer.selectedSpecies")
-        let container = try makeInMemoryContainer()
+        resetLocalTestState()
+        defer { resetLocalTestState() }
+
+        let store = AppDataStore()
         let schedule = UserSchedule(name: "平日", targetDepartureTime: .now.addingTimeInterval(600), isActive: true)
         let vm = TimerViewModel(schedule: schedule)
-        vm.selectSpecies(.shark, context: container.mainContext)
+        await vm.selectSpecies(.shark, store: store)
 
-        let fishesBefore = try container.mainContext.fetch(FetchDescriptor<ActiveFish>())
-        let fish = try #require(fishesBefore.first)
+        let fish = try #require(store.activeFishes.first)
         fish.requiredTotalWater = 300
         fish.receivedWater = 0
 
-        vm.depart(context: container.mainContext)
+        await vm.depart(store: store)
 
-        let records = try container.mainContext.fetch(FetchDescriptor<FishCareRecord>())
-        let collected = try container.mainContext.fetch(FetchDescriptor<CollectedFish>())
-        let fishesAfter = try container.mainContext.fetch(FetchDescriptor<ActiveFish>())
-
-        #expect(records.count == 1)
-        #expect(records.first?.speciesId == FishSpecies.shark.rawValue)
-        #expect(records.first?.waterAmount == 100)
-        #expect(records.first?.totalWaterAfter == 100)
-        #expect(records.first?.completedGrowth == false)
-        #expect(collected.isEmpty)
-        #expect(fishesAfter.first?.receivedWater == 100)
-        #expect(fishesAfter.first?.isCompleted == false)
+        #expect(store.careRecords.count == 1)
+        #expect(store.careRecords.first?.speciesId == FishSpecies.shark.rawValue)
+        #expect(store.careRecords.first?.waterAmount == 100)
+        #expect(store.careRecords.first?.totalWaterAfter == 100)
+        #expect(store.careRecords.first?.completedGrowth == false)
+        #expect(store.collectedFishes.isEmpty)
+        #expect(store.activeFishes.first?.receivedWater == 100)
+        #expect(store.activeFishes.first?.isCompleted == false)
         #expect(vm.activeFish != nil)
 
         vm.reset()
-        UserDefaults.standard.removeObject(forKey: "dew.timer.selectedSpecies")
     }
 
     @MainActor
     @Test func departCompletesFishAndCreatesCollectionRecordWhenEnoughWater() async throws {
-        UserDefaults.standard.removeObject(forKey: "dew.timer.selectedSpecies")
-        let container = try makeInMemoryContainer()
+        resetLocalTestState()
+        defer { resetLocalTestState() }
+
+        let store = AppDataStore()
         let schedule = UserSchedule(name: "平日", targetDepartureTime: .now.addingTimeInterval(600), isActive: true)
         let vm = TimerViewModel(schedule: schedule)
-        vm.selectSpecies(.medaka, context: container.mainContext)
+        await vm.selectSpecies(.medaka, store: store)
 
-        let fishesBefore = try container.mainContext.fetch(FetchDescriptor<ActiveFish>())
-        let fish = try #require(fishesBefore.first)
+        let fish = try #require(store.activeFishes.first)
         fish.requiredTotalWater = 80
         fish.receivedWater = 20
 
-        vm.depart(context: container.mainContext)
+        await vm.depart(store: store)
 
-        let records = try container.mainContext.fetch(FetchDescriptor<FishCareRecord>())
-        let collected = try container.mainContext.fetch(FetchDescriptor<CollectedFish>())
-        let fishesAfter = try container.mainContext.fetch(FetchDescriptor<ActiveFish>())
-
-        #expect(records.count == 1)
-        #expect(records.first?.waterAmount == 100)
-        #expect(records.first?.totalWaterAfter == 80)
-        #expect(records.first?.growthStage == .adult)
-        #expect(records.first?.completedGrowth == true)
-        #expect(collected.count == 1)
-        #expect(collected.first?.speciesId == FishSpecies.medaka.rawValue)
-        #expect(collected.first?.succeeded == true)
-        #expect(fishesAfter.first?.receivedWater == 80)
-        #expect(fishesAfter.first?.isCompleted == true)
+        #expect(store.careRecords.count == 1)
+        #expect(store.careRecords.first?.waterAmount == 100)
+        #expect(store.careRecords.first?.totalWaterAfter == 80)
+        #expect(store.careRecords.first?.growthStage == .adult)
+        #expect(store.careRecords.first?.completedGrowth == true)
+        #expect(store.collectedFishes.count == 1)
+        #expect(store.collectedFishes.first?.speciesId == FishSpecies.medaka.rawValue)
+        #expect(store.collectedFishes.first?.succeeded == true)
+        #expect(store.activeFishes.first?.receivedWater == 80)
+        #expect(store.activeFishes.first?.isCompleted == true)
         #expect(vm.activeFish == nil)
 
         vm.reset()
-        UserDefaults.standard.removeObject(forKey: "dew.timer.selectedSpecies")
     }
 
     @MainActor
@@ -180,11 +172,100 @@ struct DewTimeTests {
     }
 
     @MainActor
-    private func makeInMemoryContainer() throws -> ModelContainer {
-        try ModelContainer(
-            for: UserSchedule.self, RoutineItem.self, CollectedFish.self, ActiveFish.self, FishCareRecord.self, Aquarium.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-        )
+    @Test func liveActivityAttributesContainRoutineSegments() async throws {
+        resetLocalTestState()
+        defer { resetLocalTestState() }
+
+        let schedule = makeScheduleForLiveActivityTests()
+        let vm = TimerViewModel(schedule: schedule)
+
+        vm.start()
+
+        let attributes = try #require(vm.liveActivityAttributes())
+        #expect(attributes.scheduleName == "平日")
+        #expect(attributes.segments.count == 2)
+        #expect(attributes.segments[0].name == "ハミガキ")
+        #expect(attributes.segments[0].startOffset == 0)
+        #expect(attributes.segments[0].endOffset == 180)
+        #expect(attributes.segments[1].startOffset == 180)
+
+        vm.reset()
+    }
+
+    @MainActor
+    @Test func liveActivityContentStateMirrorsTimerAndFishState() async throws {
+        resetLocalTestState()
+        defer { resetLocalTestState() }
+
+        let store = AppDataStore()
+        let schedule = makeScheduleForLiveActivityTests()
+        let vm = TimerViewModel(schedule: schedule)
+
+        await vm.selectSpecies(.guppy, store: store)
+        let fish = try #require(store.activeFishes.first)
+        fish.requiredTotalWater = 120
+        fish.receivedWater = 30
+
+        vm.start()
+
+        let state = vm.liveActivityContentState()
+        #expect(state.status == .running)
+        #expect(state.currentTaskName == "ハミガキ")
+        #expect(state.nextTaskName == "着替え")
+        #expect(state.selectedSpeciesName == FishSpecies.guppy.displayName)
+        #expect(state.fishEmoji == FishSpecies.guppy.emoji)
+        #expect(state.receivedWater == 30)
+        #expect(state.requiredWater == 120)
+        #expect(state.projectedWater == 120)
+        #expect(state.growthStageName == GrowthStage.adult.displayName)
+
+        vm.reset()
+    }
+
+    @MainActor
+    @Test func liveActivityFinishedStatesUseTerminalLabels() async throws {
+        resetLocalTestState()
+        defer { resetLocalTestState() }
+
+        let schedule = makeScheduleForLiveActivityTests()
+        let vm = TimerViewModel(schedule: schedule)
+        vm.start()
+
+        let departed = vm.liveActivityContentState(status: .departed)
+        let cancelled = vm.liveActivityContentState(status: .cancelled)
+
+        #expect(departed.currentTaskName == "出発完了")
+        #expect(departed.nextTaskName == nil)
+        #expect(cancelled.currentTaskName == "キャンセル")
+        #expect(cancelled.nextTaskName == nil)
+
+        vm.reset()
+    }
+
+    private func makeScheduleForLiveActivityTests() -> UserSchedule {
+        let schedule = UserSchedule(name: "平日", targetDepartureTime: .now.addingTimeInterval(600), isActive: true)
+        let brushing = RoutineItem(name: "ハミガキ", durationSeconds: 180, colorHex: "#38BDF8", orderIndex: 0, schedule: schedule)
+        let clothes = RoutineItem(name: "着替え", durationSeconds: 420, colorHex: "#34D399", orderIndex: 1, schedule: schedule)
+        schedule.items = [brushing, clothes]
+        return schedule
+    }
+
+    private func resetLocalTestState() {
+        [
+            "dew.timer.scheduleId",
+            "dew.timer.startedAt",
+            "dew.timer.departed",
+            "dew.timer.finalWaterLevel",
+            "dew.timer.finalDelaySeconds",
+            "dew.timer.selectedSpecies",
+            "local_schedules",
+            "local_routine_items",
+            "local_active_fishes",
+            "local_collected_fishes",
+            "local_care_records",
+            "local_aquariums",
+            "local_profiles"
+        ].forEach { UserDefaults.standard.removeObject(forKey: $0) }
     }
 
 }

@@ -245,6 +245,8 @@ private final class AquariumEngine {
 
 struct LiveAquariumView: View {
     @Environment(AppDataStore.self) private var store
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(AppPreferences.Key.aquariumTheme.rawValue) private var aquariumTheme = AquariumTheme.dewBlue.rawValue
 
     @State private var engine = AquariumEngine()
     @State private var showRecords = false
@@ -334,11 +336,9 @@ struct LiveAquariumView: View {
 
     private func drawWater(context: GraphicsContext, size: CGSize) {
         let rect = CGRect(origin: .zero, size: size)
-        let gradient = Gradient(colors: [
-            Color(red: 0.36, green: 0.74, blue: 0.92),
-            Color(red: 0.13, green: 0.46, blue: 0.78),
-            Color(red: 0.06, green: 0.28, blue: 0.55)
-        ])
+        let theme = AquariumTheme(rawValue: aquariumTheme) ?? .dewBlue
+        let colors = theme.liveAquariumColors(isDark: colorScheme == .dark)
+        let gradient = Gradient(colors: colors)
         context.fill(
             Path(rect),
             with: .linearGradient(gradient, startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height))
@@ -348,6 +348,8 @@ struct LiveAquariumView: View {
     private func drawLightRays(context: GraphicsContext, size: CGSize, time: TimeInterval) {
         var ctx = context
         ctx.blendMode = .softLight
+        let theme = AquariumTheme(rawValue: aquariumTheme) ?? .dewBlue
+        let rayColor = theme.liveAquariumLightRayColor(isDark: colorScheme == .dark)
         for index in 0..<4 {
             let phase = sin(time * 0.3 + Double(index)) * 0.04
             let topX = size.width * (0.15 + Double(index) * 0.22 + phase)
@@ -358,17 +360,19 @@ struct LiveAquariumView: View {
                 p.addLine(to: CGPoint(x: topX + size.width * 0.06, y: size.height))
                 p.closeSubpath()
             }
-            ctx.fill(path, with: .color(.white.opacity(0.10)))
+            ctx.fill(path, with: .color(rayColor))
         }
     }
 
     private func drawSeaweed(context: GraphicsContext, size: CGSize, time: TimeInterval) {
+        let theme = AquariumTheme(rawValue: aquariumTheme) ?? .dewBlue
+        let hues = theme.liveAquariumSeaweedColors(isDark: colorScheme == .dark)
         let blades: [(x: CGFloat, height: CGFloat, hue: Color)] = [
-            (0.12, 0.32, Color(red: 0.18, green: 0.55, blue: 0.36)),
-            (0.18, 0.22, Color(red: 0.25, green: 0.62, blue: 0.42)),
-            (0.80, 0.30, Color(red: 0.16, green: 0.50, blue: 0.34)),
-            (0.88, 0.20, Color(red: 0.28, green: 0.66, blue: 0.45)),
-            (0.50, 0.16, Color(red: 0.22, green: 0.58, blue: 0.40))
+            (0.12, 0.32, hues[0]),
+            (0.18, 0.22, hues[1]),
+            (0.80, 0.30, hues[2]),
+            (0.88, 0.20, hues[3]),
+            (0.50, 0.16, hues[4])
         ]
         for (i, blade) in blades.enumerated() {
             let baseX = blade.x * size.width
@@ -402,10 +406,12 @@ struct LiveAquariumView: View {
             p.addLine(to: CGPoint(x: size.width, y: size.height))
             p.closeSubpath()
         }
+        let theme = AquariumTheme(rawValue: aquariumTheme) ?? .dewBlue
+        let colors = theme.liveAquariumSandColors(isDark: colorScheme == .dark)
         context.fill(
             path,
             with: .linearGradient(
-                Gradient(colors: [Color(red: 0.93, green: 0.86, blue: 0.66), Color(red: 0.82, green: 0.72, blue: 0.50)]),
+                Gradient(colors: colors),
                 startPoint: CGPoint(x: 0, y: sandTop),
                 endPoint: CGPoint(x: 0, y: size.height)
             )

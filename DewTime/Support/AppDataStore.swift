@@ -387,16 +387,19 @@ final class AppDataStore {
     }
 
     private func encode(activeFish: ActiveFish) -> [String: Any] {
-        [
+        var data: [String: Any] = [
             "id": activeFish.id.uuidString,
             "speciesId": activeFish.speciesId,
             "name": activeFish.name,
             "startedAt": activeFish.startedAt,
-            "lastWateredAt": activeFish.lastWateredAt ?? NSNull(),
             "requiredTotalWater": activeFish.requiredTotalWater,
             "receivedWater": activeFish.receivedWater,
             "isCompleted": activeFish.isCompleted
         ]
+        if let lastWateredAt = activeFish.lastWateredAt {
+            data["lastWateredAt"] = lastWateredAt
+        }
+        return data
     }
 
     private func encode(collectedFish: CollectedFish) -> [String: Any] {

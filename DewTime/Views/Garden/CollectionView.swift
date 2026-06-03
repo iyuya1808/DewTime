@@ -219,16 +219,8 @@ struct CollectionView: View {
                     }
                 }
             }
-            .background(
-                LinearGradient(
-                    colors: [.aquariumTop, .aquariumBottom],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-            )
+            .dewAppBackground()
         }
-        .environment(\.colorScheme, .light)
         .sheet(item: $selectedSpecies) { species in
             SpeciesDetailSheet(
                 species: species,
@@ -244,14 +236,12 @@ struct CollectionView: View {
             .presentationDetents([.large])
             .presentationBackground(.clear)
             .presentationDragIndicator(.hidden)
-            .environment(\.colorScheme, .light)
         }
         .sheet(item: $selectedFish) { fish in
             FishDetailSheet(fish: fish)
                 .presentationDetents([.medium])
                 .presentationBackground(.clear)
                 .presentationDragIndicator(.hidden)
-                .environment(\.colorScheme, .light)
         }
     }
 
@@ -309,7 +299,7 @@ struct CollectionView: View {
                         .background(
                             isSelected
                                 ? AnyShapeStyle(Color.teal.opacity(0.85))
-                                : AnyShapeStyle(.white.opacity(0.5)),
+                                : AnyShapeStyle(Color.dewSurfaceSoft),
                             in: Capsule()
                         )
                         .foregroundStyle(isSelected ? .white : .secondary)
@@ -618,7 +608,7 @@ struct CollectionView: View {
                                     .foregroundStyle(.secondary)
                             }
                             .frame(width: 76, height: 88)
-                            .background(.white.opacity(0.68), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                         .buttonStyle(.plain)
                     }
@@ -658,6 +648,7 @@ private struct SpeciesDetailSheet: View {
     let onSelectFish: (CollectedFish) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
 
     var body: some View {
@@ -710,7 +701,11 @@ private struct SpeciesDetailSheet: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom))
+                .fill(
+                    colorScheme == .dark
+                        ? AnyShapeStyle(Color(red: 0.02, green: 0.06, blue: 0.10))
+                        : AnyShapeStyle(LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom))
+                )
                 .ignoresSafeArea()
         )
     }
@@ -902,7 +897,7 @@ private struct SpeciesDetailSheet: View {
             }
         }
         .padding(18)
-        .background(.white.opacity(0.6), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private var unlockedStateHeader: some View {
@@ -992,11 +987,11 @@ private struct SpeciesDetailSheet: View {
         .padding(18)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(.white.opacity(0.58))
+                .fill(Color.dewSurfaceSoft)
         )
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.42), lineWidth: 0.8)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
         }
     }
 

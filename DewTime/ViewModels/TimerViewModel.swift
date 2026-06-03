@@ -21,6 +21,7 @@ final class TimerViewModel {
 
     private var timer: Timer?
     private var lastRoutineItemID: UUID?
+    private var lastLiveActivityUpdate: Date?
     private var didPlayOverdueWarning = false
 
     init(schedule: UserSchedule) {
@@ -176,6 +177,7 @@ final class TimerViewModel {
         startTicker()
         saveState()
         NotificationScheduler.schedule(departureAt: schedule.targetDepartureTime, scheduleName: schedule.name)
+        syncLiveActivity(force: true)
     }
 
     func depart(store: AppDataStore) async {
@@ -198,6 +200,7 @@ final class TimerViewModel {
         timer = nil
         NotificationScheduler.cancelAll()
         saveState()
+        endLiveActivity(status: .departed)
 
         await store.recordDeparture(
             species: species,
@@ -217,6 +220,9 @@ final class TimerViewModel {
     }
 
     func reset() {
+        if isRunning || departed {
+            endLiveActivity(status: .cancelled)
+        }
         timer?.invalidate()
         timer = nil
         startedAt = nil
@@ -273,6 +279,7 @@ final class TimerViewModel {
         now = .now
         handleScheduleKnocks()
         if timer == nil { startTicker() }
+        syncLiveActivity(force: true)
     }
 
     /// バックグラウンド移行時に呼ぶ。ティッカーを止めてバッテリーを節約する。
@@ -350,6 +357,7 @@ final class TimerViewModel {
                 guard let self else { return }
                 self.now = .now
                 self.handleScheduleKnocks()
+                self.syncLiveActivity(force: false)
             }
         }
         RunLoop.main.add(timer!, forMode: .common)
@@ -360,13 +368,112 @@ final class TimerViewModel {
 
         let currentID = currentRoutineItem?.id
         if let currentID, let lastRoutineItemID, currentID != lastRoutineItemID {
-            ScheduleHaptics.playPhaseKnock()
+            if AppPreferences.hapticsEnabled {
+                ScheduleHaptics.playPhaseKnock()
+            }
+            syncLiveActivity(force: true)
         }
         lastRoutineItemID = currentID
 
         if isOverdue, !didPlayOverdueWarning {
             didPlayOverdueWarning = true
-            ScheduleHaptics.playOverdueWarning()
+            if AppPreferences.hapticsEnabled {
+                ScheduleHaptics.playOverdueWarning()
+            }
+            syncLiveActivity(force: true)
+        }
+    }
+}
+
+extension TimerViewModel {
+    func liveActivityAttributes() -> DewTimerActivityAttributes? {
+        guard let startedAt else { return nil }
+
+        var elapsed: TimeInterval = 0
+        let segments = schedule.orderedItems.map { item in
+            let start = elapsed
+            elapsed += TimeInterval(item.durationSeconds)
+            return DewTimerActivityAttributes.RoutineSegment(
+                id: item.id.uuidString,
+                name: item.name,
+                colorHex: item.colorHex,
+                startOffset: start,
+                endOffset: elapsed
+            )
+        }
+
+        return DewTimerActivityAttributes(
+            scheduleName: schedule.name,
+            startedAt: startedAt,
+            targetDepartureTime: schedule.targetDepartureTime,
+            segments: segments
+        )
+    }
+
+    func liveActivityContentState(
+        status explicitStatus: DewTimerActivityAttributes.TimerStatus? = nil
+    ) -> DewTimerActivityAttributes.ContentState {
+        let status = explicitStatus ?? defaultLiveActivityStatus
+        return DewTimerActivityAttributes.ContentState(
+            currentTaskName: liveActivityCurrentTaskName(status: status),
+            nextTaskName: status.isFinished ? nil : nextRoutineItem?.name,
+            selectedSpeciesName: selectedSpecies.displayName,
+            fishEmoji: selectedSpecies.emoji,
+            growthStageName: projectedGrowthStage.displayName,
+            growthStageIconName: projectedGrowthStage.icon,
+            receivedWater: currentReceivedWater,
+            requiredWater: currentRequiredTotalWater,
+            projectedWater: projectedTotalWater,
+            waterLevel: waterLevel,
+            status: status,
+            lastUpdatedAt: now
+        )
+    }
+
+    private var defaultLiveActivityStatus: DewTimerActivityAttributes.TimerStatus {
+        if departed { return .departed }
+        if isOverdue { return .overdue }
+        return .running
+    }
+
+    private func liveActivityCurrentTaskName(status: DewTimerActivityAttributes.TimerStatus) -> String {
+        switch status {
+        case .departed:
+            return "出発完了"
+        case .cancelled:
+            return "キャンセル"
+        case .running, .overdue:
+            return currentRoutineItem?.name ?? "準備中"
+        }
+    }
+
+    private func syncLiveActivity(force: Bool) {
+        guard isRunning else { return }
+
+        let shouldUpdate: Bool
+        if force {
+            shouldUpdate = true
+        } else if let lastLiveActivityUpdate {
+            shouldUpdate = now.timeIntervalSince(lastLiveActivityUpdate) >= 15
+        } else {
+            shouldUpdate = true
+        }
+
+        guard shouldUpdate else { return }
+        lastLiveActivityUpdate = now
+
+        guard let attributes = liveActivityAttributes() else { return }
+        let state = liveActivityContentState()
+        Task {
+            await DewTimerLiveActivityController.start(attributes: attributes, state: state)
+        }
+    }
+
+    private func endLiveActivity(status: DewTimerActivityAttributes.TimerStatus) {
+        let state = liveActivityContentState(status: status)
+        lastLiveActivityUpdate = nil
+        Task {
+            await DewTimerLiveActivityController.end(state: state)
         }
     }
 }

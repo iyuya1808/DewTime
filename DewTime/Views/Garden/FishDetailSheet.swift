@@ -4,6 +4,7 @@ struct FishDetailSheet: View {
     let fish: CollectedFish
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(spacing: 20) {
@@ -59,7 +60,11 @@ struct FishDetailSheet: View {
         .padding(.bottom, 24)
         .background(
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom))
+                .fill(
+                    colorScheme == .dark
+                        ? AnyShapeStyle(Color(red: 0.02, green: 0.06, blue: 0.10))
+                        : AnyShapeStyle(LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom))
+                )
                 .ignoresSafeArea()
         )
     }
@@ -78,7 +83,7 @@ struct FishDetailSheet: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
-        .background(.white.opacity(0.62), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var fishEmoji: String {

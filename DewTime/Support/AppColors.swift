@@ -1,6 +1,12 @@
 import SwiftUI
 
 extension Color {
+    private static func adaptive(light: UIColor, dark: UIColor) -> Color {
+        Color(UIColor { traitCollection in
+            traitCollection.userInterfaceStyle == .dark ? dark : light
+        })
+    }
+
     // MARK: - Brand
     static let dewBlue = Color(hex: "#0EC5FF")
     static let dewNavy = Color(hex: "#3A7BD5")
@@ -20,8 +26,26 @@ extension Color {
     static let dewTankOverdueBottom = Color(red: 0.70, green: 0.15, blue: 0.10)
 
     // MARK: - Aquarium
-    static let aquariumTop    = Color(red: 0.90, green: 0.97, blue: 0.99)
-    static let aquariumBottom = Color(red: 0.72, green: 0.88, blue: 0.96)
+    static let aquariumTop = adaptive(
+        light: UIColor(red: 0.90, green: 0.97, blue: 0.99, alpha: 1),
+        dark: UIColor(red: 0.04, green: 0.12, blue: 0.16, alpha: 1)
+    )
+    static let aquariumBottom = adaptive(
+        light: UIColor(red: 0.72, green: 0.88, blue: 0.96, alpha: 1),
+        dark: UIColor(red: 0.02, green: 0.07, blue: 0.12, alpha: 1)
+    )
+    static let dewSurface = adaptive(
+        light: UIColor(white: 1, alpha: 0.66),
+        dark: UIColor(red: 0.08, green: 0.16, blue: 0.20, alpha: 0.82)
+    )
+    static let dewSurfaceSoft = adaptive(
+        light: UIColor(white: 1, alpha: 0.50),
+        dark: UIColor(red: 0.12, green: 0.22, blue: 0.27, alpha: 0.62)
+    )
+    static let dewListRowBackground = adaptive(
+        light: UIColor(white: 1, alpha: 0.60),
+        dark: UIColor(red: 0.08, green: 0.16, blue: 0.20, alpha: 0.72)
+    )
 
     // MARK: - Routine task color palette
     static let routinePalette: [Color] = [
@@ -29,4 +53,32 @@ extension Color {
         Color(hex: "#FFCC80"), Color(hex: "#A5D6A7"), Color(hex: "#CE93D8"),
         Color(hex: "#F48FB1"), Color(hex: "#9FA8DA")
     ]
+}
+
+struct DewAppBackgroundModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                Group {
+                    if colorScheme == .dark {
+                        Color(red: 0.02, green: 0.06, blue: 0.10)
+                    } else {
+                        LinearGradient(
+                            colors: [.aquariumTop, .aquariumBottom],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
+                }
+                .ignoresSafeArea()
+            )
+    }
+}
+
+extension View {
+    func dewAppBackground() -> some View {
+        self.modifier(DewAppBackgroundModifier())
+    }
 }

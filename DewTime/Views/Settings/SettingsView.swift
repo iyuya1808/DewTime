@@ -3,7 +3,15 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppDataStore.self) private var store
 
+    @AppStorage(AppPreferences.Key.notificationsEnabled.rawValue) private var notificationsEnabled = true
+    @AppStorage(AppPreferences.Key.departureReminderEnabled.rawValue) private var departureReminderEnabled = true
+    @AppStorage(AppPreferences.Key.departureReminderMinutes.rawValue) private var departureReminderMinutes = 5
+    @AppStorage(AppPreferences.Key.hapticsEnabled.rawValue) private var hapticsEnabled = true
+    @AppStorage(AppPreferences.Key.appTheme.rawValue) private var appTheme = AppTheme.system.rawValue
+    @AppStorage(AppPreferences.Key.aquariumTheme.rawValue) private var aquariumTheme = AquariumTheme.dewBlue.rawValue
+
     @State private var showAddSheet = false
+    @State private var showProfileEditor = false
     @State private var newName = ""
     @State private var newTime = Date()
     @State private var saveError: String?
@@ -11,6 +19,17 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    Button {
+                        showProfileEditor = true
+                    } label: {
+                        Label("プロフィールを編集", systemImage: "person.crop.circle")
+                    }
+                } header: {
+                    Text("プロフィール")
+                }
+                .listRowBackground(Color.dewListRowBackground)
+
                 Section {
                     ForEach(store.schedules) { schedule in
                         NavigationLink(destination: RoutineEditorView(schedule: schedule)) {
@@ -27,7 +46,7 @@ struct SettingsView: View {
                 } footer: {
                     Text("有効化したスケジュールがタイマーに使われます")
                 }
-                .listRowBackground(Color.white.opacity(0.6))
+                .listRowBackground(Color.dewListRowBackground)
 
                 Section {
                     Button {
@@ -38,22 +57,68 @@ struct SettingsView: View {
                         Label("スケジュールを追加", systemImage: "plus.circle.fill")
                     }
                 }
-                .listRowBackground(Color.white.opacity(0.6))
+                .listRowBackground(Color.dewListRowBackground)
+
+                Section {
+                    NavigationLink(destination: NotificationSettingsView()) {
+                        Label("通知と触覚", systemImage: "bell.badge")
+                    }
+                } header: {
+                    Text("通知と触覚")
+                } footer: {
+                    Text(notificationSummary)
+                }
+                .listRowBackground(Color.dewListRowBackground)
+
+                Section {
+                    HStack {
+                        Label("外観モード", systemImage: "circle.lefthalf.filled")
+                        Spacer()
+                        Picker("", selection: $appTheme) {
+                            ForEach(AppTheme.allCases) { theme in
+                                Text(theme.displayName).tag(theme.rawValue)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(.secondary)
+                    }
+                    HStack {
+                        Label("水槽テーマ", systemImage: "paintpalette")
+                        Spacer()
+                        Picker("", selection: $aquariumTheme) {
+                            ForEach(AquariumTheme.allCases) { theme in
+                                Text(theme.displayName).tag(theme.rawValue)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(.secondary)
+                    }
+                } header: {
+                    Text("表示")
+                } footer: {
+                    Text(themeFooterText)
+                }
+                .listRowBackground(Color.dewListRowBackground)
 
                 Section {
                     NavigationLink(destination: DataManagementView()) {
                         Label("データ管理", systemImage: "externaldrive")
                     }
                 }
-                .listRowBackground(Color.white.opacity(0.6))
+                .listRowBackground(Color.dewListRowBackground)
+
+                Section {
+                    NavigationLink(destination: SupportDeveloperView()) {
+                        Label("開発者を応援", systemImage: "heart.fill")
+                    }
+                } header: {
+                    Text("サポート")
+                }
+                .listRowBackground(Color.dewListRowBackground)
             }
             .navigationTitle("設定")
             .scrollContentBackground(.hidden)
-            .background(
-                LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom)
-                    .ignoresSafeArea()
-            )
-            .environment(\.colorScheme, .light)
+            .dewAppBackground()
             .onAppear {
                 let activeCount = store.schedules.filter(\.isActive).count
                 if !store.schedules.isEmpty, activeCount != 1 {
@@ -65,6 +130,9 @@ struct SettingsView: View {
                 addSheet
                     .presentationDetents([.medium])
             }
+            .sheet(isPresented: $showProfileEditor) {
+                ProfileEditView()
+            }
             .alert(
                 "保存エラー",
                 isPresented: Binding(get: { saveError != nil }, set: { _ in saveError = nil })
@@ -73,6 +141,29 @@ struct SettingsView: View {
             } message: {
                 Text(saveError ?? "")
             }
+        }
+    }
+
+
+
+    private var notificationSummary: String {
+        guard notificationsEnabled else { return "通知はオフです。" }
+        if departureReminderEnabled {
+            return "出発時刻と\(departureReminderMinutes)分前に通知します。"
+        }
+        return "出発時刻のみ通知します。"
+    }
+
+    private var themeFooterText: String {
+        switch AppTheme(rawValue: appTheme) {
+        case .system:
+            return "ライトモードとダークモードは端末の外観設定に合わせて切り替わります。"
+        case .light:
+            return "常にライトモードで表示します。"
+        case .dark:
+            return "常にダークモードで表示します。"
+        default:
+            return ""
         }
     }
 

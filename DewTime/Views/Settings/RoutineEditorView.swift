@@ -21,7 +21,7 @@ struct RoutineEditorView: View {
                 )
                 Toggle("このスケジュールを使用", isOn: activeBinding)
             }
-            .listRowBackground(Color.white.opacity(0.6))
+            .listRowBackground(Color.dewListRowBackground)
 
             Section {
                 ForEach(schedule.orderedItems) { item in
@@ -50,16 +50,12 @@ struct RoutineEditorView: View {
                     EditButton()
                 }
             }
-            .listRowBackground(Color.white.opacity(0.6))
+            .listRowBackground(Color.dewListRowBackground)
         }
         .navigationTitle(schedule.name)
         .navigationBarTitleDisplayMode(.inline)
         .scrollContentBackground(.hidden)
-        .background(
-            LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
-        )
-        .environment(\.colorScheme, .light)
+        .dewAppBackground()
         .sheet(isPresented: $showAddSheet) {
             addSheet
                 .presentationDetents([.medium])

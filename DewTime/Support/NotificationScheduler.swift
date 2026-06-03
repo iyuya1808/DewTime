@@ -12,17 +12,22 @@ enum NotificationScheduler {
     /// スタート時に出発通知と5分前リマインダーをスケジュール
     static func schedule(departureAt date: Date, scheduleName: String) {
         cancelAll()
+        guard AppPreferences.notificationsEnabled else { return }
+
         scheduleNotification(
             id: "dew.departure",
             title: "出発時刻です！",
             body: "「\(scheduleName)」の出発時刻になりました",
             at: date
         )
+
+        guard AppPreferences.departureReminderEnabled else { return }
+        let reminderMinutes = AppPreferences.departureReminderMinutes
         scheduleNotification(
             id: "dew.reminder5",
-            title: "あと5分！",
-            body: "「\(scheduleName)」の出発まであと5分です",
-            at: date.addingTimeInterval(-5 * 60)
+            title: "あと\(reminderMinutes)分！",
+            body: "「\(scheduleName)」の出発まであと\(reminderMinutes)分です",
+            at: date.addingTimeInterval(TimeInterval(-reminderMinutes * 60))
         )
     }
 

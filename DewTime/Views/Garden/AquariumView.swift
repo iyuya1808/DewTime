@@ -42,18 +42,13 @@ struct AquariumView: View {
                 .padding(.bottom, 24)
             }
             .navigationTitle("水槽")
-            .background(
-                LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom)
-                    .ignoresSafeArea()
-            )
+            .dewAppBackground()
         }
-        .environment(\.colorScheme, .light)
         .sheet(item: $selectedRecord) { record in
             FishCareDetailSheet(record: record)
                 .presentationDetents([.fraction(0.68), .large])
                 .presentationBackground(.clear)
                 .presentationDragIndicator(.visible)
-                .environment(\.colorScheme, .light)
         }
     }
 
@@ -84,12 +79,12 @@ struct AquariumView: View {
                     .font(.headline)
                     .foregroundStyle(.teal)
                     .frame(width: 38, height: 38)
-                    .background(.white.opacity(0.56), in: Circle())
+                    .background(Color.dewSurfaceSoft, in: Circle())
             }
             .buttonStyle(.plain)
         }
         .padding(16)
-        .background(.white.opacity(0.64), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func weekDayCell(_ day: AquariumWeekDay) -> some View {
@@ -141,7 +136,7 @@ struct AquariumView: View {
             .padding(7)
             .frame(maxWidth: .infinity)
             .aspectRatio(0.68, contentMode: .fit)
-            .background(day.record == nil ? .white.opacity(0.46) : .white.opacity(0.82), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(day.record == nil ? Color.dewSurfaceSoft : Color.dewSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay {
                 if day.isToday {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -207,13 +202,13 @@ struct AquariumView: View {
                             .foregroundStyle(.secondary)
                     }
                     .padding(12)
-                    .background(.white.opacity(0.52), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Color.dewSurfaceSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(14)
-        .background(.white.opacity(0.66), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private var recentRecords: some View {
@@ -238,7 +233,7 @@ struct AquariumView: View {
                                     .foregroundStyle(.secondary)
                             }
                             .frame(width: 82, height: 88)
-                            .background(.white.opacity(0.68), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                         .buttonStyle(.plain)
                     }
@@ -276,7 +271,7 @@ struct AquariumView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
-        .background(.white.opacity(0.68), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func insightRow(icon: String, title: String, value: String, tint: Color) -> some View {
@@ -313,7 +308,7 @@ struct AquariumView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 28)
         .padding(.horizontal)
-        .background(.white.opacity(0.56), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.dewSurfaceSoft, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private var recentWeekDays: [AquariumWeekDay] {
@@ -391,11 +386,18 @@ private struct AquariumWeekDay: Identifiable {
 
 struct FishCareDetailSheet: View {
     let record: FishCareRecord
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
+            Group {
+                if colorScheme == .dark {
+                    Color(red: 0.02, green: 0.06, blue: 0.10)
+                } else {
+                    LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom)
+                }
+            }
+            .ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 18) {
@@ -463,7 +465,7 @@ struct FishCareDetailSheet: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
-        .background(.white.opacity(0.62), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var recordColor: Color {

@@ -7,12 +7,22 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		178168454DFF4640AED5445E /* DewTimerActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22149E933C2E42FD9FF5B1EE /* DewTimerActivityAttributes.swift */; };
+		24882F24F62445B9B2B0295B /* DewTimeLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C21C8101FC66474F8D9EC7FB /* DewTimeLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		2557DFEB9B514FD510B1B781 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
 		2758003524B44BEDCB87D222 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
 		52CD365B31AC8EB82DDF5E1A /* (null) in Frameworks */ = {isa = PBXBuildFile; };
+		64A251C064C74A26BEA3A883 /* DewTimerActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22149E933C2E42FD9FF5B1EE /* DewTimerActivityAttributes.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		FB39C39A9C1441DE93E7D4D3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FAACC7CA2FBF610800622ABE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E5EA2DBA6A2C43EFA5CB084C;
+			remoteInfo = DewTimeLiveActivityExtension;
+		};
 		FAACC7E02FBF610900622ABE /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = FAACC7CA2FBF610800622ABE /* Project object */;
@@ -30,12 +40,32 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		22149E933C2E42FD9FF5B1EE /* DewTimerActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DewTimerActivityAttributes.swift; sourceTree = "<group>"; };
+		C21C8101FC66474F8D9EC7FB /* DewTimeLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DewTimeLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAACC7D22FBF610800622ABE /* DewTime.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DewTime.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAACC7DF2FBF610900622ABE /* DewTimeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DewTimeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAACC7E92FBF610900622ABE /* DewTimeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DewTimeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		CADE52322E264459ADA61F7F /* Exceptions for "DewTimeLiveActivityExtension" folder in "DewTimeLiveActivityExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = E5EA2DBA6A2C43EFA5CB084C /* DewTimeLiveActivityExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		BA8981F6F1DE4C0FA6F00C98 /* DewTimeLiveActivityExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				CADE52322E264459ADA61F7F /* Exceptions for "DewTimeLiveActivityExtension" folder in "DewTimeLiveActivityExtension" target */,
+			);
+			path = DewTimeLiveActivityExtension;
+			sourceTree = "<group>";
+		};
 		FAACC7D42FBF610800622ABE /* DewTime */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = DewTime;
@@ -54,6 +84,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		B4550A7117BA4CB8BD2C4100 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		FAACC7CF2FBF610800622ABE /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -81,10 +118,20 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		D41546F9370E4304906E4A2B /* DewTimeLiveActivityShared */ = {
+			isa = PBXGroup;
+			children = (
+				22149E933C2E42FD9FF5B1EE /* DewTimerActivityAttributes.swift */,
+			);
+			path = DewTimeLiveActivityShared;
+			sourceTree = "<group>";
+		};
 		FAACC7C92FBF610800622ABE = {
 			isa = PBXGroup;
 			children = (
 				FAACC7D42FBF610800622ABE /* DewTime */,
+				BA8981F6F1DE4C0FA6F00C98 /* DewTimeLiveActivityExtension */,
+				D41546F9370E4304906E4A2B /* DewTimeLiveActivityShared */,
 				FAACC7E22FBF610900622ABE /* DewTimeTests */,
 				FAACC7EC2FBF610900622ABE /* DewTimeUITests */,
 				FAACC7D32FBF610800622ABE /* Products */,
@@ -95,6 +142,7 @@
 			isa = PBXGroup;
 			children = (
 				FAACC7D22FBF610800622ABE /* DewTime.app */,
+				C21C8101FC66474F8D9EC7FB /* DewTimeLiveActivityExtension.appex */,
 				FAACC7DF2FBF610900622ABE /* DewTimeTests.xctest */,
 				FAACC7E92FBF610900622ABE /* DewTimeUITests.xctest */,
 			);
@@ -111,10 +159,12 @@
 				FAACC7CE2FBF610800622ABE /* Sources */,
 				FAACC7CF2FBF610800622ABE /* Frameworks */,
 				FAACC7D02FBF610800622ABE /* Resources */,
+				2327D63233204555B55DAB3B /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				4BA226BBE9EB49ACB9995BD0 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				FAACC7D42FBF610800622ABE /* DewTime */,
@@ -125,6 +175,28 @@
 			productName = DewTime;
 			productReference = FAACC7D22FBF610800622ABE /* DewTime.app */;
 			productType = "com.apple.product-type.application";
+		};
+		E5EA2DBA6A2C43EFA5CB084C /* DewTimeLiveActivityExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 47A9E5D7406B45C988292C48 /* Build configuration list for PBXNativeTarget "DewTimeLiveActivityExtension" */;
+			buildPhases = (
+				05511E5A49724BD5897CE768 /* Sources */,
+				B4550A7117BA4CB8BD2C4100 /* Frameworks */,
+				BCA37B25534844058296408B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				BA8981F6F1DE4C0FA6F00C98 /* DewTimeLiveActivityExtension */,
+			);
+			name = DewTimeLiveActivityExtension;
+			packageProductDependencies = (
+			);
+			productName = DewTimeLiveActivityExtension;
+			productReference = C21C8101FC66474F8D9EC7FB /* DewTimeLiveActivityExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 		FAACC7DE2FBF610900622ABE /* DewTimeTests */ = {
 			isa = PBXNativeTarget;
@@ -182,6 +254,9 @@
 				LastSwiftUpdateCheck = 2650;
 				LastUpgradeCheck = 2650;
 				TargetAttributes = {
+					E5EA2DBA6A2C43EFA5CB084C = {
+						CreatedOnToolsVersion = 26.5;
+					};
 					FAACC7D12FBF610800622ABE = {
 						CreatedOnToolsVersion = 26.5;
 					};
@@ -212,13 +287,35 @@
 			projectRoot = "";
 			targets = (
 				FAACC7D12FBF610800622ABE /* DewTime */,
+				E5EA2DBA6A2C43EFA5CB084C /* DewTimeLiveActivityExtension */,
 				FAACC7DE2FBF610900622ABE /* DewTimeTests */,
 				FAACC7E82FBF610900622ABE /* DewTimeUITests */,
 			);
 		};
 /* End PBXProject section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		2327D63233204555B55DAB3B /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				24882F24F62445B9B2B0295B /* DewTimeLiveActivityExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXResourcesBuildPhase section */
+		BCA37B25534844058296408B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		FAACC7D02FBF610800622ABE /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -243,10 +340,19 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		05511E5A49724BD5897CE768 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				64A251C064C74A26BEA3A883 /* DewTimerActivityAttributes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		FAACC7CE2FBF610800622ABE /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				178168454DFF4640AED5445E /* DewTimerActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -267,6 +373,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		4BA226BBE9EB49ACB9995BD0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E5EA2DBA6A2C43EFA5CB084C /* DewTimeLiveActivityExtension */;
+			targetProxy = FB39C39A9C1441DE93E7D4D3 /* PBXContainerItemProxy */;
+		};
 		FAACC7E12FBF610900622ABE /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = FAACC7D12FBF610800622ABE /* DewTime */;
@@ -280,6 +391,66 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		077EF0E376674E33BC8F9212 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = B77UF52R43;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = DewTimeLiveActivityExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.technophere.DewTime.DewTimeLiveActivityExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		7C7F5781F7384E20A6286EE0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = B77UF52R43;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = DewTimeLiveActivityExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.technophere.DewTime.DewTimeLiveActivityExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		FAACC7F12FBF610900622ABE /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -414,6 +585,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = DewTime;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -450,6 +622,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = DewTime;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -562,6 +735,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		47A9E5D7406B45C988292C48 /* Build configuration list for PBXNativeTarget "DewTimeLiveActivityExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7C7F5781F7384E20A6286EE0 /* Debug */,
+				077EF0E376674E33BC8F9212 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		FAACC7CD2FBF610800622ABE /* Build configuration list for PBXProject "DewTime" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

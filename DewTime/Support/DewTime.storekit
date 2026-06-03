@@ -1,0 +1,92 @@
+{
+  "identifier" : "DewTimeStoreKitConfig",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayVersion" : 1,
+      "familyShareable" : false,
+      "internalID" : "dewtime_tip_snack",
+      "localizations" : [
+        {
+          "description" : "DewTimeを開発しているとお腹が空いてしまいます。お菓子をつまみ食いしてもいいですか？",
+          "displayName" : "開発者にお菓子をあげる",
+          "locale" : "ja"
+        }
+      ],
+      "productID" : "com.technophere.dewtime.tip.snack",
+      "referenceName" : "Snack",
+      "type" : "Consumable"
+    },
+    {
+      "displayVersion" : 1,
+      "familyShareable" : false,
+      "internalID" : "dewtime_tip_coffee",
+      "localizations" : [
+        {
+          "description" : "開発にはカフェインが不可欠です。美味しいコーヒーで集中力をチャージさせていただけませんか？",
+          "displayName" : "開発者にコーヒーをあげる",
+          "locale" : "ja"
+        }
+      ],
+      "productID" : "com.technophere.dewtime.tip.coffee",
+      "referenceName" : "Coffee",
+      "type" : "Consumable"
+    },
+    {
+      "displayVersion" : 1,
+      "familyShareable" : false,
+      "internalID" : "dewtime_tip_pizza",
+      "localizations" : [
+        {
+          "description" : "深夜の開発には夜食が必要です。温かいピザでエネルギー補給をさせていただけませんか？",
+          "displayName" : "開発者にピザをあげる",
+          "locale" : "ja"
+        }
+      ],
+      "productID" : "com.technophere.dewtime.tip.pizza",
+      "referenceName" : "Pizza",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "ja",
+    "_storefront" : "JPN",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

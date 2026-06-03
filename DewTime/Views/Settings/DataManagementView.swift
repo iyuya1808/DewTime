@@ -14,11 +14,11 @@ struct DataManagementView: View {
                 if store.isSaving || store.isLoading {
                     HStack {
                         ProgressView()
-                        Text(store.isLoading ? "Firestoreから読み込み中..." : "Firestoreへ保存中...")
+                        Text(store.isLoading ? "ローカルデータを読み込み中..." : "ローカルデータを保存中...")
                             .foregroundStyle(.secondary)
                     }
                 } else {
-                    Label("Firestore接続中", systemImage: "checkmark.icloud")
+                    Label("ローカル保存中", systemImage: "checkmark.circle")
                         .foregroundStyle(.secondary)
                 }
 
@@ -28,11 +28,11 @@ struct DataManagementView: View {
                         .foregroundStyle(.red)
                 }
             } header: {
-                Text("Firestore")
+                Text("保存")
             } footer: {
-                Text("このアプリのスケジュール・魚・図鑑・水やり履歴はFirestoreに保存されます。")
+                Text("このアプリのスケジュール・魚・図鑑・水やり履歴は端末内に保存されます。")
             }
-            .listRowBackground(Color.white.opacity(0.6))
+            .listRowBackground(Color.dewListRowBackground)
 
             Section {
                 Button {
@@ -50,7 +50,7 @@ struct DataManagementView: View {
             } footer: {
                 Text("スケジュール・ルーティン、または魚・コレクション・水やり履歴のみを初期化します")
             }
-            .listRowBackground(Color.white.opacity(0.6))
+            .listRowBackground(Color.dewListRowBackground)
 
             Section {
                 Button {
@@ -62,16 +62,12 @@ struct DataManagementView: View {
             } footer: {
                 Text("アプリのすべてのデータを削除します。初期化後はサンプルデータに戻ります")
             }
-            .listRowBackground(Color.white.opacity(0.6))
+            .listRowBackground(Color.dewListRowBackground)
         }
         .navigationTitle("データ管理")
         .navigationBarTitleDisplayMode(.inline)
         .scrollContentBackground(.hidden)
-        .background(
-            LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
-        )
-        .environment(\.colorScheme, .light)
+        .dewAppBackground()
         .alert(
             "保存エラー",
             isPresented: Binding(get: { saveError != nil }, set: { _ in saveError = nil })

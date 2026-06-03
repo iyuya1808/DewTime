@@ -54,10 +54,7 @@ struct ProfileView: View {
                 .padding(.bottom, 32)
             }
             .navigationTitle("プロフィール")
-            .background(
-                LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom)
-                    .ignoresSafeArea()
-            )
+            .dewAppBackground()
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink(destination: SettingsView()) {
@@ -65,22 +62,18 @@ struct ProfileView: View {
                     }
                 }
             }
-            .environment(\.colorScheme, .light)
             .sheet(item: $selectedRecord) { record in
                 FishCareDetailSheet(record: record)
                     .presentationDetents([.fraction(0.68), .large])
                     .presentationBackground(.clear)
                     .presentationDragIndicator(.visible)
-                    .environment(\.colorScheme, .light)
             }
             .sheet(isPresented: $showProfileEditor) {
                 ProfileEditView()
-                    .environment(\.colorScheme, .light)
             }
             .sheet(item: $selectedAchievement) { achievement in
                 AchievementDetailSheet(achievement: achievement, store: store)
                     .presentationDetents([.height(260)])
-                    .environment(\.colorScheme, .light)
             }
         }
     }
@@ -119,7 +112,7 @@ struct ProfileView: View {
                         .font(.headline)
                         .foregroundStyle(.teal)
                         .frame(width: 38, height: 38)
-                        .background(.white.opacity(0.56), in: Circle())
+                        .background(Color.dewSurfaceSoft, in: Circle())
                 }
                 .buttonStyle(.plain)
             }
@@ -131,7 +124,7 @@ struct ProfileView: View {
             }
         }
         .padding(16)
-        .background(.white.opacity(0.64), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func headerMetric(icon: String, value: String, label: String, tint: Color) -> some View {
@@ -146,7 +139,7 @@ struct ProfileView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(.white.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color.dewSurfaceSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private var periodPicker: some View {
@@ -201,13 +194,13 @@ struct ProfileView: View {
                             .foregroundStyle(.secondary)
                     }
                     .padding(12)
-                    .background(.white.opacity(0.52), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Color.dewSurfaceSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(14)
-        .background(.white.opacity(0.66), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     // MARK: - Activity
@@ -231,7 +224,7 @@ struct ProfileView: View {
                         .font(.title2)
                         .foregroundStyle(.teal)
                         .frame(width: 40, height: 40)
-                        .background(.white.opacity(0.56), in: Circle())
+                        .background(Color.dewSurfaceSoft, in: Circle())
                     VStack(alignment: .leading, spacing: 2) {
                         Text("今月の水槽をカレンダーで見る")
                             .font(.subheadline.weight(.semibold))
@@ -245,7 +238,7 @@ struct ProfileView: View {
                         .foregroundStyle(.secondary)
                 }
                 .padding(14)
-                .background(.white.opacity(0.64), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
             .buttonStyle(.plain)
             .padding(.horizontal)
@@ -281,7 +274,7 @@ struct ProfileView: View {
             }
         }
         .padding(14)
-        .background(.white.opacity(0.66), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func weekDayCell(_ day: ProfileWeekDay) -> some View {
@@ -333,7 +326,7 @@ struct ProfileView: View {
             .frame(maxWidth: .infinity)
             .aspectRatio(0.68, contentMode: .fit)
             .background(
-                day.record == nil ? .white.opacity(0.46) : .white.opacity(0.82),
+                day.record == nil ? Color.dewSurfaceSoft : Color.dewSurface,
                 in: RoundedRectangle(cornerRadius: 10, style: .continuous)
             )
             .overlay {
@@ -378,7 +371,7 @@ struct ProfileView: View {
                                     .foregroundStyle(.secondary)
                             }
                             .frame(width: 82, height: 88)
-                            .background(.white.opacity(0.68), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                         .buttonStyle(.plain)
                     }
@@ -411,7 +404,7 @@ struct ProfileView: View {
             }
         }
         .padding(14)
-        .background(.white.opacity(0.66), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func badgeCell(_ achievement: Achievement) -> some View {
@@ -433,7 +426,7 @@ struct ProfileView: View {
             .frame(maxWidth: .infinity)
             .frame(height: 78)
             .background(
-                unlocked ? achievement.tint.opacity(0.16) : .white.opacity(0.4),
+                unlocked ? achievement.tint.opacity(0.16) : Color.dewSurfaceSoft,
                 in: RoundedRectangle(cornerRadius: 12, style: .continuous)
             )
             .overlay {
@@ -463,7 +456,7 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 28)
         .padding(.horizontal)
-        .background(.white.opacity(0.56), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.dewSurfaceSoft, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     // MARK: - Shared subviews
@@ -488,7 +481,7 @@ struct ProfileView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
-        .background(.white.opacity(0.68), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func insightRow(icon: String, title: String, value: String, tint: Color) -> some View {
