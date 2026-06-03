@@ -32,6 +32,7 @@ struct DataManagementView: View {
             } footer: {
                 Text("このアプリのスケジュール・魚・図鑑・水やり履歴はFirestoreに保存されます。")
             }
+            .listRowBackground(Color.white.opacity(0.6))
 
             Section {
                 Button {
@@ -49,6 +50,7 @@ struct DataManagementView: View {
             } footer: {
                 Text("スケジュール・ルーティン、または魚・コレクション・水やり履歴のみを初期化します")
             }
+            .listRowBackground(Color.white.opacity(0.6))
 
             Section {
                 Button {
@@ -60,9 +62,16 @@ struct DataManagementView: View {
             } footer: {
                 Text("アプリのすべてのデータを削除します。初期化後はサンプルデータに戻ります")
             }
+            .listRowBackground(Color.white.opacity(0.6))
         }
         .navigationTitle("データ管理")
         .navigationBarTitleDisplayMode(.inline)
+        .scrollContentBackground(.hidden)
+        .background(
+            LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+        )
+        .environment(\.colorScheme, .light)
         .alert(
             "保存エラー",
             isPresented: Binding(get: { saveError != nil }, set: { _ in saveError = nil })

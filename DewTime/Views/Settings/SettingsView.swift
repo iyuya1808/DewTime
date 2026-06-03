@@ -27,6 +27,7 @@ struct SettingsView: View {
                 } footer: {
                     Text("有効化したスケジュールがタイマーに使われます")
                 }
+                .listRowBackground(Color.white.opacity(0.6))
 
                 Section {
                     Button {
@@ -37,14 +38,22 @@ struct SettingsView: View {
                         Label("スケジュールを追加", systemImage: "plus.circle.fill")
                     }
                 }
+                .listRowBackground(Color.white.opacity(0.6))
 
                 Section {
                     NavigationLink(destination: DataManagementView()) {
                         Label("データ管理", systemImage: "externaldrive")
                     }
                 }
+                .listRowBackground(Color.white.opacity(0.6))
             }
             .navigationTitle("設定")
+            .scrollContentBackground(.hidden)
+            .background(
+                LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom)
+                    .ignoresSafeArea()
+            )
+            .environment(\.colorScheme, .light)
             .onAppear {
                 let activeCount = store.schedules.filter(\.isActive).count
                 if !store.schedules.isEmpty, activeCount != 1 {
@@ -101,16 +110,25 @@ struct SettingsView: View {
     // MARK: - Actions
 
     private func activate(_ schedule: UserSchedule) {
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.prepare()
+        generator.impactOccurred()
         UserSchedule.setActive(schedule, in: store.schedules)
         Task { await store.saveAll() }
     }
 
     private func delete(at offsets: IndexSet) {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.prepare()
+        generator.impactOccurred()
         let deleting = offsets.map { store.schedules[$0] }
         Task { await store.deleteSchedules(deleting) }
     }
 
     private func addSchedule() {
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.prepare()
+        generator.impactOccurred()
         Task { await store.addSchedule(name: newName, targetDepartureTime: newTime) }
     }
 

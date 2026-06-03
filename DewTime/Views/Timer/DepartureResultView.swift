@@ -131,6 +131,16 @@ struct DepartureResultView: View {
             .foregroundStyle(.white)
         }
         .onAppear {
+            if completedGrowth {
+                let generator = UINotificationFeedbackGenerator()
+                generator.prepare()
+                generator.notificationOccurred(.success)
+            } else {
+                let generator = UIImpactFeedbackGenerator(style: .medium)
+                generator.prepare()
+                generator.impactOccurred()
+            }
+
             withAnimation(.easeOut(duration: 1.2).delay(0.15)) {
                 waterFill = waterLevel
             }

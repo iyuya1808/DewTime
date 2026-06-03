@@ -162,7 +162,9 @@ struct TimerView: View {
                 isOverdue: vm.isOverdue,
                 cornerRadius: 0,
                 showBorder: false,
-                showLevelText: false
+                showLevelText: false,
+                startDate: vm.isRunning ? vm.startedAt : nil,
+                targetDate: vm.isRunning ? vm.schedule.targetDepartureTime : nil
             )
             .ignoresSafeArea()
 
@@ -449,6 +451,7 @@ struct TimerView: View {
                 Capsule()
                     .fill(color)
                     .frame(width: proxy.size.width * max(0, min(1, value)))
+                    .animation(.linear(duration: 1.0), value: value)
             }
         }
         .frame(height: 4)

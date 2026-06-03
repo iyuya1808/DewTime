@@ -8,6 +8,8 @@ struct WaterTankView: View {
     var cornerRadius: CGFloat = 36
     var showBorder: Bool = true
     var showLevelText: Bool = true
+    var startDate: Date? = nil
+    var targetDate: Date? = nil
 
     @StateObject private var motion = TankMotionManager()
 
@@ -36,7 +38,22 @@ struct WaterTankView: View {
 
             TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
                 Canvas { context, size in
-                    let level = max(0, min(1, waterLevel))
+                    let level: Double
+                    if let startDate, let targetDate, startDate < targetDate {
+                        let now = timeline.date
+                        if now >= targetDate {
+                            level = 0.0
+                        } else if now <= startDate {
+                            level = 1.0
+                        } else {
+                            let total = targetDate.timeIntervalSince(startDate)
+                            let remaining = targetDate.timeIntervalSince(now)
+                            level = min(1.0, max(0.0, remaining / total))
+                        }
+                    } else {
+                        level = max(0, min(1, waterLevel))
+                    }
+
                     let visualLevel = level * 0.95
                     let time = timeline.date.timeIntervalSinceReferenceDate
                     let colors = tankColors

@@ -21,6 +21,7 @@ struct RoutineEditorView: View {
                 )
                 Toggle("このスケジュールを使用", isOn: activeBinding)
             }
+            .listRowBackground(Color.white.opacity(0.6))
 
             Section {
                 ForEach(schedule.orderedItems) { item in
@@ -49,9 +50,16 @@ struct RoutineEditorView: View {
                     EditButton()
                 }
             }
+            .listRowBackground(Color.white.opacity(0.6))
         }
         .navigationTitle(schedule.name)
         .navigationBarTitleDisplayMode(.inline)
+        .scrollContentBackground(.hidden)
+        .background(
+            LinearGradient(colors: [.aquariumTop, .aquariumBottom], startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+        )
+        .environment(\.colorScheme, .light)
         .sheet(isPresented: $showAddSheet) {
             addSheet
                 .presentationDetents([.medium])
@@ -80,7 +88,12 @@ struct RoutineEditorView: View {
                             .overlay(
                                 Circle().strokeBorder(.white, lineWidth: newColor == c ? 3 : 0)
                             )
-                            .onTapGesture { newColor = c }
+                            .onTapGesture {
+                                newColor = c
+                                let generator = UISelectionFeedbackGenerator()
+                                generator.prepare()
+                                generator.selectionChanged()
+                            }
                     }
                 }
             }
@@ -105,6 +118,10 @@ struct RoutineEditorView: View {
         Binding(
             get: { schedule.isActive },
             set: { isActive in
+                let generator = UISelectionFeedbackGenerator()
+                generator.prepare()
+                generator.selectionChanged()
+
                 if isActive {
                     UserSchedule.setActive(schedule, in: store.schedules)
                 } else if store.schedules.filter(\.isActive).count > 1 {
@@ -118,6 +135,10 @@ struct RoutineEditorView: View {
     }
 
     private func moveItems(from source: IndexSet, to destination: Int) {
+        let generator = UISelectionFeedbackGenerator()
+        generator.prepare()
+        generator.selectionChanged()
+
         var items = schedule.orderedItems
         items.move(fromOffsets: source, toOffset: destination)
         for (idx, item) in items.enumerated() {
@@ -127,10 +148,17 @@ struct RoutineEditorView: View {
     }
 
     private func deleteItems(at offsets: IndexSet) {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.prepare()
+        generator.impactOccurred()
         Task { await store.deleteRoutineItems(from: schedule, at: offsets) }
     }
 
     private func addItem() {
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.prepare()
+        generator.impactOccurred()
+
         let nextOrder = (schedule.orderedItems.last?.orderIndex ?? -1) + 1
         let item = RoutineItem(
             name: newName,

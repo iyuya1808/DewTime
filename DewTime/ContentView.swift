@@ -34,12 +34,20 @@ enum AppTab: CaseIterable, Identifiable {
 }
 
 struct ContentView: View {
+    @State private var selectedTab: AppTab = .timer
+
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             ForEach(AppTab.allCases) { tab in
                 tab.destination
+                    .tag(tab)
                     .tabItem { Label(tab.title, systemImage: tab.icon) }
             }
+        }
+        .onChange(of: selectedTab) { oldValue, newValue in
+            let generator = UISelectionFeedbackGenerator()
+            generator.prepare()
+            generator.selectionChanged()
         }
     }
 }

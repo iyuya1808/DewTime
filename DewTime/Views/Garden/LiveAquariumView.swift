@@ -195,9 +195,15 @@ private final class AquariumEngine {
         if let index = nearestFishIndex(to: p, within: 0.09) {
             fish[index].happy = 1.4
             hearts.append(Heart(x: p.x, y: p.y - 0.02, life: 1.3, drift: .random(in: 0...3)))
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.prepare()
+            generator.impactOccurred()
         } else {
             guard food.count < 12 else { return }
             food.append(FoodPellet(x: p.x, y: max(0.06, p.y), sink: .random(in: 0.06...0.1), wobblePhase: 0))
+            let generator = UIImpactFeedbackGenerator(style: .light)
+            generator.prepare()
+            generator.impactOccurred()
         }
     }
 
