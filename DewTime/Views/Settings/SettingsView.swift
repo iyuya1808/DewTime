@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage(AppPreferences.Key.hapticsEnabled.rawValue) private var hapticsEnabled = true
     @AppStorage(AppPreferences.Key.appTheme.rawValue) private var appTheme = AppTheme.system.rawValue
     @AppStorage(AppPreferences.Key.aquariumTheme.rawValue) private var aquariumTheme = AquariumTheme.dewBlue.rawValue
+    @AppStorage(AppPreferences.Key.hasCompletedTutorial.rawValue) private var hasCompletedTutorial = false
 
     @State private var showAddSheet = false
     @State private var showProfileEditor = false
@@ -67,6 +68,17 @@ struct SettingsView: View {
                     Text("通知と触覚")
                 } footer: {
                     Text(notificationSummary)
+                }
+                .listRowBackground(Color.dewListRowBackground)
+
+                Section {
+                    Button {
+                        hasCompletedTutorial = false
+                    } label: {
+                        Label("チュートリアルを見る", systemImage: "questionmark.circle")
+                    }
+                } footer: {
+                    Text("タイマー・図鑑・水槽・プロフィールの使い方をもう一度確認できます。")
                 }
                 .listRowBackground(Color.dewListRowBackground)
 

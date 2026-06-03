@@ -246,6 +246,7 @@ enum AppPreferences {
         case hapticsEnabled = "dew.preferences.hapticsEnabled"
         case appTheme = "dew.preferences.appTheme"
         case aquariumTheme = "dew.preferences.aquariumTheme"
+        case hasCompletedTutorial = "dew.preferences.hasCompletedTutorial"
     }
 
     static let reminderMinuteOptions = [3, 5, 10, 15]
@@ -265,6 +266,10 @@ enum AppPreferences {
 
     static var hapticsEnabled: Bool {
         bool(for: .hapticsEnabled, default: true)
+    }
+
+    static var hasCompletedTutorial: Bool {
+        bool(for: .hasCompletedTutorial, default: false)
     }
 
     static var appTheme: AppTheme {

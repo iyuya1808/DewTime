@@ -34,6 +34,7 @@ enum AppTab: CaseIterable, Identifiable {
 }
 
 struct ContentView: View {
+    @AppStorage(AppPreferences.Key.hasCompletedTutorial.rawValue) private var hasCompletedTutorial = false
     @State private var selectedTab: AppTab = .timer
 
     var body: some View {
@@ -44,7 +45,17 @@ struct ContentView: View {
                     .tabItem { Label(tab.title, systemImage: tab.icon) }
             }
         }
-        .onChange(of: selectedTab) { oldValue, newValue in
+        .overlay {
+            if !hasCompletedTutorial {
+                TutorialOverlayView(
+                    selectedTab: $selectedTab,
+                    onFinish: { hasCompletedTutorial = true }
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: hasCompletedTutorial)
+        .onChange(of: selectedTab) { _, _ in
             let generator = UISelectionFeedbackGenerator()
             generator.prepare()
             generator.selectionChanged()
