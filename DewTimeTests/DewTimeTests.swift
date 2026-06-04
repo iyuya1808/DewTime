@@ -242,6 +242,214 @@ struct DewTimeTests {
         vm.reset()
     }
 
+    @MainActor
+    @Test func cloudSnapshotRoundTripsStoreModelsAndRoutineParent() async throws {
+        let userId = UUID()
+        let store = AppDataStore(enableCloudSync: false)
+        let schedule = UserSchedule(name: "朝", targetDepartureTime: .now, isActive: true)
+        let routine = RoutineItem(name: "準備", durationSeconds: 120, colorHex: "#38BDF8", orderIndex: 0, schedule: schedule)
+        schedule.items = [routine]
+        store.schedules = [schedule]
+        store.activeFishes = [
+            ActiveFish(speciesId: FishSpecies.guppy.rawValue, name: FishSpecies.guppy.displayName, requiredTotalWater: 100)
+        ]
+        store.collectedFishes = [
+            CollectedFish(name: FishSpecies.medaka.displayName, speciesId: FishSpecies.medaka.rawValue, succeeded: true, waterRatio: 1)
+        ]
+        store.careRecords = [
+            FishCareRecord(
+                speciesId: FishSpecies.medaka.rawValue,
+                waterAmount: 80,
+                totalWaterAfter: 80,
+                requiredTotalWater: 80,
+                growthStage: .adult,
+                completedGrowth: true
+            )
+        ]
+        store.aquariums = [Aquarium(totalWaterCollected: 500)]
+        store.profiles = [UserProfile(nickname: "Yuya", avatarEmoji: "🐬")]
+
+        let snapshot = store.makeCloudSnapshot(userId: userId)
+        let restored = AppDataStore(enableCloudSync: false)
+        restored.applyCloudSnapshot(snapshot)
+
+        #expect(restored.schedules.count == 1)
+        #expect(restored.schedules.first?.items.count == 1)
+        #expect(restored.schedules.first?.items.first?.schedule?.id == schedule.id)
+        #expect(restored.activeFishes.first?.speciesId == FishSpecies.guppy.rawValue)
+        #expect(restored.collectedFishes.first?.speciesId == FishSpecies.medaka.rawValue)
+        #expect(restored.careRecords.first?.growthStage == .adult)
+        #expect(restored.aquariums.first?.totalWaterCollected == 500)
+        #expect(restored.profiles.first?.nickname == "Yuya")
+    }
+
+    @MainActor
+    @Test func cloudEmptyUploadsLocalCacheOnLoad() async throws {
+        resetLocalTestState()
+        defer { resetLocalTestState() }
+
+        let userId = UUID()
+        let localStore = AppDataStore(enableCloudSync: false)
+        await localStore.addSchedule(name: "ローカル朝", targetDepartureTime: .now)
+
+        let cloud = FakeCloudDataService(initialSnapshot: CloudSnapshot())
+        let syncingStore = AppDataStore(
+            cloudDataService: cloud,
+            enableCloudSync: true,
+            cloudUserIdProvider: { userId }
+        )
+
+        await syncingStore.load()
+
+        #expect(syncingStore.schedules.first?.name == "ローカル朝")
+        #expect(cloud.savedSnapshots.last?.schedules.first?.name == "ローカル朝")
+        #expect(cloud.savedUserIds.last == userId)
+    }
+
+    @MainActor
+    @Test func cloudDataWinsOverLocalCacheOnLoad() async throws {
+        resetLocalTestState()
+        defer { resetLocalTestState() }
+
+        let userId = UUID()
+        let localStore = AppDataStore(enableCloudSync: false)
+        await localStore.addSchedule(name: "端末側", targetDepartureTime: .now)
+
+        let cloudSchedule = CloudSchedule(
+            id: UUID(),
+            userId: userId,
+            name: "クラウド側",
+            targetDepartureTime: .now,
+            isActive: true,
+            createdAt: .now,
+            updatedAt: .now
+        )
+        let cloud = FakeCloudDataService(initialSnapshot: CloudSnapshot(schedules: [cloudSchedule]))
+        let syncingStore = AppDataStore(
+            cloudDataService: cloud,
+            enableCloudSync: true,
+            cloudUserIdProvider: { userId }
+        )
+
+        await syncingStore.load()
+
+        #expect(syncingStore.schedules.map(\.name) == ["クラウド側"])
+        let cachedStore = AppDataStore(enableCloudSync: false)
+        await cachedStore.load()
+        #expect(cachedStore.schedules.map(\.name) == ["クラウド側"])
+    }
+
+    @MainActor
+    @Test func resetAquariumDeletesOnlyAquariumCloudData() async throws {
+        resetLocalTestState()
+        defer { resetLocalTestState() }
+
+        let userId = UUID()
+        let cloud = FakeCloudDataService(initialSnapshot: CloudSnapshot())
+        let store = AppDataStore(
+            cloudDataService: cloud,
+            enableCloudSync: true,
+            cloudUserIdProvider: { userId }
+        )
+        store.schedules = [UserSchedule(name: "残す", targetDepartureTime: .now, isActive: true)]
+        store.activeFishes = [ActiveFish(speciesId: FishSpecies.medaka.rawValue, name: "メダカ", requiredTotalWater: 80)]
+        store.collectedFishes = [CollectedFish(name: "メダカ", speciesId: FishSpecies.medaka.rawValue, succeeded: true, waterRatio: 1)]
+        store.careRecords = [
+            FishCareRecord(
+                speciesId: FishSpecies.medaka.rawValue,
+                waterAmount: 80,
+                totalWaterAfter: 80,
+                requiredTotalWater: 80,
+                growthStage: .adult,
+                completedGrowth: true
+            )
+        ]
+        store.aquariums = [Aquarium(totalWaterCollected: 100)]
+
+        await store.resetAquarium()
+
+        #expect(cloud.deletedAquariumUserIds == [userId])
+        #expect(store.schedules.first?.name == "残す")
+        #expect(store.activeFishes.isEmpty)
+        #expect(store.collectedFishes.isEmpty)
+        #expect(store.careRecords.isEmpty)
+        #expect(store.aquariums.isEmpty)
+    }
+
+    @MainActor
+    @Test func resetAllDeletesCloudAndSeedsDefaultSchedule() async throws {
+        resetLocalTestState()
+        defer { resetLocalTestState() }
+
+        let userId = UUID()
+        let cloud = FakeCloudDataService(initialSnapshot: CloudSnapshot())
+        let store = AppDataStore(
+            cloudDataService: cloud,
+            enableCloudSync: true,
+            cloudUserIdProvider: { userId }
+        )
+        store.schedules = [UserSchedule(name: "消す", targetDepartureTime: .now, isActive: true)]
+        store.profiles = [UserProfile(nickname: "消す")]
+
+        await store.resetAll()
+
+        #expect(cloud.deletedAllUserIds == [userId])
+        #expect(store.schedules.count == 1)
+        #expect(store.schedules.first?.name == "平日通常モード")
+        #expect(store.profiles.isEmpty)
+        #expect(cloud.savedSnapshots.last?.schedules.first?.name == "平日通常モード")
+    }
+
+    @MainActor
+    @Test func cloudLoadPurchasesUpdatesStoreDeveloperSupportState() async throws {
+        resetLocalTestState()
+        defer { resetLocalTestState() }
+
+        let userId = UUID()
+        let cloud = FakeCloudDataService(initialSnapshot: CloudSnapshot())
+        cloud.purchases = [
+            CloudPurchase(
+                id: UUID(),
+                userId: userId,
+                productId: "com.dewtime.support.tier1",
+                originalTransactionId: "tx_123",
+                purchasedAt: .now,
+                createdAt: .now
+            )
+        ]
+
+        let store = AppDataStore(
+            cloudDataService: cloud,
+            enableCloudSync: true,
+            cloudUserIdProvider: { userId }
+        )
+
+        #expect(store.isDeveloperSupported == false)
+        await store.load()
+        #expect(store.isDeveloperSupported == true)
+    }
+
+    @MainActor
+    @Test func updateDeveloperSupportStatusSavesToCloud() async throws {
+        resetLocalTestState()
+        defer { resetLocalTestState() }
+
+        let userId = UUID()
+        let cloud = FakeCloudDataService(initialSnapshot: CloudSnapshot())
+        let store = AppDataStore(
+            cloudDataService: cloud,
+            enableCloudSync: true,
+            cloudUserIdProvider: { userId }
+        )
+
+        await store.updateDeveloperSupportStatus(productId: "com.dewtime.support.tier2", originalTransactionId: "tx_999")
+
+        #expect(store.isDeveloperSupported == true)
+        #expect(cloud.savedPurchases.count == 1)
+        #expect(cloud.savedPurchases.first?.originalTransactionId == "tx_999")
+        #expect(cloud.savedPurchases.first?.productId == "com.dewtime.support.tier2")
+    }
+
     private func makeScheduleForLiveActivityTests() -> UserSchedule {
         let schedule = UserSchedule(name: "平日", targetDepartureTime: .now.addingTimeInterval(600), isActive: true)
         let brushing = RoutineItem(name: "ハミガキ", durationSeconds: 180, colorHex: "#38BDF8", orderIndex: 0, schedule: schedule)
@@ -264,8 +472,56 @@ struct DewTimeTests {
             "local_collected_fishes",
             "local_care_records",
             "local_aquariums",
-            "local_profiles"
+            "local_profiles",
+            "local_is_developer_supported"
         ].forEach { UserDefaults.standard.removeObject(forKey: $0) }
     }
 
+}
+
+@MainActor
+private final class FakeCloudDataService: CloudDataServicing {
+    var snapshot: CloudSnapshot
+    var savedSnapshots: [CloudSnapshot] = []
+    var savedUserIds: [UUID] = []
+    var deletedAquariumUserIds: [UUID] = []
+    var deletedAllUserIds: [UUID] = []
+    var purchases: [CloudPurchase] = []
+    var savedPurchases: [CloudPurchase] = []
+
+    init(initialSnapshot: CloudSnapshot) {
+        snapshot = initialSnapshot
+    }
+
+    func loadAll(userId: UUID) async throws -> CloudSnapshot {
+        snapshot
+    }
+
+    func saveAll(snapshot: CloudSnapshot, userId: UUID) async throws {
+        savedSnapshots.append(snapshot)
+        savedUserIds.append(userId)
+        self.snapshot = snapshot
+    }
+
+    func deleteAquariumData(userId: UUID) async throws {
+        deletedAquariumUserIds.append(userId)
+        snapshot.activeFishes.removeAll()
+        snapshot.collectedFishes.removeAll()
+        snapshot.careRecords.removeAll()
+        snapshot.aquariums.removeAll()
+    }
+
+    func deleteAll(userId: UUID) async throws {
+        deletedAllUserIds.append(userId)
+        snapshot = CloudSnapshot()
+    }
+
+    func loadPurchases(userId: UUID) async throws -> [CloudPurchase] {
+        purchases
+    }
+
+    func savePurchase(_ purchase: CloudPurchase) async throws {
+        savedPurchases.append(purchase)
+        purchases.append(purchase)
+    }
 }

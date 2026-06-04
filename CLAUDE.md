@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **DewTime** は iOS 17+ 向けの朝タイマーアプリ。「水やり／水槽育成」メタファーで朝の準備を可視化する。出発時刻までに使える「水」が満タンのタンクに入っており、スケジュール通りに準備するほど水が温存される。「いってきます」を押すと残った水が水槽に注がれ、魚が成長し（卵→稚魚→幼魚→成魚）、成魚になると図鑑に登録される。水槽は累積水量で大きくなり、大きいほど大型の魚を飼える。
 
-> 詳細な企画・UX 仕様は `SPEC.md`、画面イメージは `wireframe.html` を参照。ただし `SPEC.md` は永続化を「SwiftData」と記載しているが**実装は Firebase Firestore に移行済み**。仕様書と実装が食い違う場合はコードを正とする。
+> 詳細な企画・UX 仕様は `SPEC.md`、画面イメージは `wireframe.html` を参照。ただし `SPEC.md` は永続化を「SwiftData」と記載しているが**実装は Supabase Auth + Database に移行済み**。仕様書と実装が食い違う場合はコードを正とする。
 
 ## ビルド・実行
 
@@ -25,25 +25,29 @@ xcodebuild test -project DewTime.xcodeproj -scheme DewTime -destination 'platfor
 
 LSP（コード補完・診断）は `buildServer.json` により xcode-build-server が提供している（スキーム: `DewTime`）。`buildServer.json` はローカル絶対パスを含むため `.gitignore` 済み。
 
-### Firebase の前提
+### Supabase の前提
 
-依存は Swift Package Manager で導入（`firebase-ios-sdk`: `FirebaseAuth` / `FirebaseCore` / `FirebaseFirestore`）。
+依存は Swift Package Manager で導入（`supabase-swift` の `Supabase`）。
 
-- 実行には DewTime ターゲットに **`GoogleService-Info.plist`** が必要（リポジトリには含まれない）。
-- `AppDelegate` は plist が存在するときだけ `FirebaseApp.configure()` を呼ぶ。**plist が無くてもビルド・起動は可能**で、その場合 `AppDataStore` は Firestore 読み込みに失敗し、ローカルでサンプルスケジュールを seed する（グレースフルデグレード）。
-- 認証は**匿名認証**。`users/{uid}` 配下のサブコレクションにデータを保存する。
+- `Support/SupabaseManager.swift` が `SupabaseClient` を生成する。
+- 認証は起動時に `AuthService.ensureAuthenticated()` で既存セッションを使い、なければ匿名ログインする。メール/Apple 連携で正式アカウントへ移行できる。
+- Database は `supabase/migrations/202606040001_create_cloud_data_tables.sql` を Supabase 側で実行する必要がある。
+- 全テーブルは `user_id = auth.uid()` の RLS で保護する。
+- ネットワークや認証エラー時は `UserDefaults` のローカルキャッシュで起動する。
 
 ## アーキテクチャ
 
 ### 状態管理・永続化の中核：`AppDataStore`
 
-このアプリは **SwiftData を使っていない**（過去は使用していたが Firestore に移行済み）。永続化の中心は `Support/AppDataStore.swift` の `@Observable @MainActor final class AppDataStore`。
+このアプリは **SwiftData を使っていない**。永続化の中心は `Support/AppDataStore.swift` の `@Observable @MainActor final class AppDataStore`。
 
 - `DewTimeApp` が `@State private var dataStore = AppDataStore()` を生成し、`.environment(dataStore)` で全画面へ注入。起動時 `.task` で `dataStore.load()`。
-- **全データはメモリ上の配列**（`schedules`, `activeFishes`, `collectedFishes`, `careRecords`, `aquariums`）として保持される。モデルは素の `@Observable` クラス（`@Model` ではない、リレーションは手動で配列管理）。
-- 変更を加える操作（`addSchedule`, `recordDeparture`, `selectSpecies` 等）は最後に `saveAll()` を呼び、**コレクション全体を Firestore へ「全消し→再書き込み」**する（`replaceCollection` がバッチで delete 後 setData）。差分更新ではない点に注意。
-- Firestore ↔ モデルの変換は手書きの `encode(...)` / `decode...(...)` と型ゆるい value helper（`string/bool/int/double/date/optionalDate`、`Timestamp` 対応）で行う。`@Model` の自動永続化に頼れないため、**モデルにフィールドを追加したら encode/decode の両方を更新**する必要がある。
-- seed: `seedSampleSchedules()`（「平日通常モード」+ ルーティン5件）。Firestore が空、または読み込み失敗時に投入。
+- **全データはメモリ上の配列**（`schedules`, `activeFishes`, `collectedFishes`, `careRecords`, `aquariums`, `profiles`）として保持される。モデルは素の `@Observable` クラス（`@Model` ではない、リレーションは手動で配列管理）。
+- `Support/CloudDataService.swift` の `SupabaseDataService` が Supabase Database の `select/upsert/delete` を担当し、`AppDataStore` は `CloudSnapshot` へ変換して保存する。
+- 起動時 `load()` はクラウド優先。クラウドにデータがあればローカルキャッシュを上書きし、クラウドが空なら既存ローカルデータを初回アップロードする。
+- 変更を加える操作（`addSchedule`, `recordDeparture`, `selectSpecies` 等）は最後に `saveAll()` を呼び、ローカルキャッシュ保存後に Supabase へ全置換保存する。リアルタイム同期や差分更新ではない。
+- Supabase DTO ↔ モデル変換は `CloudSnapshot` 系の `Codable` DTO と `AppDataStore.makeCloudSnapshot/applyCloudSnapshot` で行う。モデルにフィールドを追加したら DTO、SQL、変換、ローカル encode/decode を更新する。
+- seed: `seedSampleSchedules()`（「平日通常モード」+ ルーティン5件）。クラウド・ローカルが空、または読み込み失敗でローカルも空のときに投入。
 
 ### 画面構成（タブ）
 

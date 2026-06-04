@@ -21,11 +21,27 @@ final class AppDataStore {
     var careRecords: [FishCareRecord] = []
     var aquariums: [Aquarium] = []
     var profiles: [UserProfile] = []
+    var isDeveloperSupported = false
     var isLoading = false
     var isSaving = false
     var errorMessage: String?
 
     private let schemaVersion = 1
+    private let cloudDataService: CloudDataServicing?
+    private let enableCloudSync: Bool
+    private let cloudUserIdProvider: () async throws -> UUID
+
+    init(
+        cloudDataService: CloudDataServicing? = nil,
+        enableCloudSync: Bool? = nil,
+        cloudUserIdProvider: @escaping () async throws -> UUID = {
+            try await AuthService.shared.ensureAuthenticatedUserId()
+        }
+    ) {
+        self.cloudDataService = cloudDataService ?? SupabaseDataService.shared
+        self.enableCloudSync = enableCloudSync ?? !AppDataStore.isRunningTests
+        self.cloudUserIdProvider = cloudUserIdProvider
+    }
 
     var isConfigured: Bool {
         return true
@@ -40,6 +56,39 @@ final class AppDataStore {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
+
+        if enableCloudSync, let cloudDataService {
+            do {
+                let userId = try await cloudUserIdProvider()
+                
+                // Load developer support status
+                if let purchases = try? await cloudDataService.loadPurchases(userId: userId) {
+                    self.isDeveloperSupported = !purchases.isEmpty
+                } else {
+                    self.isDeveloperSupported = false
+                }
+                
+                let snapshot = try await cloudDataService.loadAll(userId: userId)
+                if snapshot.isEmpty {
+                    try loadFromLocal()
+                    if schedules.isEmpty {
+                        seedSampleSchedules()
+                    }
+                    try saveToLocal()
+                    try await cloudDataService.saveAll(
+                        snapshot: makeCloudSnapshot(userId: userId),
+                        userId: userId
+                    )
+                } else {
+                    applyCloudSnapshot(snapshot)
+                    try saveToLocal()
+                }
+                return
+            } catch {
+                errorMessage = "クラウド同期に失敗しました。端末内のデータを表示しています。"
+                print("[DewTime] Cloud load failed: \(error)")
+            }
+        }
 
         do {
             try loadFromLocal()
@@ -60,9 +109,16 @@ final class AppDataStore {
 
         do {
             try saveToLocal()
+            if enableCloudSync, let cloudDataService {
+                let userId = try await cloudUserIdProvider()
+                try await cloudDataService.saveAll(
+                    snapshot: makeCloudSnapshot(userId: userId),
+                    userId: userId
+                )
+            }
         } catch {
-            errorMessage = "ローカルデータの保存に失敗しました"
-            print("[DewTime] Local save failed: \(error)")
+            errorMessage = "データの保存に失敗しました"
+            print("[DewTime] Save failed: \(error)")
         }
     }
 
@@ -119,6 +175,14 @@ final class AppDataStore {
         collectedFishes.removeAll()
         careRecords.removeAll()
         aquariums.removeAll()
+        if enableCloudSync, let cloudDataService, let userId = await currentCloudUserId() {
+            do {
+                try await cloudDataService.deleteAquariumData(userId: userId)
+            } catch {
+                errorMessage = "クラウド上の水槽データ初期化に失敗しました"
+                print("[DewTime] Cloud aquarium reset failed: \(error)")
+            }
+        }
         await saveAll()
     }
 
@@ -129,6 +193,15 @@ final class AppDataStore {
         careRecords.removeAll()
         aquariums.removeAll()
         profiles.removeAll()
+        isDeveloperSupported = false
+        if enableCloudSync, let cloudDataService, let userId = await currentCloudUserId() {
+            do {
+                try await cloudDataService.deleteAll(userId: userId)
+            } catch {
+                errorMessage = "クラウド上の全データ初期化に失敗しました"
+                print("[DewTime] Cloud reset failed: \(error)")
+            }
+        }
         seedSampleSchedules()
         await saveAll()
     }
@@ -234,10 +307,189 @@ final class AppDataStore {
         await saveAll()
     }
 
+    // MARK: - Cloud Snapshot Mapping
+
+    func makeCloudSnapshot(userId: UUID, now: Date = .now) -> CloudSnapshot {
+        CloudSnapshot(
+            schedules: schedules.map { schedule in
+                CloudSchedule(
+                    id: schedule.id,
+                    userId: userId,
+                    name: schedule.name,
+                    targetDepartureTime: schedule.targetDepartureTime,
+                    isActive: schedule.isActive,
+                    createdAt: now,
+                    updatedAt: now
+                )
+            },
+            routineItems: schedules.flatMap(\.items).compactMap { item in
+                guard let scheduleId = item.schedule?.id else { return nil }
+                return CloudRoutineItem(
+                    id: item.id,
+                    userId: userId,
+                    scheduleId: scheduleId,
+                    name: item.name,
+                    durationSeconds: item.durationSeconds,
+                    colorHex: item.colorHex,
+                    orderIndex: item.orderIndex,
+                    createdAt: now,
+                    updatedAt: now
+                )
+            },
+            activeFishes: activeFishes.map { fish in
+                CloudActiveFish(
+                    id: fish.id,
+                    userId: userId,
+                    speciesId: fish.speciesId,
+                    name: fish.name,
+                    startedAt: fish.startedAt,
+                    lastWateredAt: fish.lastWateredAt,
+                    requiredTotalWater: fish.requiredTotalWater,
+                    receivedWater: fish.receivedWater,
+                    isCompleted: fish.isCompleted,
+                    createdAt: fish.startedAt,
+                    updatedAt: fish.lastWateredAt ?? now
+                )
+            },
+            collectedFishes: collectedFishes.map { fish in
+                CloudCollectedFish(
+                    id: fish.id,
+                    userId: userId,
+                    name: fish.name,
+                    speciesId: fish.speciesId,
+                    recordedAt: fish.recordedAt,
+                    succeeded: fish.succeeded,
+                    waterRatio: fish.waterRatio,
+                    createdAt: fish.recordedAt,
+                    updatedAt: fish.recordedAt
+                )
+            },
+            careRecords: careRecords.map { record in
+                CloudCareRecord(
+                    id: record.id,
+                    userId: userId,
+                    speciesId: record.speciesId,
+                    recordedAt: record.recordedAt,
+                    waterAmount: record.waterAmount,
+                    totalWaterAfter: record.totalWaterAfter,
+                    requiredTotalWater: record.requiredTotalWater,
+                    growthStageRawValue: record.growthStageRawValue,
+                    completedGrowth: record.completedGrowth,
+                    createdAt: record.recordedAt,
+                    updatedAt: record.recordedAt
+                )
+            },
+            aquariums: aquariums.map { aquarium in
+                CloudAquarium(
+                    id: aquarium.id,
+                    userId: userId,
+                    totalWaterCollected: aquarium.totalWaterCollected,
+                    createdAt: aquarium.createdAt,
+                    updatedAt: aquarium.updatedAt
+                )
+            },
+            profiles: profiles.map { profile in
+                CloudProfile(
+                    id: profile.id,
+                    userId: userId,
+                    nickname: profile.nickname,
+                    avatarEmoji: profile.avatarEmoji,
+                    createdAt: profile.createdAt,
+                    updatedAt: now
+                )
+            }
+        )
+    }
+
+    func applyCloudSnapshot(_ snapshot: CloudSnapshot) {
+        let decodedSchedules = snapshot.schedules.map { row in
+            UserSchedule(
+                id: row.id,
+                name: row.name,
+                targetDepartureTime: row.targetDepartureTime,
+                isActive: row.isActive
+            )
+        }
+        let schedulesById = Dictionary(uniqueKeysWithValues: decodedSchedules.map { ($0.id, $0) })
+        let decodedRoutineItems = snapshot.routineItems.map { row in
+            RoutineItem(
+                id: row.id,
+                name: row.name,
+                durationSeconds: row.durationSeconds,
+                colorHex: row.colorHex,
+                orderIndex: row.orderIndex,
+                schedule: schedulesById[row.scheduleId]
+            )
+        }
+
+        for schedule in decodedSchedules {
+            schedule.items = decodedRoutineItems.filter { $0.schedule?.id == schedule.id }
+        }
+
+        schedules = decodedSchedules.sorted { $0.name < $1.name }
+        UserSchedule.ensureSingleActive(in: schedules)
+
+        activeFishes = snapshot.activeFishes.map { row in
+            ActiveFish(
+                id: row.id,
+                speciesId: row.speciesId,
+                name: row.name,
+                startedAt: row.startedAt,
+                lastWateredAt: row.lastWateredAt,
+                requiredTotalWater: row.requiredTotalWater,
+                receivedWater: row.receivedWater,
+                isCompleted: row.isCompleted
+            )
+        }.sorted { $0.startedAt > $1.startedAt }
+
+        collectedFishes = snapshot.collectedFishes.map { row in
+            CollectedFish(
+                id: row.id,
+                name: row.name,
+                speciesId: row.speciesId,
+                recordedAt: row.recordedAt,
+                succeeded: row.succeeded,
+                waterRatio: row.waterRatio
+            )
+        }.sorted { $0.recordedAt > $1.recordedAt }
+
+        careRecords = snapshot.careRecords.map { row in
+            FishCareRecord(
+                id: row.id,
+                speciesId: row.speciesId,
+                recordedAt: row.recordedAt,
+                waterAmount: row.waterAmount,
+                totalWaterAfter: row.totalWaterAfter,
+                requiredTotalWater: row.requiredTotalWater,
+                growthStage: GrowthStage(rawValue: row.growthStageRawValue) ?? .egg,
+                completedGrowth: row.completedGrowth
+            )
+        }.sorted { $0.recordedAt > $1.recordedAt }
+
+        aquariums = snapshot.aquariums.map { row in
+            Aquarium(
+                id: row.id,
+                totalWaterCollected: row.totalWaterCollected,
+                createdAt: row.createdAt,
+                updatedAt: row.updatedAt
+            )
+        }
+
+        profiles = snapshot.profiles.map { row in
+            UserProfile(
+                id: row.id,
+                nickname: row.nickname,
+                avatarEmoji: row.avatarEmoji,
+                createdAt: row.createdAt
+            )
+        }
+    }
+
     // MARK: - Local Save / Load
 
     private func loadFromLocal() throws {
         let defaults = UserDefaults.standard
+        self.isDeveloperSupported = defaults.bool(forKey: "local_is_developer_supported")
 
         // schedules
         if let schedulesData = defaults.array(forKey: "local_schedules") as? [[String: Any]] {
@@ -313,6 +565,7 @@ final class AppDataStore {
 
     private func saveToLocal() throws {
         let defaults = UserDefaults.standard
+        defaults.set(isDeveloperSupported, forKey: "local_is_developer_supported")
 
         defaults.set(schedules.map { encode(schedule: $0) }, forKey: "local_schedules")
 
@@ -335,6 +588,29 @@ final class AppDataStore {
         careRecords.removeAll()
         aquariums.removeAll()
         seedSampleSchedules()
+    }
+
+    // MARK: - Developer Support
+
+    func updateDeveloperSupportStatus(productId: String, originalTransactionId: String, purchasedAt: Date = .now) async {
+        self.isDeveloperSupported = true
+        try? saveToLocal()
+
+        if enableCloudSync, let cloudDataService, let userId = await currentCloudUserId() {
+            let purchase = CloudPurchase(
+                id: UUID(),
+                userId: userId,
+                productId: productId,
+                originalTransactionId: originalTransactionId,
+                purchasedAt: purchasedAt,
+                createdAt: .now
+            )
+            do {
+                try await cloudDataService.savePurchase(purchase)
+            } catch {
+                print("[DewTime] Failed to sync developer support purchase to cloud: \(error)")
+            }
+        }
     }
 
     private func seedSampleSchedules() {
@@ -566,5 +842,18 @@ final class AppDataStore {
         if let seconds = value as? TimeInterval { return Date(timeIntervalSince1970: seconds) }
         if let number = value as? NSNumber { return Date(timeIntervalSince1970: number.doubleValue) }
         return nil
+    }
+
+    private func currentCloudUserId() async -> UUID? {
+        do {
+            return try await cloudUserIdProvider()
+        } catch {
+            print("[DewTime] Auth lookup failed: \(error)")
+            return nil
+        }
+    }
+
+    private static var isRunningTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 }

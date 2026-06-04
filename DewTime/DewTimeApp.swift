@@ -20,6 +20,7 @@ struct DewTimeApp: App {
                 .preferredColorScheme(colorScheme)
                 .task {
                     NotificationScheduler.requestPermission()
+                    _ = try? await AuthService.shared.ensureAuthenticated()
                     await dataStore.load()
                 }
         }

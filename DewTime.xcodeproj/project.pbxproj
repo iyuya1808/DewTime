@@ -13,6 +13,7 @@
 		2758003524B44BEDCB87D222 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
 		52CD365B31AC8EB82DDF5E1A /* (null) in Frameworks */ = {isa = PBXBuildFile; };
 		64A251C064C74A26BEA3A883 /* DewTimerActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22149E933C2E42FD9FF5B1EE /* DewTimerActivityAttributes.swift */; };
+		FAF70BFD2FD12740009352F6 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = FAF70BFC2FD12740009352F6 /* Supabase */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -109,6 +110,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FAF70BFD2FD12740009352F6 /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -148,6 +150,7 @@
 				D41546F9370E4304906E4A2B /* DewTimeLiveActivityShared */,
 				FAACC7E22FBF610900622ABE /* DewTimeTests */,
 				FAACC7EC2FBF610900622ABE /* DewTimeUITests */,
+				FAF70BFB2FD12740009352F6 /* Frameworks */,
 				FAACC7D32FBF610800622ABE /* Products */,
 			);
 			sourceTree = "<group>";
@@ -161,6 +164,13 @@
 				FAACC7E92FBF610900622ABE /* DewTimeUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		FAF70BFB2FD12740009352F6 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -207,6 +217,7 @@
 			);
 			name = DewTime;
 			packageProductDependencies = (
+				FAF70BFC2FD12740009352F6 /* Supabase */,
 			);
 			productName = DewTime;
 			productReference = FAACC7D22FBF610800622ABE /* DewTime.app */;
@@ -294,6 +305,7 @@
 			mainGroup = FAACC7C92FBF610800622ABE;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				FAF70BFA2FD126F9009352F6 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = FAACC7D32FBF610800622ABE /* Products */;
@@ -577,8 +589,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = DewTime/DewTime.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = B77UF52R43;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -600,12 +613,16 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.technophere.DewTime;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -614,8 +631,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = DewTime/DewTime.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = B77UF52R43;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -637,12 +655,16 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.technophere.DewTime;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -781,6 +803,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		FAF70BFA2FD126F9009352F6 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase-community/supabase-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		FAF70BFC2FD12740009352F6 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FAF70BFA2FD126F9009352F6 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = FAACC7CA2FBF610800622ABE /* Project object */;
 }

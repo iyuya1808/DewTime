@@ -1,4 +1,5 @@
 import SwiftUI
+import Supabase
 
 struct SettingsView: View {
     @Environment(AppDataStore.self) private var store
@@ -17,6 +18,8 @@ struct SettingsView: View {
     @State private var newTime = Date()
     @State private var saveError: String?
 
+    @State private var authService = AuthService.shared
+
     var body: some View {
         NavigationStack {
             List {
@@ -24,10 +27,54 @@ struct SettingsView: View {
                     Button {
                         showProfileEditor = true
                     } label: {
-                        Label("プロフィールを編集", systemImage: "person.crop.circle")
+                        HStack(spacing: 12) {
+                            let profile = store.profile()
+                            Text(profile.avatarEmoji)
+                                .font(.system(size: 28))
+                                .frame(width: 44, height: 44)
+                                .background(Color.dewSurfaceSoft, in: Circle())
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(profile.nickname)
+                                    .font(.headline)
+                                    .foregroundStyle(.primary)
+                                
+                                if let user = authService.currentUser {
+                                    if authService.isAnonymous {
+                                        Text("クラウド保存: 未有効")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    } else {
+                                        Text(user.email ?? "クラウド保存: 有効")
+                                            .font(.caption2)
+                                            .foregroundStyle(.teal)
+                                    }
+                                } else {
+                                    Text("アカウント準備中...")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
+                        .background(Color.black.opacity(0.0001))
                     }
+                    .buttonStyle(.plain)
                 } header: {
-                    Text("プロフィール")
+                    Text("アカウント")
+                } footer: {
+                    if let user = authService.currentUser, authService.isAnonymous {
+                        Text("現在はアカウント登録なしでご利用中です（データはローカルに保存されます）。プロフィールを編集するにはアカウント登録が必要です。")
+                    } else if authService.currentUser != nil {
+                        Text("クラウド保存が有効になっています。タップしてプロフィール変更やアカウント管理を行えます。")
+                    }
                 }
                 .listRowBackground(Color.dewListRowBackground)
 

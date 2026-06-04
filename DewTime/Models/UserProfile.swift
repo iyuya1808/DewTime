@@ -5,7 +5,7 @@ import Observation
 ///
 /// 表示名・アバター絵文字・利用開始日を保持する。アプリ内で 1 レコードのみ存在する想定
 /// （初回アクセス時に `AppDataStore.profile()` が lazy 生成する）。`Aquarium` と同じ単一
-/// レコード方針で Firestore に永続化する。
+/// レコード方針で Supabase に永続化する。
 @Observable
 final class UserProfile: Identifiable {
     var id: UUID
