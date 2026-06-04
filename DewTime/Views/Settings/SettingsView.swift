@@ -170,6 +170,12 @@ struct SettingsView: View {
                     NavigationLink(destination: SupportDeveloperView()) {
                         Label("開発者を応援", systemImage: "heart.fill")
                     }
+                    HStack {
+                        Label("バージョン", systemImage: "info.circle")
+                        Spacer()
+                        Text(verbatim: appVersionString)
+                            .foregroundStyle(.secondary)
+                    }
                 } header: {
                     Text("サポート")
                 }
@@ -204,6 +210,12 @@ struct SettingsView: View {
     }
 
 
+
+    private var appVersionString: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
+        return "\(version) (\(build))"
+    }
 
     private var notificationSummary: String {
         guard notificationsEnabled else { return "通知はオフです。" }
