@@ -1,4 +1,5 @@
 import SwiftUI
+import StoreKit
 
 private enum UnlockFilter: String, CaseIterable {
     case all = "すべて"
@@ -124,6 +125,7 @@ private struct SpeciesGrowthSnapshot {
 
 struct CollectionView: View {
     @Environment(AppDataStore.self) private var store
+    @Environment(\.requestReview) private var requestReview
 
     @State private var selectedSpecies: FishSpecies?
     @State private var selectedFish: CollectedFish?
@@ -220,6 +222,13 @@ struct CollectionView: View {
                 }
             }
             .dewAppBackground()
+        .onAppear {
+            guard !ReviewRequestManager.shared.hasRequestedThisSession else { return }
+            Task {
+                try? await Task.sleep(for: .seconds(3))
+                ReviewRequestManager.shared.tryRequest(for: .collectionTab) { requestReview() }
+            }
+        }
         }
         .sheet(item: $selectedSpecies) { species in
             SpeciesDetailSheet(

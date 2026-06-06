@@ -1,8 +1,10 @@
 import SwiftUI
+import StoreKit
 
 struct TimerView: View {
     @Environment(AppDataStore.self) private var store
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.requestReview) private var requestReview
 
     @State private var viewModel: TimerViewModel?
     @State private var showConfirm = false
@@ -108,7 +110,9 @@ struct TimerView: View {
                 .presentationCornerRadius(32)
             }
         }
-        .sheet(isPresented: $showResult) {
+        .sheet(isPresented: $showResult, onDismiss: {
+            ReviewRequestManager.shared.tryRequest(for: .departureResult) { requestReview() }
+        }) {
             if let vm = viewModel {
                 DepartureResultView(
                     waterLevel: vm.finalWaterLevel,
