@@ -275,7 +275,7 @@ struct MonthlyAquariumView: View {
                 .foregroundStyle(.teal)
             Text("この月はまだ静かです")
                 .font(.headline)
-            Text("別の月へ移動するか、次の朝に水やり記録を残しましょう")
+            Text("別の月へ移動するか、次回に水やり記録を残しましょう")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

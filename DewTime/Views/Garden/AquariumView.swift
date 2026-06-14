@@ -436,7 +436,7 @@ struct FishCareDetailSheet: View {
                         )
                     }
 
-                    Text(record.completedGrowth ? "成魚になった魚は図鑑に登録されています。" : "次の朝も水を残して、この魚を育てましょう。")
+                    Text(record.completedGrowth ? "成魚になった魚は図鑑に登録されています。" : "次も水を残して、この魚を育てましょう。")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)

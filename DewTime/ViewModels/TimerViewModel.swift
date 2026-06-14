@@ -219,7 +219,9 @@ final class TimerViewModel {
             waterAmount: finalWaterAmount,
             totalWaterAfter: totalAfter,
             growthStage: growthStage,
-            completedGrowth: completedGrowth
+            completedGrowth: completedGrowth,
+            waterRatio: finalWaterLevel,
+            succeeded: !isOverdue
         )
 
         if let error = store.errorMessage {

@@ -448,7 +448,7 @@ struct CollectionView: View {
                         Image(systemName: "info.circle")
                             .font(.caption2)
                             .foregroundStyle(.secondary.opacity(0.8))
-                        Text("朝の出発で成魚になると解放")
+                        Text("出発で成魚になると解放")
                             .font(.caption.weight(.medium))
                             .foregroundStyle(.secondary.opacity(0.8))
                             .lineLimit(1)
@@ -963,7 +963,7 @@ private struct SpeciesDetailSheet: View {
                     Text("未解放の魚")
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.primary)
-                    Text("条件をクリアして朝の出発を行うと解放されます。")
+                    Text("条件をクリアして出発を行うと解放されます。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -996,7 +996,7 @@ private struct SpeciesDetailSheet: View {
                 }
             }
 
-            Text("朝の準備をスムーズに進めて\n水タンクに十分な水を残して出発しましょう！")
+            Text("準備をスムーズに進めて\n水タンクに十分な水を残して出発しましょう！")
                 .font(.caption2)
                 .foregroundStyle(.secondary.opacity(0.85))
                 .multilineTextAlignment(.center)

@@ -283,7 +283,9 @@ final class AppDataStore {
         waterAmount: Double,
         totalWaterAfter: Double,
         growthStage: GrowthStage,
-        completedGrowth: Bool
+        completedGrowth: Bool,
+        waterRatio: Double,
+        succeeded: Bool
     ) async {
         fish.receivedWater = totalWaterAfter
         fish.lastWateredAt = .now
@@ -311,8 +313,8 @@ final class AppDataStore {
                     name: fish.name,
                     speciesId: species.rawValue,
                     recordedAt: .now,
-                    succeeded: true,
-                    waterRatio: 1.0
+                    succeeded: succeeded,
+                    waterRatio: waterRatio
                 )
             )
         }
@@ -628,7 +630,7 @@ final class AppDataStore {
 
     private func seedSampleSchedules() {
         let schedule = UserSchedule(
-            name: "平日通常モード",
+            name: "平日モード",
             targetDepartureTime: DepartureTimeDefaults.fifteenMinutesFromNow(),
             isActive: true
         )
@@ -637,7 +639,7 @@ final class AppDataStore {
             ("ハミガキ", 180, "#4FC3F7"),
             ("洗顔", 120, "#81D4FA"),
             ("着替え", 300, "#FFB74D"),
-            ("朝食", 600, "#FFCC80"),
+            ("食事", 600, "#FFCC80"),
             ("持ち物確認", 120, "#A5D6A7")
         ]
 

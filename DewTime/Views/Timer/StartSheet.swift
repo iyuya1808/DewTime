@@ -547,7 +547,7 @@ struct StartSheet: View {
 
 #Preview {
     StartSheet(
-        scheduleName: "朝の通勤",
+        scheduleName: "通勤",
         currentTime: Calendar.current.date(bySettingHour: 8, minute: 0, second: 0, of: .now)!,
         selectedSpecies: .medaka,
         aquariumTier: 0,

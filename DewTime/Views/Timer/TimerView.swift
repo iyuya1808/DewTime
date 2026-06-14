@@ -22,6 +22,10 @@ struct TimerView: View {
 
             if let vm = viewModel {
                 mainContent(vm: vm)
+            } else if store.isLoading {
+                ProgressView()
+                    .tint(.white)
+                    .scaleEffect(1.5)
             } else {
                 emptyState
             }
@@ -36,6 +40,12 @@ struct TimerView: View {
             ensureViewModel()
             viewModel?.syncActiveFish(store.activeFishes)
             handlePendingQuickTimerRequest()
+        }
+        .onChange(of: store.isLoading) { _, isLoading in
+            if !isLoading {
+                ensureViewModel()
+                viewModel?.syncActiveFish(store.activeFishes)
+            }
         }
         .onChange(of: store.activeFishes.map(\.id)) { _, _ in
             viewModel?.syncActiveFish(store.activeFishes)

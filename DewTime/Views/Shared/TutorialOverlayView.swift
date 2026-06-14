@@ -195,7 +195,7 @@ private enum TutorialStep: CaseIterable {
     var title: String {
         switch self {
         case .timerOverview:
-            return "水を残す朝タイマー"
+            return "水を残すタイマー"
         case .timerFlow:
             return "出発すると魚が育ちます"
         case .collection:
@@ -212,7 +212,7 @@ private enum TutorialStep: CaseIterable {
         case .timerOverview:
             return "出発時刻までの余裕が水量として表示されます。準備が順調なほど水が残り、魚にあげられる水も増えます。"
         case .timerFlow:
-            return "「スタート」で朝の準備を始めます。出発できたら「いってきます！」を押して、残った水を今日の魚に届けましょう。"
+            return "「スタート」で準備を始めます。出発できたら「いってきます！」を押して、残った水を今日の魚に届けましょう。"
         case .collection:
             return "魚が成魚まで育つと図鑑に登録されます。育成中の進み具合や、まだ出会っていない魚の目安もここで確認できます。"
         case .aquarium:
