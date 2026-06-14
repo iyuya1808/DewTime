@@ -243,12 +243,12 @@ struct AquariumView: View {
         }
     }
 
-    /// 成魚なら魚の絵文字、それ以外は成長段階の SF Symbol を表示する。
+    /// 成魚なら魚の姿、それ以外は成長段階の SF Symbol を表示する。
     @ViewBuilder
     private func recordSymbol(for record: FishCareRecord, size: CGFloat) -> some View {
         if record.completedGrowth {
-            Text(record.species.emoji)
-                .font(.system(size: size))
+            FishArtworkView(species: record.species)
+                .frame(width: size * 1.2, height: size)
         } else {
             Image(systemName: record.growthStage.icon)
                 .font(.system(size: size, weight: .semibold))
@@ -407,8 +407,8 @@ struct FishCareDetailSheet: View {
                             .fill(recordColor.opacity(0.16))
                             .frame(width: 112, height: 112)
                         if record.completedGrowth {
-                            Text(record.species.emoji)
-                                .font(.system(size: 58))
+                            FishArtworkView(species: record.species)
+                                .frame(width: 82, height: 76)
                         } else {
                             Image(systemName: record.growthStage.icon)
                                 .font(.system(size: 58, weight: .semibold))

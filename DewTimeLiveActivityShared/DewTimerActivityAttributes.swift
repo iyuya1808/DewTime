@@ -22,6 +22,7 @@ struct DewTimerActivityAttributes: ActivityAttributes {
         var projectedWater: Double
         var waterLevel: Double
         var status: TimerStatus
+        var phaseIndex: Int
         var lastUpdatedAt: Date
 
         var waterPercent: Int {

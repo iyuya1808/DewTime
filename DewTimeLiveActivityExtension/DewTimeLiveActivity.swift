@@ -5,6 +5,7 @@ import WidgetKit
 @main
 struct DewTimeLiveActivityBundle: WidgetBundle {
     var body: some Widget {
+        DewTimeQuickStartWidget()
         DewTimeLiveActivity()
     }
 }
@@ -40,9 +41,13 @@ struct DewTimeLiveActivity: Widget {
             } minimal: {
                 HStack(spacing: 1) {
                     Image(systemName: "drop.fill")
+                    Text("\(context.state.waterPercent)%")
+                        .monospacedDigit()
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
                 }
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(.cyan)
+                .foregroundStyle(context.state.waterLevel <= 0.2 ? .orange : .cyan)
             }
         }
     }
@@ -51,10 +56,12 @@ struct DewTimeLiveActivity: Widget {
 private struct LockScreenLiveActivityView: View {
     let context: ActivityViewContext<DewTimerActivityAttributes>
 
+    private var isDeparted: Bool { context.state.status == .departed }
+
     var body: some View {
         HStack(spacing: 14) {
             TankPreviewView(
-                waterLevel: context.state.waterLevel,
+                waterLevel: isDeparted ? 0 : context.state.waterLevel,
                 segments: context.attributes.segments,
                 fishEmoji: context.state.fishEmoji
             )
@@ -77,25 +84,36 @@ private struct LockScreenLiveActivityView: View {
                     Spacer()
 
                     VStack(alignment: .trailing, spacing: 3) {
-                        Text(context.state.status == .overdue ? "超過" : "残り")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(context.state.status == .overdue ? .orange : .white.opacity(0.58))
-                        Text(timerInterval: Date.now...context.attributes.targetDepartureTime, countsDown: true)
-                            .font(.title3.monospacedDigit().weight(.semibold))
-                            .foregroundStyle(.white)
-                            .multilineTextAlignment(.trailing)
-                            .minimumScaleFactor(0.72)
+                        if isDeparted {
+                            Text("水槽へ")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.mint)
+                            Text("注水完了")
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .minimumScaleFactor(0.72)
+                        } else {
+                            Text(context.state.status == .overdue ? "超過" : "残り")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(context.state.status == .overdue ? .orange : .white.opacity(0.58))
+                            Text(timerInterval: Date.now...context.attributes.targetDepartureTime, countsDown: true)
+                                .font(.title3.monospacedDigit().weight(.semibold))
+                                .foregroundStyle(.white)
+                                .multilineTextAlignment(.trailing)
+                                .minimumScaleFactor(0.72)
+                        }
                     }
                 }
 
                 WaterMeterView(
-                    waterLevel: context.state.waterLevel,
+                    waterLevel: isDeparted ? 0 : context.state.waterLevel,
                     projectedWater: context.state.projectedWater,
                     requiredWater: context.state.requiredWater
                 )
 
                 HStack(spacing: 10) {
                     FishPreviewBadge(state: context.state)
+                        .scaleEffect(isDeparted ? 1.18 : 1.0)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(context.state.selectedSpeciesName) / \(context.state.growthStageName)")
@@ -114,34 +132,42 @@ private struct LockScreenLiveActivityView: View {
         }
         .padding(16)
         .foregroundStyle(.white)
+        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: context.state.status)
+        .animation(.spring(response: 0.35, dampingFraction: 0.55), value: context.state.phaseIndex)
     }
 }
 
 private struct ExpandedTankView: View {
     let context: ActivityViewContext<DewTimerActivityAttributes>
 
+    private var isDeparted: Bool { context.state.status == .departed }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             TankPreviewView(
-                waterLevel: context.state.waterLevel,
+                waterLevel: isDeparted ? 0 : context.state.waterLevel,
                 segments: context.attributes.segments,
                 fishEmoji: context.state.fishEmoji
             )
             .frame(width: 66, height: 72)
-            Text("\(context.state.waterPercent)%")
+            Text(isDeparted ? "注水完了" : "\(context.state.waterPercent)%")
                 .font(.caption2.monospacedDigit().weight(.semibold))
-                .foregroundStyle(.cyan)
+                .foregroundStyle(isDeparted ? .mint : .cyan)
         }
+        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: context.state.status)
     }
 }
 
 private struct ExpandedFishView: View {
     let state: DewTimerActivityAttributes.ContentState
 
+    private var isDeparted: Bool { state.status == .departed }
+
     var body: some View {
         VStack(alignment: .trailing, spacing: 5) {
             Text(state.fishEmoji)
                 .font(.title)
+                .scaleEffect(isDeparted ? 1.3 : 1.0)
             Text(state.growthStageName)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.82))
@@ -149,39 +175,50 @@ private struct ExpandedFishView: View {
                 .tint(.mint)
                 .frame(width: 78)
         }
+        .animation(.spring(response: 0.5, dampingFraction: 0.6), value: state.status)
     }
 }
 
 private struct ExpandedTaskView: View {
     let context: ActivityViewContext<DewTimerActivityAttributes>
 
+    private var isDeparted: Bool { context.state.status == .departed }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Label(context.state.currentTaskName, systemImage: "figure.walk.motion")
+                Label(context.state.currentTaskName, systemImage: isDeparted ? "drop.fill" : "figure.walk.motion")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                 Spacer()
-                Text(timerInterval: Date.now...context.attributes.targetDepartureTime, countsDown: true)
-                    .font(.caption.monospacedDigit().weight(.bold))
-                    .foregroundStyle(.white.opacity(0.88))
+                if isDeparted {
+                    Text("水槽へ注水 ✨")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.mint)
+                } else {
+                    Text(timerInterval: Date.now...context.attributes.targetDepartureTime, countsDown: true)
+                        .font(.caption.monospacedDigit().weight(.bold))
+                        .foregroundStyle(.white.opacity(0.88))
+                }
             }
 
             WaterMeterView(
-                waterLevel: context.state.waterLevel,
+                waterLevel: isDeparted ? 0 : context.state.waterLevel,
                 projectedWater: context.state.projectedWater,
                 requiredWater: context.state.requiredWater,
                 isCompact: true
             )
 
-            if let nextTaskName = context.state.nextTaskName {
+            if !isDeparted, let nextTaskName = context.state.nextTaskName {
                 Text("次: \(nextTaskName)")
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(.white.opacity(0.62))
                     .lineLimit(1)
             }
         }
+        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: context.state.status)
+        .animation(.spring(response: 0.35, dampingFraction: 0.55), value: context.state.phaseIndex)
     }
 }
 
@@ -317,13 +354,14 @@ private func shortTaskName(_ name: String) -> String {
 private func compactStatusText(_ state: DewTimerActivityAttributes.ContentState) -> String {
     switch state.status {
     case .overdue:
-        return "!"
+        return "⚠️"
     case .departed:
-        return "OK"
+        return "✨"
     case .cancelled:
-        return "-"
+        return "💧"
     case .running:
-        return state.fishEmoji
+        // 現時点の予測で成魚に届くなら ✨、それ以外は順調を表す 🐟。
+        return state.growthProgress >= 1.0 ? "✨" : "🐟"
     }
 }
 

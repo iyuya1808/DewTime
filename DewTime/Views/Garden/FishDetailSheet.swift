@@ -3,8 +3,11 @@ import SwiftUI
 struct FishDetailSheet: View {
     let fish: CollectedFish
 
+    @Environment(AppDataStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @State private var showNameEditor = false
+    @State private var nameDraft = ""
 
     var body: some View {
         VStack(spacing: 20) {
@@ -24,14 +27,36 @@ struct FishDetailSheet: View {
                 Circle()
                     .fill(fishColor.opacity(0.16))
                     .frame(width: 112, height: 112)
-                Text(fishEmoji)
-                    .font(.system(size: 58))
-                    .grayscale(fish.succeeded ? 0 : 1)
+                FishArtworkView(
+                    species: fishSpecies,
+                    tint: fish.succeeded ? nil : .secondary,
+                    isLocked: !fish.succeeded
+                )
+                .frame(width: 82, height: 78)
             }
 
             VStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    Text(fish.name)
+                        .font(.title2.weight(.bold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Button {
+                        nameDraft = fish.name
+                        showNameEditor = true
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.teal)
+                            .frame(width: 28, height: 28)
+                            .background(Color.dewSurface, in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("魚の名前を編集")
+                }
                 Text(speciesName)
-                    .font(.title2.weight(.bold))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
                 Text(fish.recordedAt, format: .dateTime.year().month().day().hour().minute())
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -67,6 +92,15 @@ struct FishDetailSheet: View {
                 )
                 .ignoresSafeArea()
         )
+        .alert("魚の名前", isPresented: $showNameEditor) {
+            TextField("名前", text: $nameDraft)
+            Button("保存") {
+                Task { await store.renameCollectedFish(fish, name: nameDraft) }
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("空欄で保存すると種類名に戻ります。")
+        }
     }
 
     private func detailMetric(icon: String, value: String, label: String, tint: Color) -> some View {
@@ -86,8 +120,8 @@ struct FishDetailSheet: View {
         .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    private var fishEmoji: String {
-        FishSpecies(rawValue: fish.speciesId)?.emoji ?? "🐟"
+    private var fishSpecies: FishSpecies {
+        FishSpecies(rawValue: fish.speciesId) ?? .medaka
     }
 
     private var fishColor: Color {
@@ -96,7 +130,7 @@ struct FishDetailSheet: View {
     }
 
     private var speciesName: String {
-        FishSpecies(rawValue: fish.speciesId)?.displayName ?? fish.name
+        fishSpecies.displayName
     }
 
     private var message: String {

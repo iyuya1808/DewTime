@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct DewTimeApp: App {
     @State private var dataStore = AppDataStore()
+    @State private var deepLinkRouter = QuickTimerDeepLinkRouter()
     @AppStorage(AppPreferences.Key.appTheme.rawValue) private var appTheme = AppTheme.system.rawValue
 
     private var colorScheme: ColorScheme? {
@@ -17,7 +18,11 @@ struct DewTimeApp: App {
         WindowGroup {
             ContentView()
                 .environment(dataStore)
+                .environment(deepLinkRouter)
                 .preferredColorScheme(colorScheme)
+                .onOpenURL { url in
+                    deepLinkRouter.handle(url)
+                }
                 .task {
                     NotificationScheduler.requestPermission()
                     _ = try? await AuthService.shared.ensureAuthenticated()

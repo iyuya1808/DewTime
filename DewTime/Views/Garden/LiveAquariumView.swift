@@ -4,8 +4,9 @@ import SwiftUI
 
 /// 水槽内を泳ぐ1匹の魚。座標は 0...1 の正規化空間で保持し、描画時にサイズへスケールする。
 private struct SwimmingFish: Identifiable {
-    let id = UUID()
-    var emoji: String
+    var id: UUID
+    var name: String
+    var species: FishSpecies
     /// 描画サイズ（pt）。
     var size: CGFloat
     /// 巡航速度（正規化単位/秒）。
@@ -57,7 +58,9 @@ private struct Heart: Identifiable {
 
 /// 投入する魚の仕様（ビュー側で `FishSpecies` から生成）。
 private struct FishSpec {
-    var emoji: String
+    var id: UUID
+    var name: String
+    var species: FishSpecies
     var size: CGFloat
     var speed: CGFloat
     var ghost: Bool
@@ -76,13 +79,15 @@ private final class AquariumEngine {
 
     /// 種構成が変わったときだけ作り直す。
     func populate(_ specs: [FishSpec]) {
-        let signature = specs.map { "\($0.emoji)\($0.ghost)" }.joined()
+        let signature = specs.map { "\($0.id.uuidString)\($0.name)\($0.species.rawValue)\($0.ghost)" }.joined()
         guard signature != currentSignature else { return }
         currentSignature = signature
 
         fish = specs.map { spec in
             SwimmingFish(
-                emoji: spec.emoji,
+                id: spec.id,
+                name: spec.name,
+                species: spec.species,
                 size: spec.size,
                 speed: spec.speed,
                 ghost: spec.ghost,
@@ -191,19 +196,21 @@ private final class AquariumEngine {
     // MARK: 操作
 
     /// タップ位置に最寄りの魚がいれば喜ばせ、いなければエサを落とす。
-    func tap(at p: CGPoint) {
+    func tap(at p: CGPoint) -> UUID? {
         if let index = nearestFishIndex(to: p, within: 0.09) {
             fish[index].happy = 1.4
             hearts.append(Heart(x: p.x, y: p.y - 0.02, life: 1.3, drift: .random(in: 0...3)))
             let generator = UIImpactFeedbackGenerator(style: .medium)
             generator.prepare()
             generator.impactOccurred()
+            return fish[index].id
         } else {
-            guard food.count < 12 else { return }
+            guard food.count < 12 else { return nil }
             food.append(FoodPellet(x: p.x, y: max(0.06, p.y), sink: .random(in: 0.06...0.1), wobblePhase: 0))
             let generator = UIImpactFeedbackGenerator(style: .light)
             generator.prepare()
             generator.impactOccurred()
+            return nil
         }
     }
 
@@ -250,6 +257,7 @@ struct LiveAquariumView: View {
 
     @State private var engine = AquariumEngine()
     @State private var showRecords = false
+    @State private var selectedFish: CollectedFish?
     @State private var canvasSize: CGSize = .zero
 
     private var collected: [CollectedFish] {
@@ -263,25 +271,27 @@ struct LiveAquariumView: View {
     private var specs: [FishSpec] {
         let succeeded = collected.filter(\.succeeded)
         var counts: [String: Int] = [:]
-        for fish in succeeded { counts[fish.speciesId, default: 0] += 1 }
-
         var result: [FishSpec] = []
-        for species in FishSpecies.allCases {
-            guard let count = counts[species.rawValue], count > 0 else { continue }
-            for _ in 0..<min(count, 3) {
-                result.append(spec(for: species, ghost: false))
-                if result.count >= 18 { break }
+
+        for fish in succeeded {
+            guard counts[fish.speciesId, default: 0] < 3,
+                  let species = FishSpecies(rawValue: fish.speciesId) else {
+                continue
             }
+            counts[fish.speciesId, default: 0] += 1
+            result.append(spec(for: fish, species: species, ghost: false))
             if result.count >= 18 { break }
         }
 
         return result
     }
 
-    private func spec(for species: FishSpecies, ghost: Bool) -> FishSpec {
+    private func spec(for fish: CollectedFish, species: FishSpecies, ghost: Bool) -> FishSpec {
         let ratio = species.requiredWaterRatio
         return FishSpec(
-            emoji: species.emoji,
+            id: fish.id,
+            name: fish.name,
+            species: species,
             size: 30 + ratio * 46,          // 小型魚ほど小さく、大型魚ほど大きく
             speed: 0.13 - ratio * 0.07,     // 小型魚ほど速く泳ぐ
             ghost: ghost
@@ -302,8 +312,16 @@ struct LiveAquariumView: View {
         .sheet(isPresented: $showRecords) {
             AquariumView()
         }
+        .sheet(item: $selectedFish) { fish in
+            FishDetailSheet(fish: fish)
+                .presentationDetents([.medium])
+                .presentationBackground(.clear)
+                .presentationDragIndicator(.hidden)
+        }
         .onAppear { engine.populate(specs) }
-        .onChange(of: collected.count) { engine.populate(specs) }
+        .onChange(of: collected.map { "\($0.id.uuidString):\($0.name):\($0.succeeded)" }) { _, _ in
+            engine.populate(specs)
+        }
     }
 
     // MARK: シーン
@@ -328,7 +346,10 @@ struct LiveAquariumView: View {
         .contentShape(Rectangle())
         .onTapGesture(coordinateSpace: .local) { location in
             guard canvasSize.width > 0 else { return }
-            engine.tap(at: CGPoint(x: location.x / canvasSize.width, y: location.y / canvasSize.height))
+            if let fishId = engine.tap(at: CGPoint(x: location.x / canvasSize.width, y: location.y / canvasSize.height)),
+               let fish = collected.first(where: { $0.id == fishId }) {
+                selectedFish = fish
+            }
         }
     }
 
@@ -454,11 +475,33 @@ struct LiveAquariumView: View {
             ctx.rotate(by: .degrees(Double(wiggle)))
             ctx.scaleBy(x: f.facingRight ? pop : -pop, y: pop)
             ctx.opacity = f.ghost ? 0.4 : 1.0
-            ctx.draw(
-                Text(f.emoji).font(.system(size: f.size)),
-                at: .zero,
-                anchor: .center
+            FishArtworkRenderer.draw(
+                f.species,
+                in: CGRect(x: -f.size / 2, y: -f.size / 2, width: f.size, height: f.size),
+                context: &ctx
             )
+
+            if f.happy > 0, !f.ghost {
+                let labelOpacity = min(1, f.happy)
+                let labelWidth = min(max(CGFloat(f.name.count) * 9 + 18, 44), 120)
+                let labelRect = CGRect(
+                    x: min(max(x - labelWidth / 2, 10), size.width - labelWidth - 10),
+                    y: max(y - f.size * 0.85 - 26, 60),
+                    width: labelWidth,
+                    height: 24
+                )
+                context.fill(
+                    Path(roundedRect: labelRect, cornerRadius: 12),
+                    with: .color(.black.opacity(0.34 * labelOpacity))
+                )
+                context.draw(
+                    Text(f.name)
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.white),
+                    at: CGPoint(x: labelRect.midX, y: labelRect.midY),
+                    anchor: .center
+                )
+            }
         }
     }
 
@@ -509,7 +552,7 @@ struct LiveAquariumView: View {
 
             Spacer()
 
-            Label("水面をタップでエサ・魚をタップでなでなで", systemImage: "hand.tap.fill")
+            Label("水面をタップでエサ・魚をタップで名前編集", systemImage: "hand.tap.fill")
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 14)

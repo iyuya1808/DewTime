@@ -13,7 +13,7 @@ struct DepartureConfirmView: View {
     let onConfirm: () -> Void
     let onCancel: () -> Void
 
-    @State private var emojiScale: CGFloat = 0.8
+    @State private var fishScale: CGFloat = 0.8
 
     var body: some View {
         ZStack {
@@ -24,12 +24,12 @@ struct DepartureConfirmView: View {
                 VStack(spacing: 0) {
                     // メインメッセージ
                     VStack(spacing: 12) {
-                        Text(selectedSpecies.emoji)
-                            .font(.system(size: 58))
-                            .scaleEffect(emojiScale)
-                            .animation(.spring(response: 0.4, dampingFraction: 0.5), value: emojiScale)
+                        FishArtworkView(species: selectedSpecies)
+                            .frame(width: 84, height: 78)
+                            .scaleEffect(fishScale)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.5), value: fishScale)
                             .onAppear {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { emojiScale = 1.0 }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { fishScale = 1.0 }
                             }
 
                         Text(headline)

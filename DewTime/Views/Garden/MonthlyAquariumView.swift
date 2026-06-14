@@ -299,12 +299,12 @@ struct MonthlyAquariumView: View {
         .background(Color.dewSurfaceSoft, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
-    /// 成魚なら魚の絵文字、それ以外は成長段階の SF Symbol を表示する。
+    /// 成魚なら魚の姿、それ以外は成長段階の SF Symbol を表示する。
     @ViewBuilder
     private func recordSymbol(for record: FishCareRecord, size: CGFloat) -> some View {
         if record.completedGrowth {
-            Text(record.species.emoji)
-                .font(.system(size: size))
+            FishArtworkView(species: record.species)
+                .frame(width: size * 1.2, height: size)
         } else {
             Image(systemName: record.growthStage.icon)
                 .font(.system(size: size, weight: .semibold))

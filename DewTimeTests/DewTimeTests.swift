@@ -164,6 +164,28 @@ struct DewTimeTests {
     }
 
     @MainActor
+    @Test func completedFishKeepsCustomNameInCollectionRecord() async throws {
+        resetLocalTestState()
+        defer { resetLocalTestState() }
+
+        let store = AppDataStore()
+        let schedule = UserSchedule(name: "平日", targetDepartureTime: .now.addingTimeInterval(600), isActive: true)
+        let vm = TimerViewModel(schedule: schedule)
+        await vm.selectSpecies(.medaka, store: store)
+
+        let fish = try #require(store.activeFishes.first)
+        fish.requiredTotalWater = 80
+        fish.receivedWater = 20
+        await store.renameActiveFish(fish, name: "しずく")
+
+        await vm.depart(store: store)
+
+        #expect(store.collectedFishes.first?.name == "しずく")
+
+        vm.reset()
+    }
+
+    @MainActor
     @Test func aquariumTierUnlocksLargerSpecies() async throws {
         #expect(FishSpecies.medaka.isUnlocked(aquariumTier: 0))
         #expect(FishSpecies.dolphin.isUnlocked(aquariumTier: 4))

@@ -373,12 +373,14 @@ struct CollectionView: View {
                                 )
                         }
 
-                    Text(species.emoji)
-                        .font(.system(size: 42))
-                        .grayscale(isUnlocked || isGrowing ? 0 : 1)
-                        .opacity(isUnlocked || isGrowing ? 1 : 0.22)
-                        .shadow(color: isUnlocked ? snapshot.accentColor.opacity(0.45) : isGrowing ? .blue.opacity(0.25) : .clear, radius: isUnlocked ? 8 : 0)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    FishArtworkView(
+                        species: species,
+                        tint: isUnlocked || isGrowing ? nil : .secondary,
+                        isLocked: !(isUnlocked || isGrowing)
+                    )
+                    .frame(width: 72, height: 72)
+                    .shadow(color: isUnlocked ? snapshot.accentColor.opacity(0.45) : isGrowing ? .blue.opacity(0.25) : .clear, radius: isUnlocked ? 8 : 0)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                     statusPill(snapshot: snapshot, species: species)
                         .padding(8)
@@ -606,11 +608,16 @@ struct CollectionView: View {
                             selectedFish = fish
                         } label: {
                             VStack(spacing: 6) {
-                                Text(emoji(for: fish))
-                                    .font(.system(size: 28))
-                                    .grayscale(fish.succeeded ? 0 : 1)
-                                Text(fish.recordedAt, format: .dateTime.month().day())
+                                FishArtworkView(
+                                    species: species(for: fish),
+                                    tint: fish.succeeded ? nil : .secondary,
+                                    isLocked: !fish.succeeded
+                                )
+                                .frame(width: 38, height: 34)
+                                Text(fish.name)
                                     .font(.caption2.weight(.semibold))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.72)
                                 Text("\(Int(fish.waterRatio * 100))%")
                                     .font(.caption2.bold())
                                     .monospacedDigit()
@@ -645,8 +652,8 @@ struct CollectionView: View {
         )
     }
 
-    private func emoji(for fish: CollectedFish) -> String {
-        FishSpecies(rawValue: fish.speciesId)?.emoji ?? "🐟"
+    private func species(for fish: CollectedFish) -> FishSpecies {
+        FishSpecies(rawValue: fish.speciesId) ?? .medaka
     }
 }
 
@@ -758,11 +765,13 @@ private struct SpeciesDetailSheet: View {
                             )
                     }
 
-                Text(species.emoji)
-                    .font(.system(size: 58))
-                    .grayscale(unlocked || isGrowing ? 0 : 1)
-                    .opacity(unlocked || isGrowing ? 1 : 0.3)
-                    .shadow(color: unlocked ? snapshot.accentColor.opacity(0.5) : .clear, radius: unlocked ? 12 : 0)
+                FishArtworkView(
+                    species: species,
+                    tint: unlocked || isGrowing ? nil : .secondary,
+                    isLocked: !(unlocked || isGrowing)
+                )
+                .frame(width: 80, height: 76)
+                .shadow(color: unlocked ? snapshot.accentColor.opacity(0.5) : .clear, radius: unlocked ? 12 : 0)
 
                 if !unlocked && !isGrowing {
                     Image(systemName: "lock.fill")
@@ -1032,12 +1041,14 @@ private struct SpeciesDetailSheet: View {
     private func fishTile(_ fish: CollectedFish) -> some View {
         let theme = WaterLevelTheme(waterRatio: fish.waterRatio)
         return VStack(spacing: 6) {
-            Text(species.emoji)
-                .font(.system(size: 28))
+            FishArtworkView(species: species)
+                .frame(width: 42, height: 36)
                 .shadow(color: theme.tintColor.opacity(0.3), radius: 4)
-            Text(fish.recordedAt, format: .dateTime.month().day())
+            Text(fish.name)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.primary.opacity(0.8))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
             Text("\(Int(fish.waterRatio * 100))%")
                 .font(.caption2.bold())
                 .foregroundStyle(theme.tintColor)

@@ -264,6 +264,19 @@ final class AppDataStore {
         await saveAll()
     }
 
+    func renameActiveFish(_ fish: ActiveFish, name: String) async {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        fish.name = trimmed.isEmpty ? fish.species.displayName : trimmed
+        await saveAll()
+    }
+
+    func renameCollectedFish(_ fish: CollectedFish, name: String) async {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let speciesName = FishSpecies(rawValue: fish.speciesId)?.displayName ?? "魚"
+        fish.name = trimmed.isEmpty ? speciesName : trimmed
+        await saveAll()
+    }
+
     func recordDeparture(
         species: FishSpecies,
         fish: ActiveFish,
@@ -295,7 +308,7 @@ final class AppDataStore {
         if completedGrowth {
             collectedFishes.append(
                 CollectedFish(
-                    name: species.displayName,
+                    name: fish.name,
                     speciesId: species.rawValue,
                     recordedAt: .now,
                     succeeded: true,

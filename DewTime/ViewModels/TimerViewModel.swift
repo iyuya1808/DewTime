@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import WidgetKit
 
 @Observable
 @MainActor
@@ -84,6 +85,12 @@ final class TimerViewModel {
         return items[index + 1]
     }
 
+    /// 現在のルーティン項目の orderedItems 内インデックス。Live Activity の境界演出トリガーに使う。
+    var currentPhaseIndex: Int {
+        guard let currentRoutineItem else { return -1 }
+        return schedule.orderedItems.firstIndex(where: { $0.id == currentRoutineItem.id }) ?? -1
+    }
+
     var currentRoutineProgress: Double {
         guard let currentRoutineItem else { return 0 }
         var elapsedBeforeCurrent = 0
@@ -139,6 +146,10 @@ final class TimerViewModel {
 
     var hasActiveFish: Bool {
         activeFish != nil
+    }
+
+    var currentFishName: String {
+        activeFish?.name ?? selectedSpecies.displayName
     }
 
     // MARK: - Formatted strings
@@ -255,6 +266,15 @@ final class TimerViewModel {
         }
     }
 
+    func renameActiveFish(_ name: String, store: AppDataStore) async {
+        let activeFish = activeFish ?? createActiveFish(for: selectedSpecies, in: store)
+        await store.renameActiveFish(activeFish, name: name)
+        if let error = store.errorMessage {
+            saveError = "魚の名前を保存できませんでした"
+            print("[DewTime] ActiveFish の名前保存に失敗しました: \(error)")
+        }
+    }
+
     func syncActiveFish(_ fishes: [ActiveFish]) {
         if let fish = fishes
             .filter({ !$0.isCompleted })
@@ -306,6 +326,7 @@ final class TimerViewModel {
         ud.set(departed,                forKey: PKey.departed.rawValue)
         ud.set(finalWaterLevel,         forKey: PKey.finalWaterLevel.rawValue)
         ud.set(finalDelaySeconds,       forKey: PKey.finalDelaySeconds.rawValue)
+        saveWidgetStateIfNeeded()
     }
 
     private func restoreState() {
@@ -328,6 +349,8 @@ final class TimerViewModel {
     private func clearState() {
         [PKey.scheduleId, .startedAt, .departed, .finalWaterLevel, .finalDelaySeconds]
             .forEach { UserDefaults.standard.removeObject(forKey: $0.rawValue) }
+        SharedTimerWidgetState.clear()
+        WidgetCenter.shared.reloadTimelines(ofKind: SharedTimerWidgetState.widgetKind)
     }
 
     // MARK: - Private helpers
@@ -426,6 +449,7 @@ extension TimerViewModel {
             projectedWater: projectedTotalWater,
             waterLevel: waterLevel,
             status: status,
+            phaseIndex: currentPhaseIndex,
             lastUpdatedAt: now
         )
     }
@@ -469,11 +493,48 @@ extension TimerViewModel {
         }
     }
 
+    private func saveWidgetStateIfNeeded() {
+        guard let startedAt, !departed else {
+            SharedTimerWidgetState.clear()
+            WidgetCenter.shared.reloadTimelines(ofKind: SharedTimerWidgetState.widgetKind)
+            return
+        }
+
+        var elapsed: TimeInterval = 0
+        let segments = schedule.orderedItems.map { item in
+            let start = elapsed
+            elapsed += TimeInterval(item.durationSeconds)
+            return SharedTimerWidgetState.RoutineSegment(
+                id: item.id.uuidString,
+                name: item.name,
+                startOffset: start,
+                endOffset: elapsed
+            )
+        }
+
+        SharedTimerWidgetState.save(
+            SharedTimerWidgetState(
+                scheduleName: schedule.name,
+                startedAt: startedAt,
+                targetDepartureTime: schedule.targetDepartureTime,
+                fishEmoji: selectedSpecies.emoji,
+                selectedSpeciesName: selectedSpecies.displayName,
+                segments: segments
+            )
+        )
+        WidgetCenter.shared.reloadTimelines(ofKind: SharedTimerWidgetState.widgetKind)
+    }
+
     private func endLiveActivity(status: DewTimerActivityAttributes.TimerStatus) {
         let state = liveActivityContentState(status: status)
         lastLiveActivityUpdate = nil
         Task {
-            await DewTimerLiveActivityController.end(state: state)
+            if status == .departed {
+                // 出発時は即消去せず、注水演出を見せてから自動で消す。
+                await DewTimerLiveActivityController.finishWithPour(state: state)
+            } else {
+                await DewTimerLiveActivityController.end(state: state)
+            }
         }
     }
 }

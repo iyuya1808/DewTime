@@ -368,8 +368,8 @@ struct StartSheet: View {
                 ZStack {
                     Circle()
                         .fill(speciesAccentColor(selectedSpecies).opacity(0.18))
-                    Text(selectedSpecies.emoji)
-                        .font(.system(size: 26))
+                    FishArtworkView(species: selectedSpecies)
+                        .frame(width: 36, height: 32)
                 }
                 .frame(width: 48, height: 48)
 

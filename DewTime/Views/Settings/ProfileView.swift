@@ -464,7 +464,8 @@ struct ProfileView: View {
     @ViewBuilder
     private func recordSymbol(for record: FishCareRecord, size: CGFloat) -> some View {
         if record.completedGrowth {
-            Text(record.species.emoji).font(.system(size: size))
+            FishArtworkView(species: record.species)
+                .frame(width: size * 1.2, height: size)
         } else {
             Image(systemName: record.growthStage.icon)
                 .font(.system(size: size, weight: .semibold))

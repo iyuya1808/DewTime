@@ -3,6 +3,7 @@ import StoreKit
 
 struct TimerView: View {
     @Environment(AppDataStore.self) private var store
+    @Environment(QuickTimerDeepLinkRouter.self) private var deepLinkRouter
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.requestReview) private var requestReview
 
@@ -12,6 +13,8 @@ struct TimerView: View {
     @State private var showCancelConfirm = false
     @State private var showStartSheet = false
     @State private var showFishPicker = false
+    @State private var showFishNameEditor = false
+    @State private var fishNameDraft = ""
 
     var body: some View {
         ZStack {
@@ -26,14 +29,19 @@ struct TimerView: View {
         .onAppear {
             ensureViewModel()
             viewModel?.syncActiveFish(store.activeFishes)
+            handlePendingQuickTimerRequest()
         }
         .onChange(of: activeSchedule?.id) { _, _ in
             viewModel = nil
             ensureViewModel()
             viewModel?.syncActiveFish(store.activeFishes)
+            handlePendingQuickTimerRequest()
         }
         .onChange(of: store.activeFishes.map(\.id)) { _, _ in
             viewModel?.syncActiveFish(store.activeFishes)
+        }
+        .onChange(of: deepLinkRouter.pendingRequest) { _, _ in
+            handlePendingQuickTimerRequest()
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
@@ -55,6 +63,15 @@ struct TimerView: View {
             Button("続ける", role: .cancel) {}
         } message: {
             Text("タイマーをリセットして最初の状態に戻ります。")
+        }
+        .alert("魚の名前", isPresented: $showFishNameEditor) {
+            TextField("名前", text: $fishNameDraft)
+            Button("保存") {
+                Task { await viewModel?.renameActiveFish(fishNameDraft, store: store) }
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("空欄で保存すると種類名に戻ります。")
         }
         .sheet(isPresented: $showConfirm) {
             if let vm = viewModel {
@@ -243,72 +260,91 @@ struct TimerView: View {
     }
 
     private func fishSelectionCard(vm: TimerViewModel, isEditable: Bool) -> some View {
-        Button {
-            if isEditable { showFishPicker = true }
-        } label: {
-            VStack(spacing: 12) {
-                HStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(fishStatusColor(vm: vm).opacity(0.18))
-                        Text(vm.selectedSpecies.emoji)
-                            .font(.system(size: isEditable ? 30 : 22))
-                    }
-                    .frame(width: isEditable ? 54 : 42, height: isEditable ? 54 : 42)
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(fishStatusColor(vm: vm).opacity(0.18))
+                    FishArtworkView(species: vm.selectedSpecies)
+                        .frame(width: isEditable ? 42 : 32, height: isEditable ? 38 : 30)
+                }
+                .frame(width: isEditable ? 54 : 42, height: isEditable ? 54 : 42)
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("今日育てる魚")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.68))
-                        Text(vm.selectedSpecies.displayName)
-                            .font(isEditable ? .headline : .subheadline.weight(.semibold))
-                            .foregroundStyle(.white)
-                        Text(vm.hasActiveFish ? vm.currentGrowthStage.message : "魚を選んで育てましょう")
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.54))
-                            .lineLimit(1)
-                    }
-
-                    Spacer()
-
-                    VStack(alignment: .trailing, spacing: 3) {
-                        Text("育成水量")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.52))
-                        Text("\(Int(vm.currentReceivedWater.rounded()))/\(Int(vm.currentRequiredTotalWater.rounded()))pt")
-                            .font(.subheadline.weight(.bold))
-                            .monospacedDigit()
-                            .foregroundStyle(.white)
-                    }
-
-                    if isEditable {
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.white.opacity(0.5))
-                    }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("今日育てる魚")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.68))
+                    Text(vm.currentFishName)
+                        .font(isEditable ? .headline : .subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                    Text(vm.hasActiveFish ? "\(vm.selectedSpecies.displayName)・\(vm.currentGrowthStage.message)" : "魚を選んで育てましょう")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.54))
+                        .lineLimit(1)
                 }
 
-                progressBar(value: vm.growthProgress, color: fishStatusColor(vm: vm), trackOpacity: 0.14)
+                Spacer()
 
-                HStack {
-                    Label(vm.currentGrowthStage.displayName, systemImage: vm.currentGrowthStage.icon)
-                    Spacer()
-                    Text(vm.meetsSelectedRequirement ? "今回で成魚に" : "今回 +\(Int(vm.currentWaterAmount.rounded()))pt")
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text("育成水量")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.52))
+                    Text("\(Int(vm.currentReceivedWater.rounded()))/\(Int(vm.currentRequiredTotalWater.rounded()))pt")
+                        .font(.subheadline.weight(.bold))
                         .monospacedDigit()
+                        .foregroundStyle(.white)
                 }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(fishStatusColor(vm: vm).opacity(0.92))
+
+                if isEditable {
+                    HStack(spacing: 8) {
+                        Button {
+                            fishNameDraft = vm.currentFishName
+                            showFishNameEditor = true
+                        } label: {
+                            Image(systemName: "pencil")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.white.opacity(0.82))
+                                .frame(width: 32, height: 32)
+                                .background(.white.opacity(0.14), in: Circle())
+                                .overlay(Circle().strokeBorder(.white.opacity(0.22), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("魚の名前を編集")
+
+                        Button {
+                            showFishPicker = true
+                        } label: {
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.white.opacity(0.72))
+                                .frame(width: 32, height: 32)
+                                .background(.white.opacity(0.10), in: Circle())
+                                .overlay(Circle().strokeBorder(.white.opacity(0.18), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("育てる魚を変更")
+                    }
+                }
             }
-            .padding(.horizontal, isEditable ? 18 : 14)
-            .padding(.vertical, isEditable ? 16 : 12)
-            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: isEditable ? 20 : 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: isEditable ? 20 : 16, style: .continuous)
-                    .strokeBorder(.white.opacity(0.18), lineWidth: 1)
-            )
+
+            progressBar(value: vm.growthProgress, color: fishStatusColor(vm: vm), trackOpacity: 0.14)
+
+            HStack {
+                Label(vm.currentGrowthStage.displayName, systemImage: vm.currentGrowthStage.icon)
+                Spacer()
+                Text(vm.meetsSelectedRequirement ? "今回で成魚に" : "今回 +\(Int(vm.currentWaterAmount.rounded()))pt")
+                    .monospacedDigit()
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(fishStatusColor(vm: vm).opacity(0.92))
         }
-        .buttonStyle(DepartureCardButtonStyle())
-        .disabled(!isEditable)
+        .padding(.horizontal, isEditable ? 18 : 14)
+        .padding(.vertical, isEditable ? 16 : 12)
+        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: isEditable ? 20 : 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: isEditable ? 20 : 16, style: .continuous)
+                .strokeBorder(.white.opacity(0.18), lineWidth: 1)
+        )
     }
 
     /// 実行中 / 完了時: コンパクトな中央揃えヘッダー
@@ -557,6 +593,28 @@ struct TimerView: View {
         store.activeSchedule
     }
 
+    private func handlePendingQuickTimerRequest() {
+        guard let request = deepLinkRouter.pendingRequest,
+              let vm = viewModel,
+              !vm.isRunning,
+              !vm.departed else {
+            return
+        }
+
+        let targetDate = Calendar.current.date(
+            byAdding: .minute,
+            value: request.minutes,
+            to: .now
+        ) ?? Date.now.addingTimeInterval(TimeInterval(request.minutes * 60))
+
+        vm.updateDepartureTime(targetDate)
+        Task {
+            await store.saveAll()
+            vm.start()
+            deepLinkRouter.consume(request)
+        }
+    }
+
     private var currentAquariumTier: Int {
         store.aquariums.first?.sizeTier ?? 0
     }
@@ -674,9 +732,12 @@ struct FishPickerSheet: View {
                         .strokeBorder(accent.opacity(0.45), lineWidth: 1.5)
                         .frame(width: 52, height: 52)
                 }
-                Text(species.emoji)
-                    .font(.system(size: 26))
-                    .opacity(isUnlocked ? 1 : 0.35)
+                FishArtworkView(
+                    species: species,
+                    tint: isUnlocked ? nil : .secondary,
+                    isLocked: !isUnlocked
+                )
+                .frame(width: 38, height: 34)
             }
 
             VStack(alignment: .leading, spacing: 5) {

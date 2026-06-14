@@ -15,7 +15,6 @@ struct DepartureResultView: View {
     let onDismiss: () -> Void
 
     @State private var waterFill: Double = 0
-    @State private var fishScale: CGFloat = 0
 
     var body: some View {
         ZStack {
@@ -40,16 +39,9 @@ struct DepartureResultView: View {
                                 .multilineTextAlignment(.center)
                         }
 
-                        // 魚プレビュー
-                        ZStack {
-                            Circle()
-                                .fill(fishBgColor.opacity(0.18))
-                                .frame(width: 120, height: 120)
-                            Text(selectedSpecies.emoji)
-                                .font(.system(size: 62))
-                                .scaleEffect(fishScale)
-                                .animation(.spring(response: 0.5, dampingFraction: 0.5).delay(0.3), value: fishScale)
-                        }
+                        // 注水演出（タンク → 水槽へ水が流れ込み、魚が育つ）
+                        PourTransitionView(waterLevel: waterLevel, species: selectedSpecies)
+                            .frame(height: 232)
 
                         // 水量ゲージ
                         VStack(spacing: 10) {
@@ -144,9 +136,6 @@ struct DepartureResultView: View {
             withAnimation(.easeOut(duration: 1.2).delay(0.15)) {
                 waterFill = waterLevel
             }
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.5).delay(0.3)) {
-                fishScale = 1.0
-            }
         }
     }
 
@@ -228,10 +217,6 @@ struct DepartureResultView: View {
     private var resultTitle: String {
         if completedGrowth { return "\(selectedSpecies.displayName)が成魚になりました！" }
         return growthStage.message
-    }
-
-    private var fishBgColor: Color {
-        completedGrowth ? fishColor : .orange
     }
 
     private var theme: WaterLevelTheme { WaterLevelTheme(waterRatio: waterLevel) }

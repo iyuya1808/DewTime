@@ -66,4 +66,5 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .environment(AppDataStore())
+        .environment(QuickTimerDeepLinkRouter())
 }
