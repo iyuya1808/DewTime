@@ -19,9 +19,12 @@
 | 対応OS | iOS 17.0 以上 |
 | UIフレームワーク | SwiftUI |
 | バックグラウンド・システム領域 | ActivityKit (Live Activities / Dynamic Island), WidgetKit |
-| ローカルデータベース | SwiftData（ルーティン設定・魚コレクション・水槽の永続化に使用） |
+| データ永続化 | `AppDataStore` によるオンメモリ管理 ➔ ローカルJSON/UserDefaults |
+| クラウドデータ同期・認証 | Supabase Auth, Supabase Database (PostgreSQL) |
 | 通知 & インタラクション | UserNotifications, Core Haptics（ハプティクスフィードバック） |
-| グラフィック・アニメーション | SwiftUI Canvas, Path, TimelineView（液体の波形表現用） |
+| グラフィック・アニメーション | SwiftUI Canvas, Path, TimelineView（液体の波形表現およびライブアクアリウム用） |
+| アプリ内課金（収益化） | StoreKit（StoreManagerによる開発者へのチップ購入機能） |
+| 品質改善・フィードバック | StoreKit (ReviewRequestManagerによるアプリ内レビュー要求) |
 
 ---
 
@@ -46,7 +49,7 @@ ActivityKitを使用し、状態に応じて3つの表示パターンを出し�
 
 - **左半分（タンクエリア）:** タンクには満水の水が蓄えられており、スケジュール通りなら水位は高く保たれます。遅れが生じると水位が下がり（水が無駄になる）、残り水量が視覚的に伝わります。タスク色のレイヤー（地層）と滑らかに波打つ液体のアニメーションを描画。
 - **右半分（水槽エリア）:** 現在の育成予測状態（卵 ➔ 稚魚 ➔ 幼魚 ➔ 成魚）をシンプルなグラフィックで表示。現時点の残水量で出発した場合に育つ魚のプレビューとして機能。
-- **出発時の演出:** 「いってきます！」ボタンを押すと、タンク底部から水が流れ出し、水槽へ注ぎ込むアニメーションをライブアクティビティ上で実行。
+- **出発時の演出:** 「いってきます！」ボタンを押すと、タンク底部から水が流れ出し、水槽へ注ぎ込むアニメーションをライブアクティビティ上で実行（`pour` アニメーション）。
 - **境界の演出:** タスクが自動進行で切り替わる瞬間、ライブアクティビティ全体が軽く「ぷるん」と揺れるスプリングアニメーションを実行。
 
 ### 2.3 Core Hapticsによる五感通知（スケジュール・ノック）
@@ -55,6 +58,13 @@ ActivityKitを使用し、状態に応じて3つの表示パターンを出し�
 
 - **フェーズ自動移行の瞬間:** 単なるシステム通知音だけでなく、心地よい固有のリズム振動（ハプティクス）を出力。
 - **遅延警告時:** 予定時間がオーバーした瞬間、警告を示す少し不快（微細で細かい）なザラザラとしたバイブレーションを発生させ、心地よい危機感を促します。
+
+### 2.4 ホーム画面ウィジェットとディープリンク起動
+
+`DewTimeQuickStartWidget` をホーム画面に配置することで、アプリを起動して時間をセットする手間を省き、クイックにタイマーを開始できます。
+
+- **クイック起動:** 「15分」「20分」「30分」といったルーティン時間を配置したウィジェットから、ワンタップでタイマーを即座に開始。
+- **ディープリンク:** `dewtime://start-timer?minutes=N` のURLスキームを発行し、アプリ内の `QuickTimerDeepLinkRouter` が受信して `TimerView` でタイマーを自動スタートします。
 
 ---
 
@@ -68,7 +78,7 @@ ActivityKitを使用し、状態に応じて3つの表示パターンを出し�
 - タンクはアプリ起動時（または出発時刻のカウント開始時）に満水（100%）でスタートします。
 - スケジュール通りに進んでいる間は水位が高く保たれます。遅延が発生するとその分だけ水位が下がり（水が無駄に溢れ出る）、現在の残水量を0%〜100%で表します。
 - 時間の経過と同期した「位相（ズレ）」を波の計算式に与え続けることで、常に水面がゆらゆらと波打っているような視覚効果を表現します。
-- **出発アニメーション:** 「いってきます！」タップ時、タンク底部のバルブが開くように水が流れ出し、タンクが空になるとともに水槽へ水が注ぎ込まれるシーケンスアニメーションを再生します。
+- **出発アニメーション (`PourTransitionView`):** 「いってきます！」タップ時、タンク底部のバルブが開くように水が流れ出し、タンクが空になるとともに水槽へ水が注ぎ込まれるシーケンスアニメーションを再生します。
 
 ### 3.2 タスクの地層グラフィック
 
@@ -90,107 +100,290 @@ ActivityKitを使用し、状態に応じて3つの表示パターンを出し�
 - シミュレーション本体（`AquariumEngine`）は `TimelineView` の再描画に同期して毎フレーム物理ステップを進め、バックグラウンド復帰時の巨大な経過時間はクランプして破綻を防ぐ。
 - 画面上部には水槽サイズ名（`Aquarium.sizeName`）と遊泳中の匹数を表示。カレンダーボタンから直近7日の水やり記録（後述の記録グリッド）をシートで開ける。
 
+### 3.5 認証およびクラウドデータ同期フロー
+
+ユーザーデータの保護と複数端末での利用のため、Supabaseをベースにしたクラウド同期機能を実装しています。
+
+- **シームレスな匿名ログイン:** 初回起動時にバックグラウンドで `AuthService` が匿名アカウントを自動作成。アカウント登録の手間なしに即座にタイマーを開始できます。
+- **アカウント統合・登録:** 設定画面からメールアドレス/パスワードまたはApple IDでアカウントを「アップグレード（本登録）」可能。機種変更時や複数端末間でデータを安全に引き継げます。
+- **自動データ同期 (`CloudDataService`):**
+  - アプリ起動時およびバックグラウンドからの復帰時：自動的に最新のスナップショットをSupabaseから取得し、ローカルに適用。
+  - データ変更時（タイマー終了、設定変更など）：変更を検知してローカルとクラウドの双方に全置換保存（`saveAll()`）。
+  - オフライン対応：オフライン状態ではローカルのみに保存され、次にオンラインで起動・操作された際に自動的にSupabaseと同期します。
+
+### 3.6 チュートリアルとオンボーディング
+
+初回起動時にアプリの概要と使い方の流れを直感的に教えるチュートリアル機能を搭載しています。
+
+- **チュートリアルオーバーレイ (`TutorialOverlayView`):** アプリの基本となる「タイマー設定」「水の節約」「魚の育成」「水槽の成長」をステップバイステップの対話式カードで説明。
+- **タブ連動ナビゲーション:** 説明の各ステップに合わせて「タイマー」タブや「水槽」タブへ動的に切り替え、画面位置を意識したユーザー体験を構築。
+- **再実行機能:** 設定画面からいつでもチュートリアルを再実行可能です。
+
+### 3.7 アプリ内レビュー促進 (`ReviewRequestManager`)
+
+アプリの評価向上を図るため、適切なタイミングでレビューポップアップを促します。
+
+- **トリガータイミング:** 「いってきます！」を押し、朝のタイマーを正常に出発完了した直後のポジティブな瞬間にポップアップを判定。
+- **クールダウン期間:** 頻繁な要求によるストレスを防ぐため、1度表示された後は最低30日間のクールダウン期間を設けます。また、開発中のデバッグビルドではポップアップを出さない仕様（DEBUG環境はスキップ）になっています。
+
+### 3.8 収益化・開発者サポート (チップ・投げ銭)
+
+`StoreKit` フレームワークを利用した、開発者への感謝を伝えるチップ機能を設定画面内に提供しています。
+
+- **投げ銭アイテム:** 「おやつ（Snack）」「コーヒー（Coffee）」「ピザ（Pizza）」の3つのメニュー。
+- **StoreKit 構成 (`DewTime.storekit`):** 課金テスト環境を用意し、ローカルやテストフライトで安全な疑似決済テストを実行可能。
+- **支援者ステータス:** チップを購入したユーザーは、`AppDataStore.isDeveloperSupported` が `true` となり、アプリ内でささやかな感謝メッセージや専用ステータスが付与されます。
+
 ---
 
-## 4. データ構造設計（SwiftData）
+## 4. データ構造 & 永続化設計（Supabase + AppDataStore）
 
-データベース（SwiftData）を活用して、設定した「ルーティン（スケジュール）」、育成中の魚、コレクション図鑑、水槽の成長状態をローカルで高速に保持します。
+本アプリは、パフォーマンスの確保と確実な同期のため、メモリ上でデータを配列として保持しつつ、ローカルファイルへのJSONシリアライズ永続化とSupabaseへの同期を二重に行うアーキテクチャを採用しています（SwiftDataは使用しません）。
 
-### 4.1 スケジュール・タスクデータ構造
+### 4.1 永続化アーキテクチャ (`AppDataStore`)
 
-朝のセットメニューと、それに含まれる個々のタスク（ハミガキ、着替えなど）のデータです。
+`Support/AppDataStore.swift` の `@Observable @MainActor final class AppDataStore` がアプリの単一真実源（Single Source of Truth）となります。
 
-**ルーティン項目（RoutineItem）:**
-- 識別子（UUID）
-- タスク名（例: 「ハミガキ」「着替え」）
-- 所要時間（秒数）
-- タンク表示用のカラー（16進数カラーコード）
-- 並び順インデックス
+- **メモリ内管理:** アプリ起動時に `load()` を実行し、全データをメモリ内のSwift配列（`schedules`, `activeFishes`, `collectedFishes`, `careRecords`, `aquariums`, `profiles`）に展開します。
+- **ローカル永続化 (`saveToLocal` / `loadFromLocal`):** アプリ内のドキュメントディレクトリにJSON形式でデータを保存。オフライン時や起動時の高速読込に使用。
+- **クラウド永続化 (`CloudSnapshot`):** 
+  - メモリ上の各オブジェクト群を `makeCloudSnapshot(userId:)` を通じて単一の DTO (Data Transfer Object) である `CloudSnapshot` に変換。
+  - Supabaseに対して**全置換**で保存を行います。
+  - データ追加や削除を検知した場合は、変更操作の最後で `saveAll()` を呼ぶことで同期を実行します。
 
-**ユーザースケジュール（UserSchedule）:**
-- 識別子（UUID）
-- スケジュール名（例: 「平日通常モード」）
-- ルーティン項目の一覧（上記の項目と1対多の関係）
-- 目標とする出発予定時刻
+### 4.2 テーブル定義 (Supabase PostgreSQL DDL)
 
-### 4.2 魚・水槽コレクションデータ構造
+Supabase上のテーブル定義とRLS（Row Level Security）の基本構造です。全データはユーザーIDに紐付けられ、第三者への開示は制限されます。
 
-毎朝の水やり（給水）記録、育成中の魚、アンロックした魚の図鑑、そして累積成長する水槽のデータです。
+```sql
+-- ユーザースケジュール
+create table if not exists public.user_schedules (
+  id uuid primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  target_departure_time timestamptz not null,
+  is_active boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 
-**育成中の魚（ActiveFish）:**
-- 識別子（UUID）／種類ID（例: "medaka", "dolphin"）／名前
-- 育成開始日時・最終水やり日時
-- 必要な総水量（種類ごとにランダム決定）・現在の受け取り水量
-- 成長完了フラグ（受け取り水量から `卵→稚魚→幼魚→成魚` を算出）
+-- ルーティンタスク項目
+create table if not exists public.routine_items (
+  id uuid primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  schedule_id uuid not null references public.user_schedules(id) on delete cascade,
+  name text not null,
+  duration_seconds integer not null,
+  color_hex text not null,
+  order_index integer not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 
-**魚コレクション（CollectedFish）:**
-- 識別子（UUID）／名前／種類ID
-- 記録日時（図鑑・カレンダー連携用）
-- 成功フラグ・出発時の注水量比率（多いほど元気な魚に育つ）
+-- 育成中のアクティブな魚
+create table if not exists public.active_fishes (
+  id uuid primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  species_id text not null,
+  name text not null,
+  started_at timestamptz not null,
+  last_watered_at timestamptz,
+  required_total_water double precision not null,
+  received_water double precision not null,
+  is_completed boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 
-**水やり記録（FishCareRecord）:**
-- 識別子（UUID）／種類ID／記録日時
-- その朝の水量・水やり後の累積水量・必要総水量
-- その時点の成長段階・その日に成魚になったか
+-- 図鑑（収集済みの魚）
+create table if not exists public.collected_fishes (
+  id uuid primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  species_id text not null,
+  recorded_at timestamptz not null,
+  succeeded boolean not null,
+  water_ratio double precision not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 
-**水槽（Aquarium）— 永続成長メトリック:**
-- 識別子（UUID）／累積で注がれた総水量／作成・更新日時
-- 累積水量から算出するサイズ段階（`sizeTier`）・サイズ名・容量
+-- 水やり（給水）記録
+create table if not exists public.fish_care_records (
+  id uuid primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  species_id text not null,
+  recorded_at timestamptz not null,
+  water_amount double precision not null,
+  total_water_after double precision not null,
+  required_total_water double precision not null,
+  growth_stage_raw_value text not null,
+  completed_growth boolean not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 
-**魚の種類（FishSpecies）:**
-- 全15種（メダカ🐟・グッピー🐠・ミナミヌマエビ🦐 … サメ🦈・クジラ🐋・ジンベエザメ🐳）を絵文字で表現
-- 種類ごとに必要水量レンジ・難易度ラベルを持ち、ゲーム難易度が変わる
+-- 水槽の総累積水量データ
+create table if not exists public.aquariums (
+  id uuid primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  total_water_collected double precision not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- ユーザープロフィール
+create table if not exists public.user_profiles (
+  id uuid primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  nickname text not null,
+  avatar_emoji text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Row Level Security (RLS) ポリシーの設定
+alter table public.user_schedules enable row level security;
+alter table public.routine_items enable row level security;
+alter table public.active_fishes enable row level security;
+alter table public.collected_fishes enable row level security;
+alter table public.fish_care_records enable row level security;
+alter table public.aquariums enable row level security;
+alter table public.user_profiles enable row level security;
+
+-- 例：スケジュールのRLSポリシー
+create policy "Users can manage own schedules" on public.user_schedules
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+```
+
+### 4.3 Swiftデータモデル定義
+
+SwiftUIの `@Observable` マクロを利用したデータモデルです。
+
+#### 1. ルーティン項目 (`RoutineItem`)
+- `id: UUID` (主キー)
+- `name: String` (タスク名、例：「歯磨き」「着替え」)
+- `durationSeconds: Int` (タスク所要秒数)
+- `colorHex: String` (タンクに重ねる色の16進コード)
+- `orderIndex: Int` (タスク表示順)
+- `schedule: UserSchedule?` (属する親スケジュールへの参照)
+
+#### 2. ユーザースケジュール (`UserSchedule`)
+- `id: UUID` (主キー)
+- `name: String` (スケジュール名、例：「平日通常」「土曜朝」)
+- `targetDepartureTime: Date` (目標出発時刻)
+- `isActive: Bool` (現在アクティブに設定されているか)
+- `items: [RoutineItem]` (ルーティン項目のリスト)
+
+#### 3. 育成中の魚 (`ActiveFish`)
+- `id: UUID` (主キー)
+- `speciesId: String` (魚の種類ID、`FishSpecies`の生値)
+- `name: String` (魚につけた名前)
+- `startedAt: Date` (育成開始日時)
+- `lastWateredAt: Date?` (最後に水をあげた日時)
+- `requiredTotalWater: Double` (成長に必要な総水量)
+- `receivedWater: Double` (現在までに注がれた水量)
+- `isCompleted: Bool` (成魚まで育ち切ったか)
+- *算出プロパティ* `progress: Double` (成長進捗率 0.0〜1.0)
+- *算出プロパティ* `growthStage: GrowthStage` (progressに基づき、`egg`/`fry`/`juvenile`/`adult`を返却)
+
+#### 4. 魚コレクション（図鑑）(`CollectedFish`)
+- `id: UUID` (主キー)
+- `name: String` (個体の名前)
+- `speciesId: String` (魚の種類ID)
+- `recorded_at: Date` (成魚になり図鑑に記録された日時)
+- `succeeded: Bool` (出発成功フラグ)
+- `waterRatio: Double` (出発時の残水率)
+
+#### 5. 水やり記録 (`FishCareRecord`)
+- `id: UUID` (主キー)
+- `speciesId: String` (魚の種類ID)
+- `recordedAt: Date` (給水日時)
+- `waterAmount: Double` (給水量)
+- `totalWaterAfter: Double` (給水後の総水量)
+- `requiredTotalWater: Double` (成長に必要な総水量)
+- `growthStageRawValue: String` (成長段階)
+- `completedGrowth: Bool` (この給水で成魚に達したか)
+
+#### 6. 水槽 (`Aquarium`)
+- `id: UUID` (主キー)
+- `totalWaterCollected: Double` (これまでに集めた総水量)
+- *算出プロパティ* `sizeTier: Int` (総水量から導出される水槽サイズ 1〜7)
+- *算出プロパティ* `sizeName: String` (サイズ階層名、例：「大型水族館」)
+
+#### 7. 魚の種類 (`FishSpecies` enum)
+- メダカ🐟、グッピー🐠、ミナミヌマエビ🦐、ネオンテトラ✨、プレコ🧹、エンゼルフィッシュ👼、カクレクマノミ🤡、ナンヨウハギ🌊、ウツボ🐍、タコ🐙、クラゲ🔮、イルカ🐬、サメ🦈、クジラ🐋、ジンベエザメ🐳の全15種。
+- 必要水量レンジ（例: メダカは300L〜500L、ジンベエザメは8000L〜12000L）を保持。
 
 ---
 
 ## 5. 画面遷移・SwiftUIビュー階層
 
-画面遷移には、SwiftUI標準のコンポーネントを使用し、タブベースの「4画面構成」を採用します。タブの並びは左から「タイマー → 図鑑 → 水槽 → プロフィール」です。
+画面遷移には、SwiftUI標準 of TabView を使用し、タブベースの「4画面構成」を採用します。タブの並びは左から「タイマー → 図鑑 → 水槽 → プロフィール」です。
+
+### 5.1 画面階層マップ
 
 ```
-アプリ全体（App）
+アプリ全体（App / ContentView）
+├── チュートリアル（TutorialOverlayView） ※初回起動時または再表示要求時
 └── タブ画面（TabView）
     ├── 1. タイマー画面（TimerView）
-    │       ├── 出発時刻の設定シート
-    │       ├── 育てる魚の選択シート（FishPickerSheet）
-    │       ├── 貯水タンクアニメーション（残水量を示す波打つ水面の描画）
-    │       ├── 今日の魚グラフィック（現在の残水量で出発した場合の成長プレビュー）
-    │       └── 「いってきます！」ボタン（タップで残水が水槽へ注がれ魚が育つ演出）
+    │       ├── 1.1 クイック起動（Widget deep link / QuickTimerDeepLinkRouter）
+    │       ├── 1.2 出発時刻設定（StartSheet）
+    │       ├── 1.3 魚の選択シート（FishPickerSheet）
+    │       ├── 1.4 タイマー稼働中（WaterTankView - 貯水タンクアニメーション）
+    │       ├── 1.5 出発確認ダイアログ（DepartureConfirmView）
+    │       ├── 1.6 注水トランジション（PourTransitionView）
+    │       └── 1.7 出発完了・結果画面（DepartureResultView） ※レビュー要求トリガー
     │
     ├── 2. 図鑑画面（CollectionView）
-    │       ├── アンロックした魚種の一覧・進捗・絞り込み
-    │       └── 種別詳細・個体詳細シート
+    │       ├── 2.1 魚種一覧・解放状況・フィルタ（Collected/Uncollected）
+    │       └── 2.2 個体・種別詳細シート（FishDetailSheet）
     │
-    ├── 3. 水槽画面（LiveAquariumView）— 泳ぐ水槽
-    │       ├── 解放済みの魚が泳ぐライブシーン（Canvas + TimelineView）
-    │       ├── 泡・海藻・光・砂底の環境演出、タップでエサ／なでなで
-    │       └── カレンダーボタン → 水やり記録グリッド（AquariumView）をシート表示
-    │              └── 月間カレンダー（MonthlyAquariumView）への遷移
+    ├── 3. 水槽画面（LiveAquariumView）
+    │       ├── 3.1 泳ぐ水槽（Canvas + AquariumEngine 物理演算）
+    │       ├── 3.2 インタラクション（エサやり・タップリアクション）
+    │       └── 3.3 給水履歴・カレンダー表示（AquariumView / MonthlyAquariumView）
     │
-    └── 4. プロフィール画面（ProfileView）
-            ├── 直近7日の水やり記録グリッドと週間サマリー
-            └── 設定（SettingsView）への導線
-                    ├── スケジュールやルーティン項目の編集リスト
-                    ├── ドラッグ＆ドロップによる直感的なタスク並び替え機能
-                    └── データ管理（魚・水槽・記録の初期化）
+    └── 4. プロフィール・設定画面（ProfileView）
+            ├── 4.1 直近7日の水やり記録グリッドと週間サマリー（ProfileStats）
+            └── 4.2 設定一覧（SettingsView）
+                    ├── 4.2.1 スケジュール・ルーティン項目の編集（RoutineEditorView） ※ドラッグ＆ドロップ並び替え
+                    ├── 4.2.2 通知オンオフ詳細設定（NotificationSettingsView）
+                    ├── 4.2.3 クラウド同期アカウント登録・ログイン（AccountRegistrationView）
+                    ├── 4.2.4 プロフィール編集（ProfileEditView）
+                    ├── 4.2.5 開発者サポート投げ銭（SupportDeveloperView） ※StoreKit
+                    └── 4.2.6 ローカル/クラウドデータ管理・初期化（DataManagementView）
 ```
 
 ---
 
-## 6. 実装プロセス（ロードマップ）
+## 6. リリース実績 & ロードマップ
 
-### 第1スプリント：基本波形UI & データベース構築（1.5ヶ月）
-- 液体シミュレーション画面と、タスク層グラフィックの作成。
-- ルーティンを登録・編集するデータベース処理の構築。
+### 6.1 リリース履歴
 
-### 第2スプリント：ActivityKitによるライブ通知の実装（1.5ヶ月）
-- ロック画面（Live Activities）およびDynamic Island用ウィジェットの作成。
-- アプリ終了時・バックグラウンド移行時もタイマー状態をウィジェットへ同期する仕組みの構築。
+#### **Ver 1.0.1 (クラウド同期 & UX改善)**
+- **新機能**:
+  - Supabase連携による「クラウドデータ同期機能」を追加。アカウント作成でデータを安全にバックアップ・複数端末同期可能に。
+  - 匿名サインインからメール/Appleアカウントへのアップグレードによる「アカウント登録・管理機能」を追加。
+  - アプリの操作方法が直感的に学べる「チュートリアルオーバーレイ」を追加。
+  - 設定画面下部へのアプリバージョン情報の表示。
+- **改善**:
+  - `Live Activities` (ロック画面ウィジェット・Dynamic Island) の動作・同期精度の向上。
+  - ボタン操作やタブ選択時におけるハプティクスフィードバックを追加し、快適な手応えを演出。
+  - 水槽画面、設定画面などのデザインの精緻化と調整。
+  - 通知設定画面を独立・リニューアルし、アラートのオン・オフを詳細に設定可能に。
 
-### 第3スプリント：魚の成長システム & コレクション（1ヶ月）
-- 時間経過に応じた魚の成長描画ロジックの構築。
-- 水槽カレンダー、アンロック図鑑、ランダムな「今日の魚」機能の実装。
+#### **Ver 1.0.2 (品質向上)**
+- **改善**:
+  - `ReviewRequestManager` を実装し、タイマーが正常に出発完了した直後の最適なタイミングで、簡単にレビューを入力できる機能を追加。
+  - 軽微なバグ修正およびアプリの動作安定化。
 
-### 第4スプリント：水槽成長システム & ハプティクス調整 & リリース準備（0.5ヶ月）
-- 累積水量に応じた水槽サイズの視覚化・大型魚の解放ロジックの組み込み。
-- 心地よい触覚パターンの組み込み、バックグラウンドでの通知テスト、App Storeへの申請。
+### 6.2 今後のロードマップ（機能拡張予定）
+
+- **ウィジェット機能の強化**:
+  - タンクの水位や育成中の魚のグラフィックをホーム画面に常時表示できる中サイズ/大サイズウィジェットの追加。
+- **育成魚・水槽カスタマイズ要素の追加**:
+  - 図鑑に登録された魚のほかに、水槽の背景（砂底、水草の色、サンゴなど）を注いだ水量やチップ購入等でアンロック・カスタマイズできる機能。
+- **カレンダー・ログの高度な分析機能**:
+  - 朝の準備時間を週・月単位でビジュアル化し、「どのタスクで遅れが発生しやすいか」を折れ線グラフや色付き地層で統計分析できるレポート画面の提供。
