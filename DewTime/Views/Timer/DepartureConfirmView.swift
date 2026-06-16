@@ -22,88 +22,84 @@ struct DepartureConfirmView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    // メインメッセージ
-                    VStack(spacing: 12) {
+                    // 魚アートワーク（成魚達成時は輝きエフェクト）
+                    ZStack {
+                        if completesGrowth {
+                            Circle()
+                                .fill(waterLevelColor.opacity(0.20))
+                                .frame(width: 140, height: 140)
+                                .blur(radius: 18)
+                        }
                         FishArtworkView(species: selectedSpecies)
-                            .frame(width: 84, height: 78)
+                            .frame(width: 100, height: 94)
                             .scaleEffect(fishScale)
                             .animation(.spring(response: 0.4, dampingFraction: 0.5), value: fishScale)
-                            .onAppear {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { fishScale = 1.0 }
-                            }
-
-                        Text(headline)
-                            .font(AppFont.confirmTitle)
-                            .multilineTextAlignment(.center)
-
-                        Text(subtext)
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.6))
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 20)
                     }
-                    .padding(.top, 16)
-                    .padding(.bottom, 24)
-
-                    // 水量バッジ
-                    HStack(spacing: 12) {
-                        badgeView(
-                            value: "\(Int(waterLevel * 100))%",
-                            label: "タンク残量",
-                            icon: "drop.fill",
-                            color: waterLevelColor
-                        )
-                        badgeView(
-                            value: isOnTime ? "オンタイム" : "遅延あり",
-                            label: "スケジュール",
-                            icon: isOnTime ? "checkmark.circle.fill" : "exclamationmark.circle.fill",
-                            color: isOnTime ? .teal : .orange
-                        )
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { fishScale = 1.0 }
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 12)
+                    .padding(.top, 24)
 
-                    HStack(spacing: 12) {
-                        badgeView(
-                            value: "\(Int(totalWaterBefore.rounded()))/\(Int(requiredTotalWater.rounded()))pt",
-                            label: "現在の育成水量",
-                            icon: selectedSpecies.icon,
-                            color: stageColor
-                        )
-                        badgeView(
-                            value: "+\(Int(waterAmount.rounded()))pt",
-                            label: "今回の水やり",
-                            icon: "drop.fill",
-                            color: waterLevelColor
-                        )
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 24)
-
-                    // ボタン
-                    VStack(spacing: 10) {
-                        Button(action: onConfirm) {
-                            HStack(spacing: 10) {
-                                Text("いってきます！")
-                                    .font(AppFont.actionButton)
-                                Image(systemName: "figure.walk.departure")
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 18)
-                            .background(
-                                LinearGradient(colors: confirmColors, startPoint: .leading, endPoint: .trailing)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                            .shadow(color: confirmColors.first!.opacity(0.4), radius: 10, y: 4)
+                    // 成長段階アイコン群
+                    HStack(spacing: 16) {
+                        ForEach(GrowthStage.allCases, id: \.self) { stage in
+                            let reached = stage.thresholdProgress <= (totalWaterAfter / max(1, requiredTotalWater))
+                            Image(systemName: stage.icon)
+                                .font(.title3)
+                                .foregroundStyle(reached ? stageColor : .white.opacity(0.22))
+                                .scaleEffect(stage == growthStage ? 1.25 : 1.0)
                         }
+                    }
+                    .padding(.top, 20)
+                    .padding(.bottom, 28)
+
+                    // インジケーターバッジ（アイコン + ビジュアル充填のみ）
+                    HStack(spacing: 12) {
+                        indicatorView(
+                            icon: "drop.fill",
+                            ratio: waterLevel,
+                            color: waterLevelColor,
+                            accessibilityText: "残水量 \(Int(waterLevel * 100))%"
+                        )
+                        indicatorView(
+                            icon: isOnTime ? "checkmark.circle.fill" : "exclamationmark.circle.fill",
+                            ratio: isOnTime ? 1.0 : 0.3,
+                            color: isOnTime ? .teal : .orange,
+                            accessibilityText: isOnTime ? "オンタイム" : "遅延あり"
+                        )
+                        indicatorView(
+                            icon: selectedSpecies.icon,
+                            ratio: min(1.0, totalWaterAfter / max(1, requiredTotalWater)),
+                            color: stageColor,
+                            accessibilityText: "育成水量 \(Int(totalWaterAfter.rounded()))pt"
+                        )
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 28)
+
+                    // ボタン（アイコンのみ）
+                    VStack(spacing: 14) {
+                        Button(action: onConfirm) {
+                            Image(systemName: "figure.walk.departure")
+                                .font(.system(size: 38, weight: .medium))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 20)
+                                .background(
+                                    LinearGradient(colors: confirmColors, startPoint: .leading, endPoint: .trailing)
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                                .shadow(color: confirmColors.first!.opacity(0.4), radius: 10, y: 4)
+                        }
+                        .accessibilityLabel("いってきます")
 
                         Button(action: onCancel) {
-                            Text("まだもう少し…戻る")
-                                .font(.subheadline)
+                            Image(systemName: "arrow.uturn.backward.circle")
+                                .font(.system(size: 28))
                                 .foregroundStyle(.white.opacity(0.45))
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
+                                .padding(.vertical, 10)
                         }
+                        .accessibilityLabel("戻る")
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
@@ -113,33 +109,30 @@ struct DepartureConfirmView: View {
         .foregroundStyle(.white)
     }
 
-    private func badgeView(value: String, label: String, icon: String, color: Color) -> some View {
-        VStack(spacing: 6) {
+    private func indicatorView(icon: String, ratio: Double, color: Color, accessibilityText: String) -> some View {
+        VStack(spacing: 8) {
             Image(systemName: icon)
                 .foregroundStyle(color)
-                .font(.title3)
-            Text(value)
-                .font(AppFont.badgeValue)
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.45))
+                .font(.title2)
+
+            GeometryReader { geo in
+                ZStack(alignment: .bottom) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(.white.opacity(0.12))
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(color.opacity(0.75))
+                        .frame(height: geo.size.height * max(0.05, min(1.0, ratio)))
+                }
+            }
+            .frame(height: 40)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
         .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private var headline: String {
-        if completesGrowth { return "\(selectedSpecies.displayName)が成魚になりそうです\n出発しますか？" }
-        return "\(growthStage.message)\n出発しますか？"
-    }
-
-    private var subtext: String {
-        "今回 +\(Int(waterAmount.rounded()))pt で、合計 \(Int(totalWaterAfter.rounded()))/\(Int(requiredTotalWater.rounded()))pt になります。"
+        .accessibilityLabel(accessibilityText)
     }
 
     private var theme: WaterLevelTheme { WaterLevelTheme(waterRatio: waterLevel) }
-
     private var waterLevelColor: Color { theme.tintColor }
     private var confirmColors: [Color] { theme.gradientColors }
 

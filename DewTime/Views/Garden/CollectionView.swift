@@ -206,7 +206,6 @@ struct CollectionView: View {
                 }
                 .padding(.bottom, 24)
             }
-            .navigationTitle("図鑑")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -216,7 +215,7 @@ struct CollectionView: View {
                             }
                         }
                     } label: {
-                        Label("並び替え", systemImage: sortOrder == .default ? "arrow.up.arrow.down" : "arrow.up.arrow.down.circle.fill")
+                        Image(systemName: sortOrder == .default ? "arrow.up.arrow.down" : "arrow.up.arrow.down.circle.fill")
                             .foregroundStyle(sortOrder == .default ? Color.secondary : Color.teal)
                     }
                 }
@@ -255,77 +254,85 @@ struct CollectionView: View {
     }
 
     private var filterBar: some View {
-        VStack(spacing: 8) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    filterChipGroup(label: "解放", items: UnlockFilter.allCases, selection: $unlockFilter)
-
-                    Rectangle()
-                        .fill(.secondary.opacity(0.25))
-                        .frame(width: 1, height: 20)
-                        .padding(.horizontal, 2)
-
-                    filterChipGroup(label: "難易度", items: DifficultyFilter.allCases, selection: $difficultyFilter)
-
-                    if isFiltering {
-                        Button {
-                            withAnimation(.spring(duration: 0.25)) {
-                                unlockFilter = .all
-                                difficultyFilter = .all
-                                sortOrder = .default
-                            }
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .padding(.leading, 4)
-                        }
-                        .transition(.scale.combined(with: .opacity))
-                    }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                iconFilterChip(icon: "square.grid.2x2", isSelected: unlockFilter == .all) {
+                    withAnimation(.spring(duration: 0.2)) { unlockFilter = .all }
                 }
-                .padding(.vertical, 2)
+                .accessibilityLabel("すべて")
+                iconFilterChip(icon: "checkmark.seal.fill", isSelected: unlockFilter == .unlocked) {
+                    withAnimation(.spring(duration: 0.2)) { unlockFilter = .unlocked }
+                }
+                .accessibilityLabel("解放済み")
+                iconFilterChip(icon: "lock.fill", isSelected: unlockFilter == .locked) {
+                    withAnimation(.spring(duration: 0.2)) { unlockFilter = .locked }
+                }
+                .accessibilityLabel("未解放")
+
+                Rectangle()
+                    .fill(.secondary.opacity(0.25))
+                    .frame(width: 1, height: 20)
+                    .padding(.horizontal, 2)
+
+                iconFilterChip(icon: "equal.circle", isSelected: difficultyFilter == .all) {
+                    withAnimation(.spring(duration: 0.2)) { difficultyFilter = .all }
+                }
+                .accessibilityLabel("難易度すべて")
+                iconFilterChip(icon: "1.circle", isSelected: difficultyFilter == .easy) {
+                    withAnimation(.spring(duration: 0.2)) { difficultyFilter = .easy }
+                }
+                .accessibilityLabel("やさしい")
+                iconFilterChip(icon: "2.circle", isSelected: difficultyFilter == .normal) {
+                    withAnimation(.spring(duration: 0.2)) { difficultyFilter = .normal }
+                }
+                .accessibilityLabel("ふつう")
+                iconFilterChip(icon: "3.circle", isSelected: difficultyFilter == .hard) {
+                    withAnimation(.spring(duration: 0.2)) { difficultyFilter = .hard }
+                }
+                .accessibilityLabel("むずかしい")
+
+                if isFiltering {
+                    Button {
+                        withAnimation(.spring(duration: 0.25)) {
+                            unlockFilter = .all
+                            difficultyFilter = .all
+                            sortOrder = .default
+                        }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 4)
+                    }
+                    .transition(.scale.combined(with: .opacity))
+                    .accessibilityLabel("フィルターをリセット")
+                }
             }
+            .padding(.vertical, 2)
         }
     }
 
-    private func filterChipGroup<T: RawRepresentable & Hashable & CaseIterable>(
-        label: String,
-        items: T.AllCases,
-        selection: Binding<T>
-    ) -> some View where T.RawValue == String {
-        HStack(spacing: 6) {
-            ForEach(Array(items), id: \.self) { item in
-                let isSelected = selection.wrappedValue == item
-                Button {
-                    withAnimation(.spring(duration: 0.2)) {
-                        selection.wrappedValue = item
-                    }
-                } label: {
-                    Text(item.rawValue)
-                        .font(.caption.weight(isSelected ? .semibold : .regular))
-                        .padding(.horizontal, 11)
-                        .padding(.vertical, 6)
-                        .background(
-                            isSelected
-                                ? AnyShapeStyle(Color.teal.opacity(0.85))
-                                : AnyShapeStyle(Color.dewSurfaceSoft),
-                            in: Capsule()
-                        )
-                        .foregroundStyle(isSelected ? .white : .secondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(label) \(item.rawValue)")
-            }
+    private func iconFilterChip(icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: isSelected ? .semibold : .regular))
+                .padding(.horizontal, 11)
+                .padding(.vertical, 8)
+                .background(
+                    isSelected
+                        ? AnyShapeStyle(Color.teal.opacity(0.85))
+                        : AnyShapeStyle(Color.dewSurfaceSoft),
+                    in: Capsule()
+                )
+                .foregroundStyle(isSelected ? .white : .secondary)
         }
+        .buttonStyle(.plain)
     }
 
     private var emptyFilterResult: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 16) {
             Image(systemName: "magnifyingglass")
                 .font(.title2)
-                .foregroundStyle(.secondary)
-            Text("条件に合う魚がいません")
-                .font(.headline)
                 .foregroundStyle(.secondary)
             Button {
                 withAnimation(.spring(duration: 0.25)) {
@@ -334,10 +341,11 @@ struct CollectionView: View {
                     sortOrder = .default
                 }
             } label: {
-                Text("フィルターをリセット")
-                    .font(.subheadline)
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
                     .foregroundStyle(.teal)
             }
+            .accessibilityLabel("フィルターをリセット")
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
@@ -597,9 +605,11 @@ struct CollectionView: View {
 
     private var latestFishes: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("最近育った魚")
+            Image(systemName: "clock.arrow.circlepath")
                 .font(.headline)
+                .foregroundStyle(.secondary)
                 .padding(.horizontal)
+                .accessibilityLabel("最近育った魚")
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {

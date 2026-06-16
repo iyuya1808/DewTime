@@ -7,9 +7,10 @@ struct WaterTankView: View {
     var isOverdue: Bool = false
     var cornerRadius: CGFloat = 36
     var showBorder: Bool = true
-    var showLevelText: Bool = true
     var startDate: Date? = nil
     var targetDate: Date? = nil
+    var isDraggable: Bool = false
+    var onLevelChanged: ((Double) -> Void)? = nil
 
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(AppPreferences.Key.aquariumTheme.rawValue) private var aquariumTheme = AquariumTheme.dewBlue.rawValue
@@ -82,17 +83,30 @@ struct WaterTankView: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
 
-            if showLevelText {
-                VStack(spacing: 2) {
-                    Text("\(Int(waterLevel * 100))")
-                        .font(AppFont.waterDisplay)
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
-                    Text("%")
-                        .font(AppFont.waterUnit)
+            if isDraggable {
+                GeometryReader { geo in
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .gesture(
+                            DragGesture(minimumDistance: 1, coordinateSpace: .local)
+                                .onChanged { value in
+                                    let newLevel = 1.0 - Double(value.location.y / geo.size.height)
+                                    onLevelChanged?(max(0.05, min(1.0, newLevel)))
+                                }
+                        )
+
+                    // 水位ラインインジケーター
+                    let indicatorY = geo.size.height * (1.0 - min(0.95, max(0.05, waterLevel)))
+                    HStack(spacing: 0) {
+                        Spacer()
+                        Rectangle()
+                            .fill(.white.opacity(0.6))
+                            .frame(width: 16, height: 2)
+                            .padding(.trailing, 4)
+                    }
+                    .offset(y: indicatorY)
+                    .animation(.interactiveSpring(), value: waterLevel)
                 }
-                .foregroundStyle(.white.opacity(0.85))
-                .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
             }
         }
         .onAppear { motion.start() }
@@ -419,3 +433,4 @@ private final class TankMotionManager: ObservableObject {
     .padding()
     .background(Color(red: 0.07, green: 0.10, blue: 0.22))
 }
+

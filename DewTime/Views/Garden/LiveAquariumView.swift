@@ -522,16 +522,21 @@ struct LiveAquariumView: View {
     private var topBar: some View {
         VStack {
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(aquarium?.sizeName ?? "ミニ水槽")
-                        .font(.title3.weight(.bold))
-                        .foregroundStyle(.white)
-                    Text("\(activeFishCount)匹が泳いでいます")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.85))
+                // 魚数バッジ（アイコン＋数字のみ）
+                HStack(spacing: 5) {
+                    Image(systemName: "fish.fill")
+                        .font(.subheadline.weight(.bold))
+                    Text("\(activeFishCount)")
+                        .font(.subheadline.weight(.bold))
                         .monospacedDigit()
                 }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(.black.opacity(0.22), in: Capsule())
+                .overlay(Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 1))
                 .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
+                .accessibilityLabel("\(activeFishCount)匹が泳いでいます")
 
                 Spacer()
 
@@ -546,42 +551,32 @@ struct LiveAquariumView: View {
                         .overlay(Circle().strokeBorder(.white.opacity(0.4), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("育成記録")
             }
             .padding(.horizontal, 20)
             .padding(.top, 8)
 
             Spacer()
-
-            Label("水面をタップでエサ・魚をタップで名前編集", systemImage: "hand.tap.fill")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(.black.opacity(0.22), in: Capsule())
-                .padding(.bottom, 14)
         }
     }
 
     private var emptyAquariumHint: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 12) {
             Image(systemName: "fish")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.9))
-            Text("まだ魚はいません")
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(.white)
-            Text("成魚になった魚がここで泳ぎます")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.78))
+                .font(.system(size: 44, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.7))
+            Image(systemName: "arrow.up")
+                .font(.title3)
+                .foregroundStyle(.white.opacity(0.4))
         }
-        .multilineTextAlignment(.center)
         .padding(.horizontal, 18)
-        .padding(.vertical, 16)
+        .padding(.vertical, 20)
         .background(.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(.white.opacity(0.22), lineWidth: 1)
         }
+        .accessibilityLabel("成魚になった魚がここで泳ぎます")
     }
 
     private var activeFishCount: Int {

@@ -1,10 +1,9 @@
 import SwiftUI
 
 // MARK: - StartSheet
+// 出発時刻は「水位を上下にスワイプして設定」するインタラクティブUI。
+// テキストラベルを排除し、数字とアイコンのみで操作できる。
 
-/// スタートボタン押下時に表示する出発時刻確認・設定シート。
-/// クイックチップ（+N分後）とホイールピッカーを1画面に並べ、
-/// ユーザーが時刻を確定してからタイマーを開始する。
 struct StartSheet: View {
 
     // MARK: - Props
@@ -16,17 +15,13 @@ struct StartSheet: View {
     let onCancel: () -> Void
 
     // MARK: - State
-    @State private var selectedTime: Date
+    @State private var draftLevel: Double = 0.5    // 0.0-1.0 → 0-maxMinutes
     @State private var selectedSpecies: FishSpecies
-    @State private var showFishPicker = false
-    @State private var selectedChip: Int?         // 選択中のクイックオフセット(分)
-    @State private var suppressChipClear = false  // チップ変更によるpicker更新でチップ選択を消さないフラグ
-    @State private var appear = false             // 入場アニメ用
+    @State private var appear = false
 
     // MARK: - Constants
-    private let chips: [(label: String, minutes: Int)] = [
-        ("15分後", 15), ("30分後", 30), ("45分後", 45), ("1時間後", 60)
-    ]
+    private static let maxMinutes = 60
+    private let presets = [15, 30, 45, 60]
 
     // MARK: - Init
     init(
@@ -44,16 +39,22 @@ struct StartSheet: View {
         self.onSelectSpecies = onSelectSpecies
         self.onStart = onStart
         self.onCancel = onCancel
-        _selectedTime = State(initialValue: currentTime)
         _selectedSpecies = State(initialValue: selectedSpecies)
+
+        // 既存の出発時刻を「今から何分後か」に変換してドラフト水位へ反映
+        let minutesFromNow = Int(currentTime.timeIntervalSince(.now) / 60)
+        let clamped = max(5, min(Self.maxMinutes, minutesFromNow))
+        _draftLevel = State(initialValue: Double(clamped) / Double(Self.maxMinutes))
     }
 
     // MARK: - Derived
-    private var minutesFromNow: Int {
-        max(0, Int(selectedTime.timeIntervalSince(.now)) / 60)
+    private var draftMinutes: Int {
+        max(5, Int((draftLevel * Double(Self.maxMinutes)).rounded()))
     }
 
-    private var isPast: Bool { selectedTime < .now }
+    private var departureDate: Date {
+        Date.now.addingTimeInterval(TimeInterval(draftMinutes * 60))
+    }
 
     // MARK: - Body
     var body: some View {
@@ -61,161 +62,179 @@ struct StartSheet: View {
             LinearGradient.dewTimeSheet
                 .ignoresSafeArea()
 
-            // オーロラグロー
             auroraLayer
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
 
             VStack(spacing: 0) {
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 0) {
-                        dragHandle
+                dragHandle
 
-                        headerSection
-                            .padding(.top, 4)
-                            .opacity(appear ? 1 : 0)
-                            .offset(y: appear ? 0 : 8)
-
-                        heroCard
-                            .padding(.horizontal, 24)
-                            .padding(.top, 24)
-                            .opacity(appear ? 1 : 0)
-                            .offset(y: appear ? 0 : 12)
-
-                        fishSelectionSection
-                            .padding(.horizontal, 24)
-                            .padding(.top, 16)
-                            .opacity(appear ? 1 : 0)
-                            .offset(y: appear ? 0 : 14)
-
-                        quickChipsSection
-                            .padding(.horizontal, 24)
-                            .padding(.top, 18)
-                            .opacity(appear ? 1 : 0)
-                            .offset(y: appear ? 0 : 16)
-
-                        orDivider
-                            .padding(.horizontal, 32)
-                            .padding(.top, 20)
-                            .opacity(appear ? 1 : 0)
-
-                        wheelPickerSection
-                            .padding(.top, 8)
-                            .padding(.bottom, 20)
-                            .opacity(appear ? 1 : 0)
-                    }
+                // 大きな残り時間数字（分）
+                HStack(alignment: .lastTextBaseline, spacing: 4) {
+                    Text("\(draftMinutes)")
+                        .font(.system(size: 80, weight: .ultraLight, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                        .contentTransition(.numericText())
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: draftMinutes)
+                    Text("min")
+                        .font(.system(size: 20, weight: .thin, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .padding(.bottom, 8)
                 }
+                .opacity(appear ? 1 : 0)
+                .padding(.top, 4)
 
-                actionButtons
-                    .padding(.top, 8)
-                    .padding(.bottom, 20)
-                    .background(.black.opacity(0.001))
+                // 水槽（ドラッグで水位設定）+ プリセット
+                HStack(alignment: .center, spacing: 16) {
+                    WaterTankView(
+                        waterLevel: draftLevel,
+                        isDraggable: true,
+                        onLevelChanged: { level in
+                            withAnimation(.interactiveSpring(response: 0.2)) {
+                                draftLevel = level
+                            }
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        }
+                    )
+                    .frame(maxWidth: .infinity)
+
+                    // プリセット縦ボタン（数字のみ）
+                    VStack(spacing: 12) {
+                        ForEach(presets.reversed(), id: \.self) { min in
+                            presetButton(minutes: min)
+                        }
+                    }
+                    .frame(width: 50)
+                }
+                .frame(height: 240)
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .opacity(appear ? 1 : 0)
+
+                // 魚選択（横スクロール）
+                fishScrollSection
+                    .padding(.top, 16)
+                    .opacity(appear ? 1 : 0)
+
+                // アクションボタン（再生 + ✕）
+                HStack(spacing: 40) {
+                    Button { onCancel() } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 48))
+                            .foregroundStyle(.white.opacity(0.35))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("キャンセル")
+
+                    Button {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        onStart(departureDate)
+                    } label: {
+                        Image(systemName: "play.circle.fill")
+                            .font(.system(size: 72))
+                            .foregroundStyle(Color.dewBlue)
+                            .shadow(color: Color.dewBlue.opacity(0.55), radius: 14, y: 4)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("スタート")
+
+                    Color.clear.frame(width: 48, height: 48)
+                }
+                .padding(.top, 20)
+                .padding(.bottom, 24)
+                .opacity(appear ? 1 : 0)
+                .offset(y: appear ? 0 : 20)
             }
+            .safeAreaPadding(.bottom, 12)
         }
         .foregroundStyle(.white)
-        .safeAreaPadding(.bottom, 12)
-        .overlay(alignment: .bottom) {
-            LinearGradient(
-                colors: [
-                    Color.clear,
-                    Color.black.opacity(0.06),
-                    Color.black.opacity(0.14)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 120)
-            .allowsHitTesting(false)
-        }
         .onAppear {
             withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
                 appear = true
             }
         }
-        .onChange(of: selectedTime) { _, _ in
-            guard !suppressChipClear else { return }
-            selectedChip = nil
-        }
-        .sheet(isPresented: $showFishPicker) {
-            FishPickerSheet(
-                selectedSpecies: selectedSpecies,
-                aquariumTier: aquariumTier,
-                onSelect: { species in
-                    selectedSpecies = species
-                    onSelectSpecies(species)
-                    showFishPicker = false
+    }
+
+    // MARK: - Preset Button
+    private func presetButton(minutes: Int) -> some View {
+        let isSelected = draftMinutes == minutes
+        let ratio = Double(minutes) / Double(Self.maxMinutes)
+        return Button {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                draftLevel = ratio
+            }
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        } label: {
+            VStack(spacing: 3) {
+                // 水位ミニビジュアル
+                ZStack(alignment: .bottom) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(.white.opacity(0.10))
+                        .frame(width: 30, height: 36)
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isSelected ? Color.dewBlue : .white.opacity(0.3))
+                        .frame(width: 30, height: max(4, 36 * ratio))
                 }
-            )
-            .presentationDetents([.fraction(0.72), .large])
-            .presentationBackground(.clear)
-            .presentationDragIndicator(.hidden)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(isSelected ? Color.dewBlue : .white.opacity(0.15), lineWidth: 1)
+                )
+
+                Text("\(minutes)")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(isSelected ? Color.dewBlue : .white.opacity(0.55))
+                    .monospacedDigit()
+            }
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(isSelected ? 1.08 : 1.0)
+        .animation(.spring(response: 0.28, dampingFraction: 0.72), value: isSelected)
+        .accessibilityLabel("\(minutes)分")
+    }
+
+    // MARK: - Fish Scroll
+    private var fishScrollSection: some View {
+        let unlocked = FishSpecies.allCases
+            .sorted { $0.requiredWaterRatio < $1.requiredWaterRatio }
+            .filter { $0.isUnlocked(aquariumTier: aquariumTier) }
+
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(unlocked) { species in
+                    fishIcon(species)
+                }
+            }
+            .padding(.horizontal, 20)
         }
     }
 
-    private var actionButtons: some View {
-        VStack(spacing: 10) {
-            // Start
-            Button {
-                let impact = UIImpactFeedbackGenerator(style: .medium)
-                impact.impactOccurred()
-                onStart(selectedTime)
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "play.fill")
-                        .font(.body.weight(.semibold))
-                    Text("スタート！")
-                        .font(.title3.weight(.bold))
+    private func fishIcon(_ species: FishSpecies) -> some View {
+        let isSelected = selectedSpecies == species
+        return Button {
+            withAnimation(.spring(response: 0.3)) {
+                selectedSpecies = species
+            }
+            onSelectSpecies(species)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(isSelected ? Color.dewBlue.opacity(0.28) : .white.opacity(0.08))
+                    .frame(width: 56, height: 56)
+                if isSelected {
+                    Circle()
+                        .strokeBorder(Color.dewBlue, lineWidth: 2)
+                        .frame(width: 56, height: 56)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
-                .background(
-                    LinearGradient(
-                        colors: [Color.dewBlue, Color(red: 0.22, green: 0.47, blue: 0.90), Color(red: 0.18, green: 0.28, blue: 0.80)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [.white.opacity(0.10), .clear],
-                                startPoint: .topLeading,
-                                endPoint: .center
-                            )
-                        )
-                )
-                .shadow(color: Color.dewBlue.opacity(0.18), radius: 8, y: 3)
+                FishArtworkView(species: species)
+                    .frame(width: 38, height: 34)
             }
-
-            // Cancel
-            Button {
-                onCancel()
-            } label: {
-                Text("キャンセル")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.45))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-            }
-            .buttonStyle(.plain)
+            .scaleEffect(isSelected ? 1.08 : 1.0)
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 12)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.clear,
-                    Color.black.opacity(0.08),
-                    Color.black.opacity(0.18)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-        .opacity(appear ? 1 : 0)
-        .offset(y: appear ? 0 : 20)
+        .buttonStyle(.plain)
+        .animation(.spring(response: 0.28), value: isSelected)
+        .accessibilityLabel(species.displayName)
     }
 
     // MARK: - Aurora Layer
@@ -251,296 +270,8 @@ struct StartSheet: View {
             )
             .frame(width: 38, height: 4)
             .padding(.top, 14)
-            .padding(.bottom, 20)
+            .padding(.bottom, 8)
     }
-
-    // MARK: - Header
-    private var headerSection: some View {
-        VStack(spacing: 5) {
-            HStack(spacing: 9) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.dewBlue.opacity(0.30), Color(red: 0.48, green: 0.40, blue: 1.0).opacity(0.20)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 36, height: 36)
-                    Circle()
-                        .strokeBorder(Color.dewBlue.opacity(0.30), lineWidth: 1)
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "timer.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(Color.dewBlue)
-                }
-
-                Text("出発時刻を確認")
-                    .font(.title2.weight(.bold))
-            }
-            Text(scheduleName)
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.40))
-                .tracking(0.4)
-        }
-    }
-
-    // MARK: - Hero Card
-    private var heroCard: some View {
-        VStack(spacing: 14) {
-            // 大きな時刻表示
-            HStack(alignment: .lastTextBaseline, spacing: 10) {
-                Image(systemName: "figure.walk.departure")
-                    .font(.title2.weight(.light))
-                    .foregroundStyle(.white.opacity(0.75))
-
-                Text(selectedTime, format: .dateTime.hour().minute())
-                    .font(.system(size: 68, weight: .ultraLight, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
-                    .shadow(color: Color.dewBlue.opacity(0.35), radius: 14)
-                    .contentTransition(.numericText())
-                    .animation(.spring(response: 0.4, dampingFraction: 0.75), value: selectedTime)
-            }
-
-            // バッジ
-            if isPast {
-                badge(
-                    icon: "exclamationmark.triangle.fill",
-                    text: "出発時刻を過ぎています",
-                    tint: .orange
-                )
-            } else if minutesFromNow == 0 {
-                badge(
-                    icon: "bolt.fill",
-                    text: "今すぐ出発",
-                    tint: Color.dewBlue
-                )
-            } else {
-                badge(
-                    icon: "clock",
-                    text: "今から \(minutesFromNow) 分後に出発",
-                    tint: Color.dewBlue
-                )
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 22)
-        .padding(.horizontal, 20)
-        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [.white.opacity(0.25), Color.dewBlue.opacity(0.12), .white.opacity(0.06)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
-        .shadow(color: Color.dewBlue.opacity(0.10), radius: 20, y: 6)
-    }
-
-    private func badge(icon: String, text: String, tint: Color) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(tint)
-            Text(text)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(tint.opacity(0.20), in: Capsule())
-        .overlay(Capsule().strokeBorder(tint.opacity(0.60), lineWidth: 1.5))
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: minutesFromNow)
-    }
-
-    // MARK: - Fish Selection
-    private var fishSelectionSection: some View {
-        Button {
-            showFishPicker = true
-        } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(speciesAccentColor(selectedSpecies).opacity(0.18))
-                    FishArtworkView(species: selectedSpecies)
-                        .frame(width: 36, height: 32)
-                }
-                .frame(width: 48, height: 48)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("今日育てる魚")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.52))
-                    Text(selectedSpecies.displayName)
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.white)
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(selectedSpecies.requiredTotalWaterRangeText)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.58))
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.white.opacity(0.38))
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(.white.opacity(0.12), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func speciesAccentColor(_ species: FishSpecies) -> Color {
-        switch species.difficultyLabel {
-        case "かんたん":   return Color(hex: "#4ADE80")
-        case "やさしい":   return Color(hex: "#34D399")
-        case "ふつう":     return Color(hex: "#60A5FA")
-        case "むずかしい": return Color(hex: "#A78BFA")
-        default:           return Color(hex: "#F472B6")
-        }
-    }
-
-    // MARK: - Quick Chips
-    private var quickChipsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("クイック設定")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.45))
-                    .textCase(.uppercase)
-                    .tracking(1.0)
-                Spacer()
-                // 現在の設定に戻すボタン
-                Button {
-                    tapChip(nil, time: currentTime)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.counterclockwise")
-                            .font(.caption2.weight(.semibold))
-                        Text("元の時刻")
-                            .font(.caption.weight(.medium))
-                    }
-                    .foregroundStyle(
-                        selectedChip == nil && selectedTime == currentTime
-                            ? Color.dewBlue
-                            : .white.opacity(0.4)
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-
-            HStack(spacing: 8) {
-                ForEach(chips, id: \.minutes) { chip in
-                    chipButton(label: chip.label, minutes: chip.minutes)
-                }
-            }
-        }
-    }
-
-    private func chipButton(label: String, minutes: Int) -> some View {
-        let isSelected = selectedChip == minutes
-        return Button {
-            tapChip(minutes, time: Date.now.addingTimeInterval(Double(minutes) * 60))
-        } label: {
-            VStack(spacing: 2) {
-                Text("+\(minutes < 60 ? "\(minutes)分" : "1時間")")
-                    .font(.footnote.weight(.bold))
-                    .monospacedDigit()
-                Text(isSelected ? "✓" : label.components(separatedBy: "後").first.map { $0 + "後" } ?? label)
-                    .font(.caption2)
-                    .foregroundStyle(isSelected ? .white.opacity(0.9) : .white.opacity(0.5))
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 11)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(
-                        isSelected
-                            ? LinearGradient(
-                                colors: [Color.dewBlue, Color(red: 0.22, green: 0.47, blue: 0.90)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                              )
-                            : LinearGradient(
-                                colors: [Color.white.opacity(0.08), Color.white.opacity(0.05)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                              )
-                    )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(
-                        isSelected ? Color.dewBlue.opacity(0.0) : Color.white.opacity(0.10),
-                        lineWidth: 1
-                    )
-            )
-            .shadow(color: isSelected ? Color.dewBlue.opacity(0.40) : .clear, radius: 10, y: 4)
-            .scaleEffect(isSelected ? 1.04 : 1.0)
-        }
-        .buttonStyle(.plain)
-        .animation(.spring(response: 0.28, dampingFraction: 0.72), value: isSelected)
-    }
-
-    private func tapChip(_ minutes: Int?, time: Date) {
-        suppressChipClear = true
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
-            selectedChip = minutes
-            selectedTime = time
-        }
-        Task { @MainActor in suppressChipClear = false }
-    }
-
-    // MARK: - Divider
-    private var orDivider: some View {
-        HStack(spacing: 12) {
-            Rectangle()
-                .fill(.white.opacity(0.10))
-                .frame(height: 0.5)
-            Text("または時刻を直接指定")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.30))
-                .fixedSize()
-            Rectangle()
-                .fill(.white.opacity(0.10))
-                .frame(height: 0.5)
-        }
-    }
-
-    // MARK: - Wheel Picker
-    private var wheelPickerSection: some View {
-        DatePicker(
-            "",
-            selection: Binding(
-                get: { selectedTime },
-                set: { newVal in
-                    selectedTime = newVal
-                    // チップとの同期は onChange で処理
-                }
-            ),
-            displayedComponents: .hourAndMinute
-        )
-        .datePickerStyle(.wheel)
-        .labelsHidden()
-        .colorScheme(.dark)
-        .frame(maxHeight: 160)
-        .clipped()
-    }
-
 }
 
 // MARK: - Preview

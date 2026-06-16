@@ -193,7 +193,6 @@ struct TimerView: View {
                 isOverdue: vm.isOverdue,
                 cornerRadius: 0,
                 showBorder: false,
-                showLevelText: false,
                 startDate: vm.isRunning ? vm.startedAt : nil,
                 targetDate: vm.isRunning ? vm.schedule.targetDepartureTime : nil
             )
@@ -380,17 +379,14 @@ struct TimerView: View {
     private func centerInfoDisplay(vm: TimerViewModel) -> some View {
         VStack(spacing: 0) {
             if vm.departed {
-                // 出発完了
-                Text("出発完了 🎉")
-                    .font(.system(.title3, design: .rounded).weight(.medium))
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 64))
                     .foregroundStyle(.white.opacity(0.85))
                     .padding(.bottom, 20)
             } else {
-                // ラベル
-                Text(vm.isOverdue ? "遅刻中" : "出発まで")
-                    .font(.system(.caption, design: .rounded).weight(.semibold))
-                    .tracking(3)
-                    .textCase(.uppercase)
+                // 状態アイコン（文字なし）
+                Image(systemName: vm.isOverdue ? "exclamationmark.triangle.fill" : "figure.walk")
+                    .font(.system(size: 22))
                     .foregroundStyle(vm.isOverdue ? Color.orange.opacity(0.9) : Color.white.opacity(0.55))
 
                 // カウントダウン（ヒーロー数字）
@@ -401,30 +397,8 @@ struct TimerView: View {
                     .contentTransition(vm.isOverdue ? .numericText() : .numericText(countsDown: true))
                     .animation(.linear(duration: 1.0), value: vm.countdownText)
                     .padding(.top, 8)
-
-                // ドット区切り
-                HStack(spacing: 5) {
-                    ForEach(0..<5, id: \.self) { _ in
-                        Circle()
-                            .fill(.white.opacity(0.25))
-                            .frame(width: 3.5, height: 3.5)
-                    }
-                }
-                .padding(.vertical, 18)
+                    .padding(.bottom, 18)
             }
-
-            // % サブ表示
-            HStack(alignment: .lastTextBaseline, spacing: 2) {
-                Text("\(Int(vm.waterLevel * 100))")
-                    .font(.system(size: 44, weight: .thin, design: .rounded))
-                    .monospacedDigit()
-                    .contentTransition(.numericText(countsDown: true))
-                    .animation(.linear(duration: 1.0), value: vm.waterLevel)
-                Text("%")
-                    .font(.system(size: 22, weight: .thin, design: .rounded))
-                    .padding(.bottom, 4)
-            }
-            .foregroundStyle(vm.isOverdue ? Color.orange.opacity(0.7) : Color.white.opacity(0.6))
         }
         .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
     }
@@ -521,46 +495,39 @@ struct TimerView: View {
             EmptyView()
         } else if vm.startedAt == nil {
             Button { showStartSheet = true } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "play.fill")
-                    Text("スタート")
-                        .font(AppFont.actionButton)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 20)
-                .background(Color.dewBlue)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .shadow(color: Color.dewBlue.opacity(0.4), radius: 12, y: 5)
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: 80))
+                    .foregroundStyle(Color.dewBlue)
+                    .shadow(color: Color.dewBlue.opacity(0.5), radius: 16, y: 6)
             }
+            .accessibilityLabel("スタート")
         } else {
-            VStack(spacing: 12) {
+            VStack(spacing: 16) {
                 Button { showConfirm = true } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "figure.walk.departure")
-                        Text("いってきます！")
-                            .font(AppFont.actionButton)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
-                    .background(
-                        LinearGradient(
-                            colors: departureBtnColors(vm.waterLevel),
-                            startPoint: .leading,
-                            endPoint: .trailing
+                    Image(systemName: "figure.walk.departure")
+                        .font(.system(size: 40, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 22)
+                        .background(
+                            LinearGradient(
+                                colors: departureBtnColors(vm.waterLevel),
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
                         )
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    .shadow(color: departureBtnColors(vm.waterLevel).first!.opacity(0.4), radius: 12, y: 5)
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .shadow(color: departureBtnColors(vm.waterLevel).first!.opacity(0.4), radius: 12, y: 5)
                 }
+                .accessibilityLabel("いってきます")
 
                 Button { showCancelConfirm = true } label: {
-                    Text("キャンセル")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.white.opacity(0.65))
+                    Image(systemName: "xmark.circle")
+                        .font(.system(size: 28))
+                        .foregroundStyle(.white.opacity(0.55))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .padding(.vertical, 8)
                 }
+                .accessibilityLabel("キャンセル")
             }
         }
     }
@@ -576,19 +543,16 @@ struct TimerView: View {
     // MARK: - Empty state
 
     private var emptyState: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "clock.badge.exclamationmark")
-                .font(AppFont.countdown)
+        VStack(spacing: 20) {
+            Image(systemName: "calendar.badge.plus")
+                .font(.system(size: 52))
                 .foregroundStyle(Color.dewBlue.opacity(0.7))
-            Text("出発時刻が設定されていません")
-                .font(.headline)
-            Text("「設定」タブから出発時刻を設定してください")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+            Image(systemName: "arrow.down")
+                .font(.title2)
+                .foregroundStyle(.white.opacity(0.35))
         }
         .foregroundStyle(.white)
+        .accessibilityLabel("「設定」タブから出発時刻を設定してください")
     }
 
     // MARK: - Background

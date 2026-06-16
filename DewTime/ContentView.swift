@@ -42,7 +42,7 @@ struct ContentView: View {
             ForEach(AppTab.allCases) { tab in
                 tab.destination
                     .tag(tab)
-                    .tabItem { Label(tab.title, systemImage: tab.icon) }
+                    .tabItem { Image(systemName: tab.icon) }
             }
         }
         .overlay {

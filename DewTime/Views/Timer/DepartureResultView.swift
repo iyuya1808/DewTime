@@ -24,31 +24,29 @@ struct DepartureResultView: View {
                 DragHandle()
 
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 28) {
-                        // タイトル
-                        VStack(spacing: 6) {
-                            Text("お疲れさまでした！")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.55))
-                                .padding(.top, 24)
-                            Text(scheduleName)
-                                .font(.caption)
-                                .foregroundStyle(.white.opacity(0.35))
-                            Text(resultTitle)
-                                .font(AppFont.sheetTitle)
-                                .multilineTextAlignment(.center)
+                    VStack(spacing: 24) {
+                        // ヘッダー：成長アイコン群（テキストなし）
+                        HStack(spacing: 20) {
+                            ForEach(GrowthStage.allCases, id: \.self) { stage in
+                                let reached = stage.thresholdProgress <= (totalWaterAfter / max(1, requiredTotalWater))
+                                Image(systemName: stage.icon)
+                                    .font(.title2)
+                                    .foregroundStyle(reached ? fishColor : .white.opacity(0.20))
+                                    .scaleEffect(stage == growthStage ? 1.35 : 1.0)
+                            }
                         }
+                        .padding(.top, 24)
 
-                        // 注水演出（タンク → 水槽へ水が流れ込み、魚が育つ）
+                        // 注水演出
                         PourTransitionView(waterLevel: waterLevel, species: selectedSpecies)
                             .frame(height: 232)
 
-                        // 水量ゲージ
+                        // 残水量ゲージ（数字あり）
                         VStack(spacing: 10) {
                             HStack {
-                                Text("残水量")
+                                Image(systemName: "drop.fill")
+                                    .foregroundStyle(gaugeColors.first ?? .cyan)
                                     .font(.caption)
-                                    .foregroundStyle(.white.opacity(0.55))
                                 Spacer()
                                 Text("\(Int(waterFill * 100))%")
                                     .font(AppFont.badgeValue)
@@ -77,45 +75,22 @@ struct DepartureResultView: View {
                         }
                         .padding(.horizontal, 4)
 
-                        HStack(spacing: 10) {
-                            fishMetric(
-                                icon: selectedSpecies.icon,
-                                value: "\(Int(totalWaterAfter.rounded()))/\(Int(requiredTotalWater.rounded()))pt",
-                                label: "合計水量",
-                                tint: fishColor
-                            )
-                            fishMetric(
-                                icon: growthStage.icon,
-                                value: growthStage.displayName,
-                                label: "成長段階",
-                                tint: fishColor
-                            )
-                        }
-
-                        // 統計カード
+                        // 統計（アイコン + 数字のみ）
                         statsGrid
 
-                        // メッセージ
-                        Text(motivationMessage)
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.65))
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 20)
-
-                        // 閉じるボタン
+                        // 閉じるボタン（魚アイコン）
                         Button {
                             onDismiss()
                         } label: {
-                            Text("また明日！ 🐟")
-                                .font(AppFont.actionButton)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 18)
-                                .background(
-                                    LinearGradient(colors: gaugeColors, startPoint: .leading, endPoint: .trailing)
+                            Image(systemName: completedGrowth ? "star.circle.fill" : "fish.fill")
+                                .font(.system(size: 52))
+                                .foregroundStyle(
+                                    LinearGradient(colors: gaugeColors, startPoint: .topLeading, endPoint: .bottomTrailing)
                                 )
-                                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                                .shadow(color: gaugeColors.first!.opacity(0.45), radius: 12, y: 4)
                         }
                         .padding(.bottom, 16)
+                        .accessibilityLabel("完了")
                     }
                     .padding(.horizontal, 24)
                 }
@@ -146,25 +121,22 @@ struct DepartureResultView: View {
             statCard(
                 icon: "clock.fill",
                 value: elapsedFormatted,
-                label: "経過時間",
                 color: .cyan
             )
             statCard(
                 icon: "calendar.badge.clock",
                 value: plannedFormatted,
-                label: "予定時間",
                 color: .indigo
             )
             statCard(
                 icon: delaySeconds > 0 ? "tortoise.fill" : "hare.fill",
-                value: delaySeconds > 0 ? "+\(delaySeconds / 60)分\(delaySeconds % 60)秒" : "ジャスト",
-                label: delaySeconds > 0 ? "遅延" : "スケジュール通り！",
+                value: delaySeconds > 0 ? "+\(delaySeconds / 60):\(String(format: "%02d", delaySeconds % 60))" : "✓",
                 color: delaySeconds > 0 ? .orange : .green
             )
         }
     }
 
-    private func statCard(icon: String, value: String, label: String, color: Color) -> some View {
+    private func statCard(icon: String, value: String, color: Color) -> some View {
         VStack(spacing: 6) {
             Image(systemName: icon)
                 .foregroundStyle(color)
@@ -174,32 +146,6 @@ struct DepartureResultView: View {
                 .monospacedDigit()
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
-            Text(label)
-                .font(AppFont.statLabel)
-                .foregroundStyle(.white.opacity(0.5))
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private func fishMetric(icon: String, value: String, label: String, tint: Color) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(tint)
-                .symbolRenderingMode(.hierarchical)
-            Text(value)
-                .font(.headline)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.5))
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
@@ -211,12 +157,7 @@ struct DepartureResultView: View {
     private var plannedFormatted: String {
         let m = totalSeconds / 60
         let s = totalSeconds % 60
-        return s == 0 ? "\(m)分" : String(format: "%02d:%02d", m, s)
-    }
-
-    private var resultTitle: String {
-        if completedGrowth { return "\(selectedSpecies.displayName)が成魚になりました！" }
-        return growthStage.message
+        return s == 0 ? "\(m)'" : String(format: "%d:%02d", m, s)
     }
 
     private var theme: WaterLevelTheme { WaterLevelTheme(waterRatio: waterLevel) }
@@ -224,13 +165,6 @@ struct DepartureResultView: View {
     private var fishColor: Color { completedGrowth ? theme.tintColor : .orange }
 
     private var background: some View { LinearGradient.dewTimeSheet }
-
-    private var motivationMessage: String {
-        if completedGrowth {
-            return "今回 +\(Int(waterAmount.rounded()))pt で必要水量に届きました。図鑑に成魚として登録されます。"
-        }
-        return "今回 +\(Int(waterAmount.rounded()))pt。合計 \(Int(totalWaterAfter.rounded()))/\(Int(requiredTotalWater.rounded()))pt まで育ちました。"
-    }
 }
 
 #Preview {

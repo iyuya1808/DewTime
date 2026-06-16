@@ -19,8 +19,7 @@ struct PourTransitionView: View {
             WaterTankView(
                 waterLevel: tankLevel,
                 cornerRadius: 14,
-                showBorder: true,
-                showLevelText: false
+                showBorder: true
             )
             .frame(width: 60, height: 66)
 
