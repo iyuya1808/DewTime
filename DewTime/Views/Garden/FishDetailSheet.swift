@@ -10,7 +10,7 @@ struct FishDetailSheet: View {
     @State private var nameDraft = ""
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 24) {
             HStack {
                 Spacer()
                 Button { dismiss() } label: {
@@ -26,23 +26,23 @@ struct FishDetailSheet: View {
             ZStack {
                 Circle()
                     .fill(fishColor.opacity(0.16))
-                    .frame(width: 112, height: 112)
+                    .frame(width: 140, height: 140)
                 FishArtworkView(
                     species: fishSpecies,
                     tint: fish.succeeded ? nil : .secondary,
                     isLocked: !fish.succeeded
                 )
-                .frame(width: 82, height: 78)
+                .frame(width: 110, height: 105)
             }
 
-            VStack(spacing: 4) {
+            VStack(spacing: 8) {
                 ZStack(alignment: .trailing) {
                     Text(fish.name)
                         .font(.title2.weight(.bold))
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.trailing, 36)
+                        .padding(.horizontal, 36)
                     Button {
                         nameDraft = fish.name
                         showNameEditor = true
@@ -56,25 +56,45 @@ struct FishDetailSheet: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("魚の名前を編集")
                 }
-                Text(speciesName)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                
                 Text(fish.recordedAt, format: .dateTime.year().month().day().hour().minute())
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
 
-            HStack(spacing: 10) {
-                waterMetricCard
-                departureMetricCard
-            }
+            HStack(spacing: 16) {
+                // 朝のゆとり（残った水量）のビジュアル化（表情マークと水滴）
+                VStack(spacing: 12) {
+                    Image(systemName: waterDropFaceIcon)
+                        .font(.system(size: 28))
+                        .foregroundStyle(fishColor)
+                    
+                    HStack(spacing: 2) {
+                        ForEach(0..<5) { i in
+                            Image(systemName: i < waterDropCount ? "drop.fill" : "drop")
+                                .font(.system(size: 10))
+                                .foregroundStyle(i < waterDropCount ? fishColor : Color(.tertiaryLabel))
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
+                .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
 
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 4)
+                // 出発タイミングのビジュアル化（時計とチェックマーク/警告）
+                VStack(spacing: 12) {
+                    Image(systemName: fish.succeeded ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(fish.succeeded ? Color.teal : Color.orange)
+                    
+                    Image(systemName: "clock")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
+                .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            }
 
             Spacer(minLength: 0)
         }
@@ -90,6 +110,8 @@ struct FishDetailSheet: View {
                 )
                 .ignoresSafeArea()
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(fish.name)の記録。朝のゆとりは\(waterEvaluation)、出発は\(fish.succeeded ? "時間内" : "時間超過")でした。")
         .alert("魚の名前", isPresented: $showNameEditor) {
             TextField("名前", text: $nameDraft)
             Button("保存") {
@@ -101,42 +123,14 @@ struct FishDetailSheet: View {
         }
     }
 
-    private var waterMetricCard: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 3) {
-                ForEach(0..<5) { i in
-                    Image(systemName: i < waterDropCount ? "drop.fill" : "drop")
-                        .font(.system(size: 14))
-                        .foregroundStyle(i < waterDropCount ? fishColor : Color(.tertiaryLabel))
-                }
-            }
-            Text(waterEvaluation)
-                .font(.headline)
-                .foregroundStyle(fishColor)
-            Text("朝のゆとり")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    private var waterDropFaceIcon: String {
+        switch fish.waterRatio {
+        case 0.8...: return "face.smiling.fill"
+        case 0.6...: return "face.smiling"
+        case 0.4...: return "face.dashed"
+        case 0.2...: return "face.neutral"
+        default: return "face.frowning"
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private var departureMetricCard: some View {
-        VStack(spacing: 8) {
-            Image(systemName: fish.succeeded ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                .font(.title3)
-                .foregroundStyle(fish.succeeded ? Color.teal : Color.orange)
-            Text(fish.succeeded ? "時間内" : "時間超過")
-                .font(.headline)
-                .foregroundStyle(fish.succeeded ? Color.teal : Color.orange)
-            Text("出発タイミング")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var waterDropCount: Int {
@@ -170,12 +164,5 @@ struct FishDetailSheet: View {
 
     private var speciesName: String {
         fishSpecies.displayName
-    }
-
-    private var message: String {
-        if fish.waterRatio >= 0.8 { return "たっぷり水が残りました。元気いっぱいの魚に育ちました。" }
-        if fish.waterRatio >= 0.5 { return "いいペースで出発できました。水槽にもちゃんと潤いが残っています。" }
-        if fish.waterRatio >= 0.2 { return "少し慌ただしかったですが、魚はきちんと育っています。" }
-        return "ぎりぎりの出発でした。次はもう少し水を残して育てましょう。"
     }
 }
