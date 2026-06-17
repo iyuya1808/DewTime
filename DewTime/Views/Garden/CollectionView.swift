@@ -578,14 +578,13 @@ struct CollectionView: View {
                                     tint: fish.succeeded ? nil : .secondary,
                                     isLocked: !fish.succeeded
                                 )
-                                .frame(width: 38, height: 34)
+                                .frame(width: 44, height: 40)
                                 Text(fish.name)
                                     .font(.caption2.weight(.semibold))
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.72)
-                                waterDropsIndicator(ratio: fish.waterRatio, color: .cyan)
                             }
-                            .frame(width: 76, height: 88)
+                            .frame(width: 76, height: 84)
                             .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                         .buttonStyle(.plain)
@@ -890,26 +889,25 @@ private struct SpeciesDetailSheet: View {
 
     private func fishTile(_ fish: CollectedFish) -> some View {
         let theme = WaterLevelTheme(waterRatio: fish.waterRatio)
-        return VStack(spacing: 6) {
+        return VStack(spacing: 8) {
             FishArtworkView(species: species)
-                .frame(width: 42, height: 36)
-                .shadow(color: theme.tintColor.opacity(0.3), radius: 4)
+                .frame(width: 48, height: 42)
+                .shadow(color: theme.tintColor.opacity(0.35), radius: 6)
             Text(fish.name)
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(.primary.opacity(0.8))
+                .foregroundStyle(.primary.opacity(0.85))
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
-            waterDropsIndicator(ratio: fish.waterRatio, color: theme.tintColor)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
+        .padding(.vertical, 14)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(theme.tintColor.opacity(0.1))
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(theme.tintColor.opacity(0.32), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(theme.tintColor.opacity(0.28), lineWidth: 1)
         }
     }
 
@@ -928,28 +926,4 @@ private struct SpeciesDetailSheet: View {
 #Preview {
     CollectionView()
         .environment(AppDataStore())
-}
-
-extension View {
-    func waterDropCount(for ratio: Double) -> Int {
-        switch ratio {
-        case 0.8...: return 5
-        case 0.6...: return 4
-        case 0.4...: return 3
-        case 0.2...: return 2
-        default: return 1
-        }
-    }
-
-    @ViewBuilder
-    func waterDropsIndicator(ratio: Double, color: Color) -> some View {
-        let count = waterDropCount(for: ratio)
-        HStack(spacing: 1.5) {
-            ForEach(0..<5) { i in
-                Image(systemName: i < count ? "drop.fill" : "drop")
-                    .font(.system(size: 7))
-                    .foregroundStyle(i < count ? color : Color.primary.opacity(0.12))
-            }
-        }
-    }
 }
