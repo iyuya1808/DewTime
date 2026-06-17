@@ -521,6 +521,7 @@ struct CollectionView: View {
                     Capsule()
                         .fill(snapshot.progressGradient)
                         .frame(width: snapshot.progress > 0 ? max(18, width * snapshot.progress) : 0, height: 12)
+                        .animation(.spring(duration: 0.6, bounce: 0.2), value: snapshot.progress)
 
                     ForEach(GrowthStage.allCases) { stage in
                         let isReached = stage.thresholdProgress <= snapshot.progress
@@ -537,6 +538,7 @@ struct CollectionView: View {
                                     .strokeBorder(snapshot.accentColor.opacity(isReached ? 0 : 0.26), lineWidth: 0.8)
                             }
                             .position(x: max(7, min(width - 7, width * stage.thresholdProgress)), y: 6)
+                            .animation(.spring(duration: 0.4), value: isReached)
                     }
                 }
             }
