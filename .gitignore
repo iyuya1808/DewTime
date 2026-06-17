@@ -47,3 +47,6 @@ fastlane/test_output
 
 # Xcode Build Server (contains local absolute paths)
 buildServer.json
+
+# graphify
+graphify-out/

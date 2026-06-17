@@ -23,6 +23,15 @@ enum GrowthStage: String, CaseIterable, Identifiable {
         }
     }
 
+    var displayNameHiragana: String {
+        switch self {
+        case .egg: return "たまご"
+        case .fry: return "ちぎょ"
+        case .juvenile: return "ようぎょ"
+        case .adult: return "せいぎょ"
+        }
+    }
+
     var message: String {
         switch self {
         case .egg: return "卵を水槽に入れました"

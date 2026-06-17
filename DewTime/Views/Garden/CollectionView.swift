@@ -459,7 +459,7 @@ struct CollectionView: View {
                                 Image(systemName: "drop.fill")
                                     .font(.system(size: 8))
                                     .foregroundStyle(.cyan)
-                                Text(species.requiredWaterPercentText)
+                                Text("水 \(species.requiredWaterPercentText)")
                                     .font(.system(size: 10, weight: .bold, design: .rounded))
                                     .foregroundStyle(.secondary)
                             }
@@ -791,6 +791,10 @@ private struct SpeciesDetailSheet: View {
                                     .scaleEffect(1.15)
                             }
                         }
+                        
+                        Text(stage.displayNameHiragana)
+                            .font(.system(size: 9, weight: isCurrent ? .bold : .medium))
+                            .foregroundStyle(isCurrent ? snapshot.accentColor : Color.secondary)
                     }
                     
                     if index < GrowthStage.allCases.count - 1 {
@@ -842,6 +846,9 @@ private struct SpeciesDetailSheet: View {
                             .font(.title3)
                             .foregroundStyle(.cyan)
                     }
+                    Text("ひつような水")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.secondary)
                     Text(species.requiredWaterPercentText)
                         .font(.system(.title3, design: .rounded).bold())
                         .foregroundStyle(.cyan)
@@ -859,6 +866,9 @@ private struct SpeciesDetailSheet: View {
                             .font(.title3)
                             .foregroundStyle(.orange)
                     }
+                    Text("むずかしさ")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.secondary)
                     difficultyStarsDetail(for: species)
                 }
                 .frame(maxWidth: .infinity)

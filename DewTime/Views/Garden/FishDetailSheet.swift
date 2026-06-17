@@ -76,6 +76,10 @@ struct FishDetailSheet: View {
                                 .foregroundStyle(i < waterDropCount ? fishColor : Color(.tertiaryLabel))
                         }
                     }
+                    
+                    Text("朝のゆとり")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 18)
@@ -89,6 +93,10 @@ struct FishDetailSheet: View {
                     
                     Image(systemName: "clock")
                         .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    
+                    Text("しゅっぱつ")
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity)
