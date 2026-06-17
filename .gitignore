@@ -54,3 +54,6 @@ graphify-out/
 # Claude/Gemini assistant config
 .claude/
 
+# VS Code workspace settings
+.vscode/
+
