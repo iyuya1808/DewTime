@@ -120,7 +120,7 @@ struct ProfileView: View {
             HStack(spacing: 8) {
                 headerMetric(icon: "drop.fill", value: Aquarium.sizeName(for: aquarium?.sizeTier ?? 0), label: "水槽", tint: .teal)
                 headerMetric(icon: "book.fill", value: "\(dexCount)/\(totalSpecies)", label: "図鑑", tint: .purple)
-                headerMetric(icon: "drop.circle.fill", value: "\(Int((aquarium?.totalWaterCollected ?? 0).rounded()))", label: "累計pt", tint: .cyan)
+                headerMetric(icon: "drop.circle.fill", value: "\(aquarium?.totalDepartures ?? 0)", label: "累計しずく", tint: .cyan)
             }
         }
         .padding(16)
@@ -162,7 +162,7 @@ struct ProfileView: View {
     }
 
     private var statsInsights: some View {
-        let best = filteredRecords.max { $0.waterAmount < $1.waterAmount }
+        let best = filteredRecords.max { $0.departuresAfter < $1.departuresAfter }
 
         return VStack(spacing: 10) {
             HStack {
@@ -181,10 +181,10 @@ struct ProfileView: View {
                     HStack(spacing: 10) {
                         recordSymbol(for: best, size: 22).frame(width: 28)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("いちばん水を残した日")
+                            Text("しずく最多の日")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Text("\(best.recordedAt.formatted(.dateTime.month().day())) / +\(Int(best.waterAmount.rounded()))pt")
+                            Text("\(best.recordedAt.formatted(.dateTime.month().day())) / \(best.departuresAfter)💧")
                                 .font(.subheadline.weight(.semibold))
                                 .monospacedDigit()
                         }
@@ -298,7 +298,7 @@ struct ProfileView: View {
                     recordSymbol(for: record, size: 24).frame(height: 28)
 
                     HStack(spacing: 2) {
-                        Text("+\(Int(record.waterAmount.rounded()))")
+                        Text("+\(record.departuresAfter)💧")
                             .font(.system(size: 10, weight: .bold, design: .rounded))
                             .monospacedDigit()
                         if day.recordCount > 1 {
@@ -365,7 +365,7 @@ struct ProfileView: View {
                                 recordSymbol(for: record, size: 28)
                                 Text(record.recordedAt, format: .dateTime.month().day())
                                     .font(.caption2.weight(.semibold))
-                                Text("+\(Int(record.waterAmount.rounded()))pt")
+                                Text("+\(record.departuresAfter)💧")
                                     .font(.caption2.bold())
                                     .monospacedDigit()
                                     .foregroundStyle(.secondary)
@@ -525,7 +525,7 @@ struct ProfileView: View {
                 date: date,
                 title: date.formatted(.dateTime.year().month()),
                 count: monthRecords.count,
-                water: monthRecords.reduce(0) { $0 + $1.waterAmount },
+                water: Double(monthRecords.filter { $0.departuresAfter > 0 }.count),
                 adults: monthRecords.filter(\.completedGrowth).count
             )
         }

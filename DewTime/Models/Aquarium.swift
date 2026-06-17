@@ -3,44 +3,37 @@ import Observation
 
 /// 水槽成長の土台モデル。
 ///
-/// 出発のたびに、その朝水槽に注いだ水量を `totalWaterCollected` に累積する。
-/// 累積量が増えるほど水槽サイズ（`sizeTier`）が大きくなり、より大きな魚を飼える――
-/// というゲーム要素の基盤となる。サイズ拡大の視覚化や大型魚の解放ロジックは次フェーズ。
-///
-/// アプリ内で 1 レコードのみ存在する想定（初回の出発時に lazy 生成）。
+/// オンタイム出発のたびに `totalDepartures` が増え、
+/// 累積数が増えるほど水槽サイズ（`sizeTier`）が大きくなり、より大きな魚を飼える。
 @Observable
 final class Aquarium: Identifiable {
     var id: UUID
-    /// 累積で水槽に注がれた水（永続成長メトリック）。
-    var totalWaterCollected: Double
+    var totalDepartures: Int
     var createdAt: Date
     var updatedAt: Date
 
     init(
         id: UUID = UUID(),
-        totalWaterCollected: Double = 0,
+        totalDepartures: Int = 0,
         createdAt: Date = .now,
         updatedAt: Date = .now
     ) {
         self.id = id
-        self.totalWaterCollected = totalWaterCollected
+        self.totalDepartures = totalDepartures
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
 
-    /// 累積水量のしきい値（暫定）。次フェーズでバランス調整する。
-    static let tierThresholds: [Double] = [0, 500, 1500, 3000, 5000, 8000, 12000]
+    static let tierThresholds: [Int] = [0, 10, 30, 60, 100, 150, 200]
 
-    /// 現在の水槽サイズ段階（0 始まり）。
     var sizeTier: Int {
         var tier = 0
-        for (index, threshold) in Self.tierThresholds.enumerated() where totalWaterCollected >= threshold {
+        for (index, threshold) in Self.tierThresholds.enumerated() where totalDepartures >= threshold {
             tier = index
         }
         return tier
     }
 
-    /// 水槽サイズ段階の表示名（暫定）。
     var sizeName: String {
         Self.sizeName(for: sizeTier)
     }
@@ -55,10 +48,5 @@ final class Aquarium: Identifiable {
         case 5: return "アクアリウム"
         default: return "大水族館"
         }
-    }
-
-    /// サイズ段階に応じた容量（暫定）。次フェーズの視覚化・解放条件で使う。
-    var capacity: Double {
-        Double(sizeTier + 1) * 500
     }
 }

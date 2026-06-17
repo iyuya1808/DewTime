@@ -111,8 +111,7 @@ struct CloudActiveFish: Codable, Equatable, Identifiable {
     var name: String
     var startedAt: Date
     var lastWateredAt: Date?
-    var requiredTotalWater: Double
-    var receivedWater: Double
+    var departures: Int
     var isCompleted: Bool
     var createdAt: Date
     var updatedAt: Date
@@ -124,8 +123,7 @@ struct CloudActiveFish: Codable, Equatable, Identifiable {
         case name
         case startedAt = "started_at"
         case lastWateredAt = "last_watered_at"
-        case requiredTotalWater = "required_total_water"
-        case receivedWater = "received_water"
+        case departures
         case isCompleted = "is_completed"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
@@ -161,9 +159,8 @@ struct CloudCareRecord: Codable, Equatable, Identifiable {
     var userId: UUID
     var speciesId: String
     var recordedAt: Date
-    var waterAmount: Double
-    var totalWaterAfter: Double
-    var requiredTotalWater: Double
+    var departuresAfter: Int
+    var earnedDrop: Bool
     var growthStageRawValue: String
     var completedGrowth: Bool
     var createdAt: Date
@@ -174,9 +171,8 @@ struct CloudCareRecord: Codable, Equatable, Identifiable {
         case userId = "user_id"
         case speciesId = "species_id"
         case recordedAt = "recorded_at"
-        case waterAmount = "water_amount"
-        case totalWaterAfter = "total_water_after"
-        case requiredTotalWater = "required_total_water"
+        case departuresAfter = "departures_after"
+        case earnedDrop = "earned_drop"
         case growthStageRawValue = "growth_stage_raw_value"
         case completedGrowth = "completed_growth"
         case createdAt = "created_at"
@@ -187,14 +183,14 @@ struct CloudCareRecord: Codable, Equatable, Identifiable {
 struct CloudAquarium: Codable, Equatable, Identifiable {
     var id: UUID
     var userId: UUID
-    var totalWaterCollected: Double
+    var totalDepartures: Int
     var createdAt: Date
     var updatedAt: Date
 
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"
-        case totalWaterCollected = "total_water_collected"
+        case totalDepartures = "total_departures"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }

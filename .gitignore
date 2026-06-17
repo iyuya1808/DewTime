@@ -50,3 +50,7 @@ buildServer.json
 
 # graphify
 graphify-out/
+
+# Claude/Gemini assistant config
+.claude/
+

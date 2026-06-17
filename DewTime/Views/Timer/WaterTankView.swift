@@ -9,6 +9,7 @@ struct WaterTankView: View {
     var showBorder: Bool = true
     var startDate: Date? = nil
     var targetDate: Date? = nil
+    var initialWaterLevel: Double = 1.0  // タイマー開始時の水位
     var isDraggable: Bool = false
     var onLevelChanged: ((Double) -> Void)? = nil
 
@@ -47,12 +48,10 @@ struct WaterTankView: View {
                         let now = timeline.date
                         if now >= targetDate {
                             level = 0.0
-                        } else if now <= startDate {
-                            level = 1.0
                         } else {
                             let total = targetDate.timeIntervalSince(startDate)
                             let remaining = targetDate.timeIntervalSince(now)
-                            level = min(1.0, max(0.0, remaining / total))
+                            level = min(initialWaterLevel, max(0.0, remaining / total * initialWaterLevel))
                         }
                     } else {
                         level = max(0, min(1, waterLevel))

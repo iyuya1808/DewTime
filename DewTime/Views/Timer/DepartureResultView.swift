@@ -7,9 +7,9 @@ struct DepartureResultView: View {
     let delaySeconds: Int
     let scheduleName: String
     let selectedSpecies: FishSpecies
-    let waterAmount: Double
-    let totalWaterAfter: Double
-    let requiredTotalWater: Double
+    let earnedDrop: Bool
+    let departuresAfter: Int
+    let requiredDepartures: Int
     let growthStage: GrowthStage
     let completedGrowth: Bool
     let onDismiss: () -> Void
@@ -28,7 +28,10 @@ struct DepartureResultView: View {
                         // ヘッダー：成長アイコン群（テキストなし）
                         HStack(spacing: 20) {
                             ForEach(GrowthStage.allCases, id: \.self) { stage in
-                                let reached = stage.thresholdProgress <= (totalWaterAfter / max(1, requiredTotalWater))
+                                let progress = requiredDepartures > 0
+                                    ? Double(departuresAfter) / Double(requiredDepartures)
+                                    : 0
+                                let reached = stage.thresholdProgress <= progress
                                 Image(systemName: stage.icon)
                                     .font(.title2)
                                     .foregroundStyle(reached ? fishColor : .white.opacity(0.20))
@@ -37,7 +40,7 @@ struct DepartureResultView: View {
                         }
                         .padding(.top, 24)
 
-                        // 注水演出
+                        // 注水演出（ビジュアルとして維持）
                         PourTransitionView(waterLevel: waterLevel, species: selectedSpecies)
                             .frame(height: 232)
 
@@ -74,6 +77,9 @@ struct DepartureResultView: View {
                             .frame(height: 14)
                         }
                         .padding(.horizontal, 4)
+
+                        // しずく進捗
+                        dropProgressRow
 
                         // 統計（アイコン + 数字のみ）
                         statsGrid
@@ -115,6 +121,33 @@ struct DepartureResultView: View {
     }
 
     // MARK: - Sub views
+
+    private var dropProgressRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: earnedDrop ? "drop.fill" : "drop")
+                .font(.title3)
+                .foregroundStyle(earnedDrop ? fishColor : .white.opacity(0.35))
+
+            HStack(spacing: 4) {
+                ForEach(0..<max(1, requiredDepartures), id: \.self) { index in
+                    Image(systemName: index < departuresAfter ? "drop.fill" : "drop")
+                        .font(.system(size: 12))
+                        .foregroundStyle(index < departuresAfter ? fishColor : .white.opacity(0.22))
+                }
+            }
+
+            Spacer()
+
+            Text("\(departuresAfter)/\(requiredDepartures)")
+                .font(AppFont.badgeValue)
+                .monospacedDigit()
+                .foregroundStyle(fishColor)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .accessibilityLabel("\(departuresAfter)/\(requiredDepartures)しずく")
+    }
 
     private var statsGrid: some View {
         HStack(spacing: 12) {
@@ -177,9 +210,9 @@ struct DepartureResultView: View {
                 delaySeconds: 0,
                 scheduleName: "平日通常モード",
                 selectedSpecies: .dolphin,
-                waterAmount: 72,
-                totalWaterAfter: 240,
-                requiredTotalWater: 240,
+                earnedDrop: true,
+                departuresAfter: 5,
+                requiredDepartures: 5,
                 growthStage: .adult,
                 completedGrowth: true,
                 onDismiss: {}

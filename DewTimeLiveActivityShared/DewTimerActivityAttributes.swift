@@ -17,9 +17,9 @@ struct DewTimerActivityAttributes: ActivityAttributes {
         var fishEmoji: String
         var growthStageName: String
         var growthStageIconName: String
-        var receivedWater: Double
-        var requiredWater: Double
-        var projectedWater: Double
+        var currentDepartures: Int
+        var requiredDepartures: Int
+        var projectedDepartures: Int
         var waterLevel: Double
         var status: TimerStatus
         var phaseIndex: Int
@@ -30,8 +30,8 @@ struct DewTimerActivityAttributes: ActivityAttributes {
         }
 
         var growthProgress: Double {
-            guard requiredWater > 0 else { return 0 }
-            return max(0, min(1, projectedWater / requiredWater))
+            guard requiredDepartures > 0 else { return 0 }
+            return max(0, min(1, Double(projectedDepartures) / Double(requiredDepartures)))
         }
     }
 

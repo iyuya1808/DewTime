@@ -231,8 +231,7 @@ final class AppDataStore {
 
         let fish = ActiveFish(
             speciesId: species.rawValue,
-            name: species.displayName,
-            requiredTotalWater: species.makeRequiredTotalWater()
+            name: species.displayName
         )
         activeFishes.append(fish)
         return fish
@@ -280,14 +279,14 @@ final class AppDataStore {
     func recordDeparture(
         species: FishSpecies,
         fish: ActiveFish,
-        waterAmount: Double,
-        totalWaterAfter: Double,
+        earnedDrop: Bool,
+        departuresAfter: Int,
         growthStage: GrowthStage,
         completedGrowth: Bool,
         waterRatio: Double,
         succeeded: Bool
     ) async {
-        fish.receivedWater = totalWaterAfter
+        fish.departures = departuresAfter
         fish.lastWateredAt = .now
         fish.isCompleted = completedGrowth
 
@@ -295,16 +294,15 @@ final class AppDataStore {
             FishCareRecord(
                 speciesId: species.rawValue,
                 recordedAt: .now,
-                waterAmount: waterAmount,
-                totalWaterAfter: totalWaterAfter,
-                requiredTotalWater: fish.requiredTotalWater,
+                departuresAfter: departuresAfter,
+                earnedDrop: earnedDrop,
                 growthStage: growthStage,
                 completedGrowth: completedGrowth
             )
         )
 
         let aquarium = aquarium()
-        aquarium.totalWaterCollected += waterAmount
+        if earnedDrop { aquarium.totalDepartures += 1 }
         aquarium.updatedAt = .now
 
         if completedGrowth {
@@ -359,8 +357,7 @@ final class AppDataStore {
                     name: fish.name,
                     startedAt: fish.startedAt,
                     lastWateredAt: fish.lastWateredAt,
-                    requiredTotalWater: fish.requiredTotalWater,
-                    receivedWater: fish.receivedWater,
+                    departures: fish.departures,
                     isCompleted: fish.isCompleted,
                     createdAt: fish.startedAt,
                     updatedAt: fish.lastWateredAt ?? now
@@ -385,9 +382,8 @@ final class AppDataStore {
                     userId: userId,
                     speciesId: record.speciesId,
                     recordedAt: record.recordedAt,
-                    waterAmount: record.waterAmount,
-                    totalWaterAfter: record.totalWaterAfter,
-                    requiredTotalWater: record.requiredTotalWater,
+                    departuresAfter: record.departuresAfter,
+                    earnedDrop: record.earnedDrop,
                     growthStageRawValue: record.growthStageRawValue,
                     completedGrowth: record.completedGrowth,
                     createdAt: record.recordedAt,
@@ -398,7 +394,7 @@ final class AppDataStore {
                 CloudAquarium(
                     id: aquarium.id,
                     userId: userId,
-                    totalWaterCollected: aquarium.totalWaterCollected,
+                    totalDepartures: aquarium.totalDepartures,
                     createdAt: aquarium.createdAt,
                     updatedAt: aquarium.updatedAt
                 )
@@ -451,8 +447,7 @@ final class AppDataStore {
                 name: row.name,
                 startedAt: row.startedAt,
                 lastWateredAt: row.lastWateredAt,
-                requiredTotalWater: row.requiredTotalWater,
-                receivedWater: row.receivedWater,
+                departures: row.departures,
                 isCompleted: row.isCompleted
             )
         }.sorted { $0.startedAt > $1.startedAt }
@@ -473,9 +468,8 @@ final class AppDataStore {
                 id: row.id,
                 speciesId: row.speciesId,
                 recordedAt: row.recordedAt,
-                waterAmount: row.waterAmount,
-                totalWaterAfter: row.totalWaterAfter,
-                requiredTotalWater: row.requiredTotalWater,
+                departuresAfter: row.departuresAfter,
+                earnedDrop: row.earnedDrop,
                 growthStage: GrowthStage(rawValue: row.growthStageRawValue) ?? .egg,
                 completedGrowth: row.completedGrowth
             )
@@ -484,7 +478,7 @@ final class AppDataStore {
         aquariums = snapshot.aquariums.map { row in
             Aquarium(
                 id: row.id,
-                totalWaterCollected: row.totalWaterCollected,
+                totalDepartures: row.totalDepartures,
                 createdAt: row.createdAt,
                 updatedAt: row.updatedAt
             )
@@ -683,8 +677,7 @@ final class AppDataStore {
             "speciesId": activeFish.speciesId,
             "name": activeFish.name,
             "startedAt": activeFish.startedAt,
-            "requiredTotalWater": activeFish.requiredTotalWater,
-            "receivedWater": activeFish.receivedWater,
+            "departures": activeFish.departures,
             "isCompleted": activeFish.isCompleted
         ]
         if let lastWateredAt = activeFish.lastWateredAt {
@@ -709,9 +702,8 @@ final class AppDataStore {
             "id": careRecord.id.uuidString,
             "speciesId": careRecord.speciesId,
             "recordedAt": careRecord.recordedAt,
-            "waterAmount": careRecord.waterAmount,
-            "totalWaterAfter": careRecord.totalWaterAfter,
-            "requiredTotalWater": careRecord.requiredTotalWater,
+            "departuresAfter": careRecord.departuresAfter,
+            "earnedDrop": careRecord.earnedDrop,
             "growthStageRawValue": careRecord.growthStageRawValue,
             "completedGrowth": careRecord.completedGrowth
         ]
@@ -720,7 +712,7 @@ final class AppDataStore {
     private func encode(aquarium: Aquarium) -> [String: Any] {
         [
             "id": aquarium.id.uuidString,
-            "totalWaterCollected": aquarium.totalWaterCollected,
+            "totalDepartures": aquarium.totalDepartures,
             "createdAt": aquarium.createdAt,
             "updatedAt": aquarium.updatedAt
         ]
@@ -769,8 +761,7 @@ final class AppDataStore {
             name: string(data["name"], default: FishSpecies.medaka.displayName),
             startedAt: try date(data["startedAt"], label: "activeFish.startedAt"),
             lastWateredAt: optionalDate(data["lastWateredAt"]),
-            requiredTotalWater: double(data["requiredTotalWater"], default: 1),
-            receivedWater: double(data["receivedWater"], default: 0),
+            departures: int(data["departures"], default: 0),
             isCompleted: bool(data["isCompleted"], default: false)
         )
     }
@@ -791,9 +782,8 @@ final class AppDataStore {
             id: try uuid(id, label: "careRecord.id"),
             speciesId: string(data["speciesId"], default: FishSpecies.medaka.rawValue),
             recordedAt: try date(data["recordedAt"], label: "careRecord.recordedAt"),
-            waterAmount: double(data["waterAmount"], default: 0),
-            totalWaterAfter: double(data["totalWaterAfter"], default: 0),
-            requiredTotalWater: double(data["requiredTotalWater"], default: 1),
+            departuresAfter: int(data["departuresAfter"], default: 0),
+            earnedDrop: bool(data["earnedDrop"], default: true),
             growthStage: GrowthStage(rawValue: string(data["growthStageRawValue"], default: GrowthStage.egg.rawValue)) ?? .egg,
             completedGrowth: bool(data["completedGrowth"], default: false)
         )
@@ -802,7 +792,7 @@ final class AppDataStore {
     private func decodeAquarium(id: String, data: [String: Any]) throws -> Aquarium {
         Aquarium(
             id: try uuid(id, label: "aquarium.id"),
-            totalWaterCollected: double(data["totalWaterCollected"], default: 0),
+            totalDepartures: int(data["totalDepartures"], default: 0),
             createdAt: try date(data["createdAt"], label: "aquarium.createdAt"),
             updatedAt: try date(data["updatedAt"], label: "aquarium.updatedAt")
         )

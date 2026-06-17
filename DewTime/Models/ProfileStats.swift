@@ -46,7 +46,7 @@ struct ProfileStats {
 
     init(records: [FishCareRecord], calendar: Calendar = .current) {
         wateringCount = records.count
-        totalWater = records.reduce(0) { $0 + $1.waterAmount }
+        totalWater = Double(records.filter(\.completedGrowth).count)
         adultCount = records.filter(\.completedGrowth).count
         averageProgress = records.isEmpty
             ? 0
@@ -144,7 +144,7 @@ enum Achievement: String, CaseIterable, Identifiable {
     func progress(in store: AppDataStore) -> (current: Int, target: Int) {
         let dexCount = Set(store.collectedFishes.map(\.speciesId)).count
         let streak = ProfileStats.longestStreak(in: store.careRecords)
-        let cumulativeWater = Int(store.aquariums.first?.totalWaterCollected ?? 0)
+        let cumulativeWater = store.aquariums.first?.totalDepartures ?? 0
         let tier = store.aquariums.first?.sizeTier ?? 0
         let adults = store.collectedFishes.count
 

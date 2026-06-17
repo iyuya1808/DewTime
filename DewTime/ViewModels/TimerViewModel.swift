@@ -9,14 +9,14 @@ final class TimerViewModel {
     private(set) var startedAt: Date?
     private(set) var now: Date = .now
     private(set) var departed: Bool = false
+    private(set) var initialWaterLevel: Double = 1.0
     private(set) var finalWaterLevel: Double = 1.0
     private(set) var finalDelaySeconds: Int = 0
     private(set) var saveError: String?
     private(set) var selectedSpecies: FishSpecies
     private(set) var activeFish: ActiveFish?
-    private(set) var finalWaterAmount: Double = 0
-    private(set) var finalTotalWaterAfter: Double = 0
-    private(set) var finalRequiredTotalWater: Double = 1
+    private(set) var finalEarnedDrop: Bool = false
+    private(set) var finalDeparturesAfter: Int = 0
     private(set) var finalGrowthStage: GrowthStage = .egg
     private(set) var finalCompletedGrowth: Bool = false
 
@@ -54,7 +54,7 @@ final class TimerViewModel {
         let total = schedule.targetDepartureTime.timeIntervalSince(startedAt)
         guard total > 0 else { return 0.0 }
         let remaining = schedule.targetDepartureTime.timeIntervalSince(now)
-        return min(1.0, max(0.0, remaining / total))
+        return min(initialWaterLevel, max(0.0, remaining / total * initialWaterLevel))
     }
 
     var isRunning: Bool { startedAt != nil && !departed }
@@ -103,37 +103,33 @@ final class TimerViewModel {
     }
 
     var meetsSelectedRequirement: Bool {
-        projectedTotalWater >= currentRequiredTotalWater
+        projectedDepartures >= currentRequiredDepartures
     }
 
     var growthProgress: Double {
-        currentGrowthProgress
+        let required = currentRequiredDepartures
+        guard required > 0 else { return 0 }
+        return min(1.0, max(0.0, Double(currentDepartures) / Double(required)))
     }
 
-    var currentWaterAmount: Double {
-        waterLevel * 100
+    var currentDepartures: Int {
+        activeFish?.departures ?? 0
     }
 
-    var projectedTotalWater: Double {
-        min(currentRequiredTotalWater, currentReceivedWater + currentWaterAmount)
+    var currentRequiredDepartures: Int {
+        selectedSpecies.requiredDepartures
     }
 
-    var currentReceivedWater: Double {
-        activeFish?.receivedWater ?? 0
+    var projectedDepartures: Int {
+        currentDepartures + (isOverdue ? 0 : 1)
     }
 
-    var currentRequiredTotalWater: Double {
-        activeFish?.requiredTotalWater ?? Double(selectedSpecies.requiredTotalWaterRange.upperBound)
-    }
-
-    var currentGrowthProgress: Double {
-        guard currentRequiredTotalWater > 0 else { return 0 }
-        return min(1.0, max(0.0, currentReceivedWater / currentRequiredTotalWater))
-    }
+    var currentGrowthProgress: Double { growthProgress }
 
     var projectedGrowthProgress: Double {
-        guard currentRequiredTotalWater > 0 else { return 0 }
-        return min(1.0, max(0.0, projectedTotalWater / currentRequiredTotalWater))
+        let required = currentRequiredDepartures
+        guard required > 0 else { return 0 }
+        return min(1.0, max(0.0, Double(projectedDepartures) / Double(required)))
     }
 
     var currentGrowthStage: GrowthStage {
@@ -178,8 +174,9 @@ final class TimerViewModel {
 
     // MARK: - Actions
 
-    func start() {
+    func start(initialLevel: Double = 1.0) {
         guard startedAt == nil else { return }
+        initialWaterLevel = max(0.01, min(1.0, initialLevel))
         startedAt = .now
         now = .now
         lastRoutineItemID = currentRoutineItem?.id
@@ -195,14 +192,15 @@ final class TimerViewModel {
         guard !departed else { return }
         finalWaterLevel = waterLevel
         finalDelaySeconds = overdueSeconds
-        finalWaterAmount = currentWaterAmount
+        finalEarnedDrop = !isOverdue
         let fish = activeFish ?? createActiveFish(for: selectedSpecies, in: store)
         let species = fish.species
-        let totalAfter = min(fish.requiredTotalWater, fish.receivedWater + finalWaterAmount)
-        let growthStage = GrowthStage.stage(for: totalAfter / fish.requiredTotalWater)
-        let completedGrowth = totalAfter >= fish.requiredTotalWater
-        finalTotalWaterAfter = totalAfter
-        finalRequiredTotalWater = fish.requiredTotalWater
+        let earnedDrop = finalEarnedDrop
+        let departuresAfter = fish.departures + (earnedDrop ? 1 : 0)
+        let required = species.requiredDepartures
+        let growthStage = GrowthStage.stage(for: required > 0 ? Double(departuresAfter) / Double(required) : 0)
+        let completedGrowth = departuresAfter >= required
+        finalDeparturesAfter = departuresAfter
         finalGrowthStage = growthStage
         finalCompletedGrowth = completedGrowth
 
@@ -216,12 +214,12 @@ final class TimerViewModel {
         await store.recordDeparture(
             species: species,
             fish: fish,
-            waterAmount: finalWaterAmount,
-            totalWaterAfter: totalAfter,
+            earnedDrop: earnedDrop,
+            departuresAfter: departuresAfter,
             growthStage: growthStage,
             completedGrowth: completedGrowth,
             waterRatio: finalWaterLevel,
-            succeeded: !isOverdue
+            succeeded: earnedDrop
         )
 
         if let error = store.errorMessage {
@@ -240,11 +238,11 @@ final class TimerViewModel {
         timer = nil
         startedAt = nil
         departed = false
+        initialWaterLevel = 1.0
         finalWaterLevel = 1.0
         finalDelaySeconds = 0
-        finalWaterAmount = 0
-        finalTotalWaterAfter = activeFish?.receivedWater ?? 0
-        finalRequiredTotalWater = activeFish?.requiredTotalWater ?? 1
+        finalEarnedDrop = false
+        finalDeparturesAfter = activeFish?.departures ?? 0
         finalGrowthStage = activeFish?.growthStage ?? .egg
         finalCompletedGrowth = false
         now = .now
@@ -317,8 +315,9 @@ final class TimerViewModel {
         case startedAt        = "dew.timer.startedAt"
         case departed         = "dew.timer.departed"
         case finalWaterLevel  = "dew.timer.finalWaterLevel"
-        case finalDelaySeconds = "dew.timer.finalDelaySeconds"
-        case selectedSpecies  = "dew.timer.selectedSpecies"
+        case finalDelaySeconds    = "dew.timer.finalDelaySeconds"
+        case initialWaterLevel    = "dew.timer.initialWaterLevel"
+        case selectedSpecies      = "dew.timer.selectedSpecies"
     }
 
     private func saveState() {
@@ -326,6 +325,7 @@ final class TimerViewModel {
         ud.set(schedule.id.uuidString,  forKey: PKey.scheduleId.rawValue)
         ud.set(startedAt,               forKey: PKey.startedAt.rawValue)
         ud.set(departed,                forKey: PKey.departed.rawValue)
+        ud.set(initialWaterLevel,       forKey: PKey.initialWaterLevel.rawValue)
         ud.set(finalWaterLevel,         forKey: PKey.finalWaterLevel.rawValue)
         ud.set(finalDelaySeconds,       forKey: PKey.finalDelaySeconds.rawValue)
         saveWidgetStateIfNeeded()
@@ -336,8 +336,10 @@ final class TimerViewModel {
         guard let savedId = ud.string(forKey: PKey.scheduleId.rawValue),
               savedId == schedule.id.uuidString else { return }
 
-        departed   = ud.bool(forKey: PKey.departed.rawValue)
-        startedAt  = ud.object(forKey: PKey.startedAt.rawValue) as? Date
+        departed          = ud.bool(forKey: PKey.departed.rawValue)
+        startedAt         = ud.object(forKey: PKey.startedAt.rawValue) as? Date
+        let savedInitial  = ud.double(forKey: PKey.initialWaterLevel.rawValue)
+        initialWaterLevel = savedInitial > 0 ? savedInitial : 1.0
 
         if departed {
             finalWaterLevel   = ud.double(forKey: PKey.finalWaterLevel.rawValue)
@@ -349,7 +351,7 @@ final class TimerViewModel {
     }
 
     private func clearState() {
-        [PKey.scheduleId, .startedAt, .departed, .finalWaterLevel, .finalDelaySeconds]
+        [PKey.scheduleId, .startedAt, .departed, .initialWaterLevel, .finalWaterLevel, .finalDelaySeconds]
             .forEach { UserDefaults.standard.removeObject(forKey: $0.rawValue) }
         SharedTimerWidgetState.clear()
         WidgetCenter.shared.reloadTimelines(ofKind: SharedTimerWidgetState.widgetKind)
@@ -446,9 +448,9 @@ extension TimerViewModel {
             fishEmoji: selectedSpecies.emoji,
             growthStageName: projectedGrowthStage.displayName,
             growthStageIconName: projectedGrowthStage.icon,
-            receivedWater: currentReceivedWater,
-            requiredWater: currentRequiredTotalWater,
-            projectedWater: projectedTotalWater,
+            currentDepartures: currentDepartures,
+            requiredDepartures: currentRequiredDepartures,
+            projectedDepartures: projectedDepartures,
             waterLevel: waterLevel,
             status: status,
             phaseIndex: currentPhaseIndex,

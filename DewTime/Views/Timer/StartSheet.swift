@@ -137,7 +137,7 @@ struct StartSheet: View {
                             .shadow(color: Color.dewBlue.opacity(0.55), radius: 14, y: 4)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("スタート")
+                    .accessibilityLabel("起きる")
 
                     Color.clear.frame(width: 48, height: 48)
                 }

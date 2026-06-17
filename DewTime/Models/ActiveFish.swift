@@ -8,8 +8,7 @@ final class ActiveFish: Identifiable {
     var name: String
     var startedAt: Date
     var lastWateredAt: Date?
-    var requiredTotalWater: Double
-    var receivedWater: Double
+    var departures: Int
     var isCompleted: Bool
 
     init(
@@ -18,8 +17,7 @@ final class ActiveFish: Identifiable {
         name: String,
         startedAt: Date = .now,
         lastWateredAt: Date? = nil,
-        requiredTotalWater: Double,
-        receivedWater: Double = 0,
+        departures: Int = 0,
         isCompleted: Bool = false
     ) {
         self.id = id
@@ -27,8 +25,7 @@ final class ActiveFish: Identifiable {
         self.name = name
         self.startedAt = startedAt
         self.lastWateredAt = lastWateredAt
-        self.requiredTotalWater = requiredTotalWater
-        self.receivedWater = receivedWater
+        self.departures = departures
         self.isCompleted = isCompleted
     }
 
@@ -37,8 +34,9 @@ final class ActiveFish: Identifiable {
     }
 
     var progress: Double {
-        guard requiredTotalWater > 0 else { return 0 }
-        return min(1.0, max(0.0, receivedWater / requiredTotalWater))
+        let required = species.requiredDepartures
+        guard required > 0 else { return 0 }
+        return min(1.0, max(0.0, Double(departures) / Double(required)))
     }
 
     var growthStage: GrowthStage {

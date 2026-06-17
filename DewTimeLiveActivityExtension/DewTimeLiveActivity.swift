@@ -107,8 +107,8 @@ private struct LockScreenLiveActivityView: View {
 
                 WaterMeterView(
                     waterLevel: isDeparted ? 0 : context.state.waterLevel,
-                    projectedWater: context.state.projectedWater,
-                    requiredWater: context.state.requiredWater
+                    projectedDepartures: context.state.projectedDepartures,
+                    requiredDepartures: context.state.requiredDepartures
                 )
 
                 HStack(spacing: 10) {
@@ -121,7 +121,7 @@ private struct LockScreenLiveActivityView: View {
                             .foregroundStyle(.white)
                             .lineLimit(1)
                             .minimumScaleFactor(0.78)
-                        Text("\(Int(context.state.projectedWater.rounded())) / \(Int(context.state.requiredWater.rounded())) pt")
+                        Text("\(context.state.projectedDepartures) / \(context.state.requiredDepartures) 💧")
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(.white.opacity(0.64))
                     }
@@ -205,8 +205,8 @@ private struct ExpandedTaskView: View {
 
             WaterMeterView(
                 waterLevel: isDeparted ? 0 : context.state.waterLevel,
-                projectedWater: context.state.projectedWater,
-                requiredWater: context.state.requiredWater,
+                projectedDepartures: context.state.projectedDepartures,
+                requiredDepartures: context.state.requiredDepartures,
                 isCompact: true
             )
 
@@ -284,8 +284,8 @@ private struct TankPreviewView: View {
 
 private struct WaterMeterView: View {
     var waterLevel: Double
-    var projectedWater: Double
-    var requiredWater: Double
+    var projectedDepartures: Int
+    var requiredDepartures: Int
     var isCompact: Bool = false
 
     var body: some View {
@@ -293,11 +293,11 @@ private struct WaterMeterView: View {
 
         VStack(alignment: .leading, spacing: isCompact ? 4 : 5) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("水量")
+                Text("💧")
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(.white.opacity(0.58))
                 Spacer(minLength: 8)
-                Text("\(Int(projectedWater.rounded()))/\(Int(requiredWater.rounded()))")
+                Text("\(projectedDepartures)/\(requiredDepartures)")
                     .font(.caption2.monospacedDigit().weight(.semibold))
                     .foregroundStyle(.white.opacity(0.74))
                     .lineLimit(1)

@@ -78,45 +78,23 @@ enum FishSpecies: String, CaseIterable, Identifiable {
         }
     }
 
-    var requiredTotalWaterRange: ClosedRange<Int> {
-        switch self {
-        case .medaka:     return 50...90
-        case .guppy:      return 80...130
-        case .shrimp:     return 100...160
-        case .pufferfish: return 130...190
-        case .crab:       return 150...210
-        case .turtle:     return 160...230
-        case .squid:      return 175...250
-        case .octopus:    return 190...270
-        case .lobster:    return 210...300
-        case .jellyfish:  return 230...330
-        case .seal:       return 255...370
-        case .dolphin:    return 270...390
-        case .shark:      return 290...430
-        case .whale:      return 320...460
-        case .whaleShark: return 350...500
+    /// 成魚になるために必要なしずく数（オンタイム出発の回数）。
+    var requiredDepartures: Int {
+        switch requiredWaterRatio {
+        case ..<0.25: return 1
+        case ..<0.50: return 2
+        case ..<0.70: return 3
+        case ..<0.85: return 5
+        default:      return 7
         }
     }
 
-    func makeRequiredTotalWater() -> Double {
-        Double(Int.random(in: requiredTotalWaterRange))
+    var requiredDeparturesText: String {
+        "\(requiredDepartures)しずく"
     }
 
     var requiredWaterPercentText: String {
         "\(Int((requiredWaterRatio * 100).rounded()))%"
-    }
-
-    var requiredTotalWaterRangeText: String {
-        "\(requiredTotalWaterRange.lowerBound)-\(requiredTotalWaterRange.upperBound)pt"
-    }
-
-    var averageRequiredTotalWater: Double {
-        Double(requiredTotalWaterRange.lowerBound + requiredTotalWaterRange.upperBound) / 2
-    }
-
-    func targetWaterAmount(for stage: GrowthStage, requiredTotalWater: Double? = nil) -> Double {
-        let total = requiredTotalWater ?? averageRequiredTotalWater
-        return total * stage.thresholdProgress
     }
 
     var difficultyLabel: String {

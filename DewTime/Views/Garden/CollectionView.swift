@@ -31,18 +31,18 @@ private struct SpeciesGrowthSnapshot {
         unlockedRecordCount > 0
     }
 
-    var requiredTotalWater: Double {
-        activeFish?.requiredTotalWater ?? species.averageRequiredTotalWater
+    var requiredDepartures: Int {
+        species.requiredDepartures
     }
 
-    var currentWater: Double {
-        activeFish?.receivedWater ?? 0
+    var currentDepartures: Int {
+        activeFish?.departures ?? 0
     }
 
     var progress: Double {
         if activeFish != nil {
-            guard requiredTotalWater > 0 else { return 0 }
-            return min(1.0, max(0.0, currentWater / requiredTotalWater))
+            guard requiredDepartures > 0 else { return 0 }
+            return min(1.0, max(0.0, Double(currentDepartures) / Double(requiredDepartures)))
         }
         if isUnlocked {
             return 1.0
@@ -60,12 +60,12 @@ private struct SpeciesGrowthSnapshot {
 
     var remainingWaterToNextStage: Int {
         guard let nextStage else { return 0 }
-        let remaining = species.targetWaterAmount(for: nextStage, requiredTotalWater: requiredTotalWater) - currentWater
-        return max(0, Int(ceil(remaining)))
+        let nextThreshold = Int(ceil(Double(requiredDepartures) * nextStage.thresholdProgress))
+        return max(0, nextThreshold - currentDepartures)
     }
 
     var currentStageWater: Int {
-        Int(species.targetWaterAmount(for: currentStage, requiredTotalWater: requiredTotalWater).rounded())
+        Int((Double(requiredDepartures) * currentStage.thresholdProgress).rounded())
     }
 
     var accentColor: Color {
@@ -95,21 +95,21 @@ private struct SpeciesGrowthSnapshot {
     var progressSummary: String {
         if let nextStage {
             if activeFish == nil {
-                return "\(nextStage.displayName)まで約 \(remainingWaterToNextStage)pt"
+                return "\(nextStage.displayName)まで約 \(remainingWaterToNextStage)しずく"
             }
-            return "\(nextStage.displayName)まであと \(remainingWaterToNextStage)pt"
+            return "\(nextStage.displayName)まであと \(remainingWaterToNextStage)しずく"
         }
         return activeFish == nil ? "成魚までの目安を達成" : "成魚まで育成完了"
     }
 
     var helperText: String {
-        if let activeFish {
-            return "育成中 \(Int(activeFish.receivedWater.rounded())) / \(Int(activeFish.requiredTotalWater.rounded()))pt"
+        if activeFish != nil {
+            return "育成中 \(currentDepartures) / \(requiredDepartures)しずく"
         }
         if isUnlocked {
             return "\(unlockedRecordCount)回発見 / 最高 \(Int(bestUnlockedRatio * 100))%"
         }
-        return "成魚目安 \(Int(requiredTotalWater.rounded()))pt"
+        return "成魚まで \(requiredDepartures)しずく"
     }
 
     var isVisible: Bool {
@@ -923,14 +923,14 @@ private struct SpeciesDetailSheet: View {
     }
 
     private func stageDetailText(_ stage: GrowthStage) -> String {
-        let water = Int(species.targetWaterAmount(for: stage, requiredTotalWater: snapshot.requiredTotalWater).rounded())
+        let drops = Int((Double(snapshot.requiredDepartures) * stage.thresholdProgress).rounded())
         if stage == .adult {
-            return "\(water)pt で成魚"
+            return "\(drops)しずくで成魚"
         }
         if stage == snapshot.currentStage, let nextStage = snapshot.nextStage {
-            return "\(nextStage.displayName)まであと \(snapshot.remainingWaterToNextStage)pt"
+            return "\(nextStage.displayName)まであと \(snapshot.remainingWaterToNextStage)しずく"
         }
-        return "\(water)pt が目安"
+        return "\(drops)しずくが目安"
     }
 }
 

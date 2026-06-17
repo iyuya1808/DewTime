@@ -130,7 +130,7 @@ struct MonthlyAquariumView: View {
                         .frame(height: 26)
 
                     HStack(spacing: 2) {
-                        Text("+\(Int(record.waterAmount.rounded()))")
+                        Text(record.earnedDrop ? "+1" : "–")
                             .font(.system(size: 10, weight: .bold, design: .rounded))
                             .monospacedDigit()
                         if day.recordCount > 1 {
@@ -183,7 +183,7 @@ struct MonthlyAquariumView: View {
     private var monthlySummary: some View {
         let records = recordsInDisplayedMonth
         return HStack(spacing: 8) {
-            summaryCard(icon: "drop.fill", value: "\(Int(records.reduce(0) { $0 + $1.waterAmount }.rounded()))", label: "水やり", tint: .cyan)
+            summaryCard(icon: "drop.fill", value: "\(records.filter(\.earnedDrop).count)", label: "しずく", tint: .cyan)
             summaryCard(icon: "fish.fill", value: "\(records.count)", label: "記録", tint: .teal)
             summaryCard(icon: "sparkles", value: "\(records.filter(\.completedGrowth).count)", label: "成魚", tint: .orange)
         }
@@ -191,7 +191,7 @@ struct MonthlyAquariumView: View {
 
     private var monthInsights: some View {
         let records = recordsInDisplayedMonth
-        let best = records.max { $0.waterAmount < $1.waterAmount }
+        let best = records.max { $0.departuresAfter < $1.departuresAfter }
         let streak = longestStreak(in: records)
 
         return VStack(spacing: 10) {
@@ -214,10 +214,10 @@ struct MonthlyAquariumView: View {
                         recordSymbol(for: best, size: 22)
                             .frame(width: 28)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("今月いちばん水を残した日")
+                            Text("今月しずくを多く獲得した日")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Text("\(best.recordedAt.formatted(.dateTime.month().day())) / +\(Int(best.waterAmount.rounded()))pt")
+                            Text("\(best.recordedAt.formatted(.dateTime.month().day())) / \(best.departuresAfter)しずく")
                                 .font(.subheadline.weight(.semibold))
                                 .monospacedDigit()
                         }
@@ -252,7 +252,7 @@ struct MonthlyAquariumView: View {
                                 recordSymbol(for: record, size: 28)
                                 Text(record.recordedAt, format: .dateTime.day())
                                     .font(.caption2.weight(.semibold))
-                                Text("+\(Int(record.waterAmount.rounded()))pt")
+                                Text(record.earnedDrop ? "+1しずく" : "–")
                                     .font(.caption2.bold())
                                     .monospacedDigit()
                                     .foregroundStyle(.secondary)

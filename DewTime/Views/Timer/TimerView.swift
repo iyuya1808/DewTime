@@ -11,10 +11,12 @@ struct TimerView: View {
     @State private var showConfirm = false
     @State private var showResult = false
     @State private var showCancelConfirm = false
-    @State private var showStartSheet = false
     @State private var showFishPicker = false
     @State private var showFishNameEditor = false
     @State private var fishNameDraft = ""
+    @State private var draftLevel: Double = 1.0
+
+    private var draftMinutes: Int { max(5, Int((draftLevel * 30).rounded())) }
 
     var body: some View {
         ZStack {
@@ -89,10 +91,9 @@ struct TimerView: View {
                     waterLevel: vm.waterLevel,
                     isOnTime: !vm.isOverdue,
                     selectedSpecies: vm.selectedSpecies,
-                    waterAmount: vm.currentWaterAmount,
-                    totalWaterBefore: vm.currentReceivedWater,
-                    totalWaterAfter: vm.projectedTotalWater,
-                    requiredTotalWater: vm.currentRequiredTotalWater,
+                    departuresBefore: vm.currentDepartures,
+                    departuresAfter: vm.projectedDepartures,
+                    requiredDepartures: vm.currentRequiredDepartures,
                     growthStage: vm.projectedGrowthStage,
                     completesGrowth: vm.meetsSelectedRequirement,
                     onConfirm: {
@@ -111,32 +112,6 @@ struct TimerView: View {
                 .presentationDragIndicator(.visible)
             }
         }
-        .sheet(isPresented: $showStartSheet) {
-            if let vm = viewModel {
-                StartSheet(
-                    scheduleName: vm.schedule.name,
-                    currentTime: DepartureTimeDefaults.fifteenMinutesFromNow(),
-                    selectedSpecies: vm.selectedSpecies,
-                    aquariumTier: currentAquariumTier,
-                    onSelectSpecies: { species in
-                        Task { await vm.selectSpecies(species, store: store) }
-                    },
-                    onStart: { newTime in
-                        vm.updateDepartureTime(newTime)
-                        Task {
-                            await store.saveAll()
-                            vm.start()
-                            showStartSheet = false
-                        }
-                    },
-                    onCancel: { showStartSheet = false }
-                )
-                .presentationDetents([.fraction(0.88), .large])
-                .presentationBackground(.clear)
-                .presentationDragIndicator(.hidden)
-                .presentationCornerRadius(32)
-            }
-        }
         .sheet(isPresented: $showResult, onDismiss: {
             ReviewRequestManager.shared.tryRequest(for: .departureResult) { requestReview() }
         }) {
@@ -148,9 +123,9 @@ struct TimerView: View {
                     delaySeconds: vm.finalDelaySeconds,
                     scheduleName: vm.schedule.name,
                     selectedSpecies: vm.selectedSpecies,
-                    waterAmount: vm.finalWaterAmount,
-                    totalWaterAfter: vm.finalTotalWaterAfter,
-                    requiredTotalWater: vm.finalRequiredTotalWater,
+                    earnedDrop: vm.finalEarnedDrop,
+                    departuresAfter: vm.finalDeparturesAfter,
+                    requiredDepartures: vm.currentRequiredDepartures,
                     growthStage: vm.finalGrowthStage,
                     completedGrowth: vm.finalCompletedGrowth,
                     onDismiss: {
@@ -187,38 +162,100 @@ struct TimerView: View {
 
     @ViewBuilder
     private func mainContent(vm: TimerViewModel) -> some View {
+        let isIdle = vm.startedAt == nil && !vm.departed
+        let displayLevel = isIdle ? draftLevel : vm.waterLevel
         ZStack {
             WaterTankView(
-                waterLevel: vm.waterLevel,
+                waterLevel: displayLevel,
                 isOverdue: vm.isOverdue,
                 cornerRadius: 0,
                 showBorder: false,
                 startDate: vm.isRunning ? vm.startedAt : nil,
-                targetDate: vm.isRunning ? vm.schedule.targetDepartureTime : nil
+                targetDate: vm.isRunning ? vm.schedule.targetDepartureTime : nil,
+                initialWaterLevel: vm.isRunning ? vm.initialWaterLevel : 1.0,
+                isDraggable: isIdle,
+                onLevelChanged: isIdle ? { newLevel in draftLevel = newLevel } : nil
             )
             .ignoresSafeArea()
+
+            if !vm.departed {
+                TimerFishOverlay(
+                    species: vm.selectedSpecies,
+                    waterLevel: displayLevel
+                )
+                .ignoresSafeArea()
+            }
 
             VStack(spacing: 0) {
                 Spacer(minLength: 72)
 
-                centerInfoDisplay(vm: vm)
+                centerInfoDisplay(vm: vm, isIdle: isIdle)
 
                 Spacer()
 
-                actionButton(vm: vm)
-                    .padding(.horizontal, 28)
-                    .padding(.bottom, 28)
+                // スタート済みなら出発ボタン、アイドルなら水滴ボタン
+                if isIdle {
+                    HStack(spacing: 16) {
+                        // 前の魚
+                        Button {
+                            let allSpecies = FishSpecies.allCases
+                            if let currentIndex = allSpecies.firstIndex(of: vm.selectedSpecies) {
+                                let previousIndex = currentIndex == 0 ? allSpecies.count - 1 : currentIndex - 1
+                                Task { await vm.selectSpecies(allSpecies[previousIndex], store: store) }
+                            }
+                        } label: {
+                            Image(systemName: "chevron.left.circle.fill")
+                                .font(.system(size: 56))
+                                .foregroundStyle(Color.dewBlue)
+                        }
+                        .buttonStyle(.plain)
+
+                        Spacer()
+
+                        // スタートボタン
+                        SluiceGateStartButton {
+                            let departureDate = Date.now.addingTimeInterval(TimeInterval(draftMinutes * 60))
+                            vm.updateDepartureTime(departureDate)
+                            vm.start(initialLevel: draftLevel)
+                            Task { await store.saveAll() }
+                        }
+
+                        Spacer()
+
+                        // 次の魚
+                        Button {
+                            let allSpecies = FishSpecies.allCases
+                            if let currentIndex = allSpecies.firstIndex(of: vm.selectedSpecies) {
+                                let nextIndex = (currentIndex + 1) % allSpecies.count
+                                Task { await vm.selectSpecies(allSpecies[nextIndex], store: store) }
+                            }
+                        } label: {
+                            Image(systemName: "chevron.right.circle.fill")
+                                .font(.system(size: 56))
+                                .foregroundStyle(Color.dewBlue)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 24)
+                    .transition(.opacity)
+                } else if !vm.departed {
+                    departureBottomButton(vm: vm)
+                        .padding(.bottom, 24)
+                        .transition(.opacity)
+                }
             }
             .foregroundStyle(.white)
+            .animation(.easeInOut(duration: 0.3), value: isIdle)
         }
     }
 
     // MARK: - Sub views
 
-    /// 未スタート時: 出発時刻を編集できる目立つカード
+    /// 未スタート時: 出発時刻を編集できる目立つカード（未使用）
     private func departureCard(vm: TimerViewModel) -> some View {
         Button {
-            showStartSheet = true
+            // no-op: StartSheet廃止のため
         } label: {
             VStack(spacing: 12) {
                 HStack(alignment: .center) {
@@ -295,10 +332,10 @@ struct TimerView: View {
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 3) {
-                    Text("育成水量")
+                    Text("しずく")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.52))
-                    Text("\(Int(vm.currentReceivedWater.rounded()))/\(Int(vm.currentRequiredTotalWater.rounded()))pt")
+                    Text("\(vm.currentDepartures)/\(vm.currentRequiredDepartures)")
                         .font(.subheadline.weight(.bold))
                         .monospacedDigit()
                         .foregroundStyle(.white)
@@ -341,7 +378,7 @@ struct TimerView: View {
             HStack {
                 Label(vm.currentGrowthStage.displayName, systemImage: vm.currentGrowthStage.icon)
                 Spacer()
-                Text(vm.meetsSelectedRequirement ? "今回で成魚に" : "今回 +\(Int(vm.currentWaterAmount.rounded()))pt")
+                Text(vm.meetsSelectedRequirement ? "今回で成魚に" : (vm.isOverdue ? "しずく +0" : "しずく +1"))
                     .monospacedDigit()
             }
             .font(.caption.weight(.semibold))
@@ -376,30 +413,55 @@ struct TimerView: View {
     }
 
     @ViewBuilder
-    private func centerInfoDisplay(vm: TimerViewModel) -> some View {
-        VStack(spacing: 0) {
+    private func centerInfoDisplay(vm: TimerViewModel, isIdle: Bool = false) -> some View {
+        ZStack {
             if vm.departed {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 64))
                     .foregroundStyle(.white.opacity(0.85))
-                    .padding(.bottom, 20)
-            } else {
-                // 状態アイコン（文字なし）
-                Image(systemName: vm.isOverdue ? "exclamationmark.triangle.fill" : "figure.walk")
-                    .font(.system(size: 22))
-                    .foregroundStyle(vm.isOverdue ? Color.orange.opacity(0.9) : Color.white.opacity(0.55))
+                    .transition(.opacity)
+            } else if isIdle {
+                VStack(spacing: 0) {
+                    Image(systemName: "hand.draw.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.white.opacity(0.45))
 
-                // カウントダウン（ヒーロー数字）
-                Text(vm.countdownText)
-                    .font(.system(size: 88, weight: .ultraLight, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(vm.isOverdue ? Color.orange : Color.white.opacity(vm.isRunning ? 1.0 : 0.7))
-                    .contentTransition(vm.isOverdue ? .numericText() : .numericText(countsDown: true))
-                    .animation(.linear(duration: 1.0), value: vm.countdownText)
+                    HStack(alignment: .bottom, spacing: 4) {
+                        Text("\(draftMinutes)")
+                            .font(.system(size: 88, weight: .ultraLight, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(.white.opacity(0.85))
+                            .contentTransition(.numericText())
+                            .animation(.interactiveSpring(), value: draftMinutes)
+                        Text("分")
+                            .font(.system(size: 28, weight: .light, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.55))
+                            .padding(.bottom, 24)
+                    }
                     .padding(.top, 8)
                     .padding(.bottom, 18)
+                    .accessibilityLabel("\(draftMinutes)分")
+                }
+                .transition(.opacity)
+            } else {
+                VStack(spacing: 0) {
+                    Image(systemName: vm.isOverdue ? "exclamationmark.triangle.fill" : "figure.walk")
+                        .font(.system(size: 22))
+                        .foregroundStyle(vm.isOverdue ? Color.orange.opacity(0.9) : Color.white.opacity(0.55))
+
+                    Text(vm.countdownText)
+                        .font(.system(size: 88, weight: .ultraLight, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(vm.isOverdue ? Color.orange : Color.white.opacity(1.0))
+                        .contentTransition(vm.isOverdue ? .numericText() : .numericText(countsDown: true))
+                        .animation(.linear(duration: 1.0), value: vm.countdownText)
+                        .padding(.top, 8)
+                        .padding(.bottom, 18)
+                }
+                .transition(.opacity)
             }
         }
+        .animation(.easeInOut(duration: 0.35), value: isIdle)
         .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
     }
 
@@ -489,18 +551,40 @@ struct TimerView: View {
         return ("急いで！ もうすぐ出発時刻", color)
     }
 
+    private func departureBottomButton(vm: TimerViewModel) -> some View {
+        HStack(spacing: 20) {
+            Button { showCancelConfirm = true } label: {
+                Image(systemName: "xmark.circle")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .frame(width: 52, height: 52)
+                    .background(.white.opacity(0.10), in: Circle())
+            }
+            .accessibilityLabel("キャンセル")
+
+            Button { showConfirm = true } label: {
+                Image(systemName: "figure.walk.departure")
+                    .font(.system(size: 28, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(
+                        LinearGradient(
+                            colors: departureBtnColors(vm.waterLevel),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+            .accessibilityLabel("いってきます")
+        }
+        .padding(.horizontal, 28)
+    }
+
     @ViewBuilder
     private func actionButton(vm: TimerViewModel) -> some View {
         if vm.departed {
             EmptyView()
-        } else if vm.startedAt == nil {
-            Button { showStartSheet = true } label: {
-                Image(systemName: "play.circle.fill")
-                    .font(.system(size: 80))
-                    .foregroundStyle(Color.dewBlue)
-                    .shadow(color: Color.dewBlue.opacity(0.5), radius: 16, y: 6)
-            }
-            .accessibilityLabel("スタート")
         } else {
             VStack(spacing: 16) {
                 Button { showConfirm = true } label: {
@@ -581,10 +665,11 @@ struct TimerView: View {
             to: .now
         ) ?? Date.now.addingTimeInterval(TimeInterval(request.minutes * 60))
 
+        let quickLevel = min(1.0, Double(request.minutes) / 30.0)
         vm.updateDepartureTime(targetDate)
         Task {
             await store.saveAll()
-            vm.start()
+            vm.start(initialLevel: quickLevel)
             deepLinkRouter.consume(request)
         }
     }
@@ -649,13 +734,8 @@ struct FishPickerSheet: View {
                             .font(.title3)
                             .foregroundStyle(Color(hex: "#52D9A4"))
                     }
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("今日育てる魚")
-                            .font(AppFont.sheetTitle)
-                        Text("難易度が高いほど多くの水が必要です")
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.40))
-                    }
+                    Text("今日育てる魚")
+                        .font(AppFont.sheetTitle)
                     Spacer()
                 }
                 .padding(.horizontal, 24)
@@ -663,7 +743,7 @@ struct FishPickerSheet: View {
 
                 ScrollView {
                     VStack(spacing: 8) {
-                        ForEach(FishSpecies.allCases.sorted { $0.requiredTotalWaterRange.lowerBound < $1.requiredTotalWaterRange.lowerBound }) { species in
+                        ForEach(FishSpecies.allCases.sorted { $0.requiredDepartures < $1.requiredDepartures }) { species in
                             let isUnlocked = species.isUnlocked(aquariumTier: aquariumTier)
                             Button {
                                 if isUnlocked { onSelect(species) }
@@ -689,6 +769,15 @@ struct FishPickerSheet: View {
         case "ふつう":     return Color(hex: "#60A5FA")
         case "むずかしい": return Color(hex: "#A78BFA")
         default:           return Color(hex: "#F472B6")
+        }
+    }
+
+    private func difficultyIconName(for label: String) -> String {
+        switch label {
+        case "かんたん":   return "1.circle.fill"
+        case "やさしい":   return "2.circle.fill"
+        case "ふつう":     return "3.circle.fill"
+        default:           return "4.circle.fill"
         }
     }
 
@@ -719,15 +808,14 @@ struct FishPickerSheet: View {
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(isUnlocked ? .white : .white.opacity(0.45))
                 HStack(spacing: 6) {
-                    Text(species.difficultyLabel)
+                    Image(systemName: difficultyIconName(for: species.difficultyLabel))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(isUnlocked ? accent : .white.opacity(0.38))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background((isUnlocked ? accent.opacity(0.15) : .white.opacity(0.07)), in: Capsule())
-                    Text(isUnlocked ? species.requiredTotalWaterRangeText : "\(species.requiredAquariumName)で解放")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.42))
+                    if isUnlocked {
+                        Text(species.requiredDeparturesText)
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.42))
+                    }
                 }
             }
 

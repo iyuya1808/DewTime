@@ -4,10 +4,9 @@ struct DepartureConfirmView: View {
     let waterLevel: Double
     let isOnTime: Bool
     let selectedSpecies: FishSpecies
-    let waterAmount: Double
-    let totalWaterBefore: Double
-    let totalWaterAfter: Double
-    let requiredTotalWater: Double
+    let departuresBefore: Int
+    let departuresAfter: Int
+    let requiredDepartures: Int
     let growthStage: GrowthStage
     let completesGrowth: Bool
     let onConfirm: () -> Void
@@ -43,7 +42,10 @@ struct DepartureConfirmView: View {
                     // 成長段階アイコン群
                     HStack(spacing: 16) {
                         ForEach(GrowthStage.allCases, id: \.self) { stage in
-                            let reached = stage.thresholdProgress <= (totalWaterAfter / max(1, requiredTotalWater))
+                            let progress = requiredDepartures > 0
+                                ? Double(departuresAfter) / Double(requiredDepartures)
+                                : 0
+                            let reached = stage.thresholdProgress <= progress
                             Image(systemName: stage.icon)
                                 .font(.title3)
                                 .foregroundStyle(reached ? stageColor : .white.opacity(0.22))
@@ -53,7 +55,7 @@ struct DepartureConfirmView: View {
                     .padding(.top, 20)
                     .padding(.bottom, 28)
 
-                    // インジケーターバッジ（アイコン + ビジュアル充填のみ）
+                    // インジケーターバッジ
                     HStack(spacing: 12) {
                         indicatorView(
                             icon: "drop.fill",
@@ -67,11 +69,11 @@ struct DepartureConfirmView: View {
                             color: isOnTime ? .teal : .orange,
                             accessibilityText: isOnTime ? "オンタイム" : "遅延あり"
                         )
-                        indicatorView(
-                            icon: selectedSpecies.icon,
-                            ratio: min(1.0, totalWaterAfter / max(1, requiredTotalWater)),
-                            color: stageColor,
-                            accessibilityText: "育成水量 \(Int(totalWaterAfter.rounded()))pt"
+                        // しずく進捗
+                        dropProgressView(
+                            before: departuresBefore,
+                            after: departuresAfter,
+                            required: requiredDepartures
                         )
                     }
                     .padding(.horizontal, 24)
@@ -132,6 +134,30 @@ struct DepartureConfirmView: View {
         .accessibilityLabel(accessibilityText)
     }
 
+    private func dropProgressView(before: Int, after: Int, required: Int) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: "drop.fill")
+                .foregroundStyle(stageColor)
+                .font(.title2)
+
+            // しずく粒アイコン列
+            HStack(spacing: 4) {
+                ForEach(0..<max(1, required), id: \.self) { index in
+                    Image(systemName: index < after ? "drop.fill" : (index < before ? "drop.fill" : "drop"))
+                        .font(.system(size: 10))
+                        .foregroundStyle(
+                            index < after ? stageColor : (index < before ? stageColor.opacity(0.5) : .white.opacity(0.22))
+                        )
+                }
+            }
+            .frame(height: 40)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityLabel("\(after)/\(required)しずく")
+    }
+
     private var theme: WaterLevelTheme { WaterLevelTheme(waterRatio: waterLevel) }
     private var waterLevelColor: Color { theme.tintColor }
     private var confirmColors: [Color] { theme.gradientColors }
@@ -148,16 +174,15 @@ struct DepartureConfirmView: View {
                 waterLevel: 0.72,
                 isOnTime: true,
                 selectedSpecies: .dolphin,
-                waterAmount: 72,
-                totalWaterBefore: 120,
-                totalWaterAfter: 192,
-                requiredTotalWater: 320,
+                departuresBefore: 2,
+                departuresAfter: 3,
+                requiredDepartures: 5,
                 growthStage: .juvenile,
                 completesGrowth: false,
                 onConfirm: {},
                 onCancel: {}
             )
-                .presentationDetents([.medium])
-                .presentationBackground(.clear)
+            .presentationDetents([.medium])
+            .presentationBackground(.clear)
         }
 }
