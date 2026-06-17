@@ -1,59 +1,8 @@
 import Foundation
 import SwiftUI
 
-/// プロフィールタブの統計・記録を集計する期間。
-enum ProfilePeriod: String, CaseIterable, Identifiable {
-    case week, month, all
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .week:  return "週"
-        case .month: return "月"
-        case .all:   return "全期間"
-        }
-    }
-
-    /// この期間の開始日。`all` は `nil`（下限なし）。
-    func startDate(now: Date = .now, calendar: Calendar = .current) -> Date? {
-        switch self {
-        case .week:
-            // 直近7日（6日前の0時〜今日）。ProfileView の週グリッドと整合させる。
-            return calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now))
-        case .month:
-            // 今月の1日。
-            return calendar.date(from: calendar.dateComponents([.year, .month], from: now))
-        case .all:
-            return nil
-        }
-    }
-
-    /// 指定レコードを期間で絞り込む。
-    func filter(_ records: [FishCareRecord], now: Date = .now, calendar: Calendar = .current) -> [FishCareRecord] {
-        guard let start = startDate(now: now, calendar: calendar) else { return records }
-        return records.filter { $0.recordedAt >= start }
-    }
-}
-
-/// 選択期間の集計値。純粋な計算ロジックを View から分離する。
-struct ProfileStats {
-    let wateringCount: Int
-    let totalWater: Double
-    let adultCount: Int
-    let averageProgress: Double
-    let longestStreak: Int
-
-    init(records: [FishCareRecord], calendar: Calendar = .current) {
-        wateringCount = records.count
-        totalWater = Double(records.filter(\.completedGrowth).count)
-        adultCount = records.filter(\.completedGrowth).count
-        averageProgress = records.isEmpty
-            ? 0
-            : records.reduce(0.0) { $0 + $1.progress } / Double(records.count)
-        longestStreak = Self.longestStreak(in: records, calendar: calendar)
-    }
-
+/// プロフィール・実績向けの集計ヘルパー。
+enum ProfileStats {
     /// 連続して記録のある最長日数。
     static func longestStreak(in records: [FishCareRecord], calendar: Calendar = .current) -> Int {
         let days = Set(records.map { calendar.startOfDay(for: $0.recordedAt) }).sorted()

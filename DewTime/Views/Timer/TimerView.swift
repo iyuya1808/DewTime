@@ -24,10 +24,6 @@ struct TimerView: View {
 
             if let vm = viewModel {
                 mainContent(vm: vm)
-            } else if store.isLoading {
-                ProgressView()
-                    .tint(.white)
-                    .scaleEffect(1.5)
             } else {
                 emptyState
             }
@@ -210,11 +206,10 @@ struct TimerView: View {
                                 Task { await vm.selectSpecies(allSpecies[previousIndex], store: store) }
                             }
                         } label: {
-                            Image(systemName: "chevron.left.circle.fill")
-                                .font(.system(size: 56))
-                                .foregroundStyle(Color.dewBlue)
+                            fishSpeciesNavButtonIcon("chevron.left")
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("前の魚")
 
                         Spacer()
 
@@ -236,11 +231,10 @@ struct TimerView: View {
                                 Task { await vm.selectSpecies(allSpecies[nextIndex], store: store) }
                             }
                         } label: {
-                            Image(systemName: "chevron.right.circle.fill")
-                                .font(.system(size: 56))
-                                .foregroundStyle(Color.dewBlue)
+                            fishSpeciesNavButtonIcon("chevron.right")
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("次の魚")
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 24)
@@ -652,6 +646,16 @@ struct TimerView: View {
     }
 
     // MARK: - Helpers
+
+    private func fishSpeciesNavButtonIcon(_ systemName: String) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 22, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 56, height: 56)
+            .background(Color.black.opacity(0.22), in: Circle())
+            .overlay(Circle().strokeBorder(.white.opacity(0.55), lineWidth: 1.5))
+            .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
+    }
 
     private var activeSchedule: UserSchedule? {
         store.activeSchedule

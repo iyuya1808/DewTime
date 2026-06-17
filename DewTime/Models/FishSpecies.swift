@@ -1,4 +1,12 @@
+import CoreGraphics
 import Foundation
+
+enum FishDisplayContext {
+    /// タイマータブの水タンク内（1匹が泳ぐ）
+    case timer
+    /// 水槽タブのライブ水槽（複数匹が泳ぐ）
+    case aquarium
+}
 
 enum FishSpecies: String, CaseIterable, Identifiable {
     case medaka, guppy, shrimp, pufferfish, crab
@@ -56,6 +64,43 @@ enum FishSpecies: String, CaseIterable, Identifiable {
         default:
             return "fish.fill"
         }
+    }
+
+    /// 種ごとの見た目の大きさ（0=最小 … 1=最大）。描画サイズ・泳ぎ速度の基準。
+    var visualSizeFactor: Double {
+        switch self {
+        case .shrimp:     return 0.05
+        case .medaka:     return 0.10
+        case .guppy:      return 0.15
+        case .pufferfish: return 0.28
+        case .crab:       return 0.32
+        case .turtle:     return 0.38
+        case .squid:      return 0.42
+        case .lobster:    return 0.44
+        case .octopus:    return 0.48
+        case .jellyfish:  return 0.52
+        case .seal:       return 0.58
+        case .dolphin:    return 0.68
+        case .shark:      return 0.78
+        case .whale:      return 0.90
+        case .whaleShark: return 1.0
+        }
+    }
+
+    /// 画面上の描画サイズ（pt）。小型魚と大型魚の差がはっきり出るよう非線形にスケールする。
+    func displaySize(for context: FishDisplayContext) -> CGFloat {
+        let (minSize, maxSize): (CGFloat, CGFloat) = switch context {
+        case .timer:    (28, 165)
+        case .aquarium: (20, 105)
+        }
+        // 指数 > 1 で小型魚を抑え、大型魚をより大きく見せる
+        let t = CGFloat(pow(visualSizeFactor, 1.25))
+        return minSize + t * (maxSize - minSize)
+    }
+
+    /// 水槽内の巡航速度（正規化単位/秒）。小さい魚ほど速く泳ぐ。
+    var aquariumSwimSpeed: CGFloat {
+        0.14 - CGFloat(visualSizeFactor) * 0.08
     }
 
     var requiredWaterRatio: Double {

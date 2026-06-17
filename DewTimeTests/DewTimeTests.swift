@@ -33,6 +33,15 @@ struct DewTimeTests {
     }
 
     @MainActor
+    @Test func fishSpeciesDisplaySizesReflectBodyScale() async throws {
+        #expect(FishSpecies.shrimp.displaySize(for: .aquarium) < FishSpecies.guppy.displaySize(for: .aquarium))
+        #expect(FishSpecies.guppy.displaySize(for: .aquarium) < FishSpecies.dolphin.displaySize(for: .aquarium))
+        #expect(FishSpecies.dolphin.displaySize(for: .aquarium) < FishSpecies.whaleShark.displaySize(for: .aquarium))
+        #expect(FishSpecies.guppy.displaySize(for: .timer) > FishSpecies.guppy.displaySize(for: .aquarium))
+        #expect(FishSpecies.shrimp.aquariumSwimSpeed > FishSpecies.whale.aquariumSwimSpeed)
+    }
+
+    @MainActor
     @Test func fishSpeciesTotalWaterRangesMatchPlan() async throws {
         #expect(FishSpecies.medaka.requiredTotalWaterRange == 50...90)
         #expect(FishSpecies.guppy.requiredTotalWaterRange == 80...130)

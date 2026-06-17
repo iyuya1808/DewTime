@@ -4,6 +4,8 @@ import SwiftUI
 struct DewTimeApp: App {
     @State private var dataStore = AppDataStore()
     @State private var deepLinkRouter = QuickTimerDeepLinkRouter()
+    @State private var isBootstrapComplete = false
+    @State private var showLaunchOverlay = true
     @AppStorage(AppPreferences.Key.appTheme.rawValue) private var appTheme = AppTheme.system.rawValue
 
     private var colorScheme: ColorScheme? {
@@ -16,18 +18,36 @@ struct DewTimeApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(dataStore)
-                .environment(deepLinkRouter)
-                .preferredColorScheme(colorScheme)
-                .onOpenURL { url in
-                    deepLinkRouter.handle(url)
+            ZStack {
+                ContentView()
+                    .environment(dataStore)
+                    .environment(deepLinkRouter)
+                    .preferredColorScheme(colorScheme)
+                    .onOpenURL { url in
+                        deepLinkRouter.handle(url)
+                    }
+
+                if showLaunchOverlay {
+                    AppLaunchLoadingView(
+                        bootstrapComplete: isBootstrapComplete,
+                        onDismissed: { showLaunchOverlay = false }
+                    )
+                    .zIndex(1)
                 }
-                .task {
-                    NotificationScheduler.requestPermission()
-                    _ = try? await AuthService.shared.ensureAuthenticated()
-                    await dataStore.load()
-                }
+            }
+            .task {
+                await runBootstrap()
+            }
+        }
+    }
+
+    @MainActor
+    private func runBootstrap() async {
+        NotificationScheduler.requestPermission()
+        await dataStore.loadLocalCache()
+        isBootstrapComplete = true
+        Task {
+            await dataStore.syncFromCloud()
         }
     }
 }

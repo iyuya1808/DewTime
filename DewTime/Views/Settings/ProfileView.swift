@@ -4,23 +4,14 @@ struct ProfileView: View {
     @Environment(AppDataStore.self) private var store
     @State private var selectedRecord: FishCareRecord?
     @State private var selectedAchievement: Achievement?
-    @State private var period: ProfilePeriod = .week
     @State private var showProfileEditor = false
 
     private let calendar = Calendar.current
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 7)
-    private let badgeColumns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 4)
+    private let badgeColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
 
     private var records: [FishCareRecord] {
         store.careRecords.sorted { $0.recordedAt > $1.recordedAt }
-    }
-
-    private var filteredRecords: [FishCareRecord] {
-        period.filter(records)
-    }
-
-    private var stats: ProfileStats {
-        ProfileStats(records: filteredRecords, calendar: calendar)
     }
 
     var body: some View {
@@ -31,35 +22,22 @@ struct ProfileView: View {
                         .padding(.horizontal)
                         .padding(.top, 12)
 
-                    periodPicker
+                    weekGrid
                         .padding(.horizontal)
-
-                    if filteredRecords.isEmpty {
-                        statsEmptyState
-                            .padding(.horizontal)
-                    } else {
-                        statsSummary.padding(.horizontal)
-                        statsInsights.padding(.horizontal)
-                    }
-
-                    activitySection
-
-                    if !filteredRecords.isEmpty {
-                        recentRecords
-                    }
 
                     achievementsSection
                         .padding(.horizontal)
                 }
                 .padding(.bottom, 32)
             }
-            .navigationTitle("プロフィール")
+            .navigationBarTitleDisplayMode(.inline)
             .dewAppBackground()
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink(destination: SettingsView()) {
                         Image(systemName: "gear")
                     }
+                    .accessibilityLabel("設定")
                 }
             }
             .sheet(item: $selectedRecord) { record in
@@ -82,199 +60,59 @@ struct ProfileView: View {
 
     private var profileHeader: some View {
         let profile = store.profiles.first
-        let aquarium = store.aquariums.first
-        let dexCount = Set(store.collectedFishes.map(\.speciesId)).count
-        let totalSpecies = FishSpecies.allCases.count
+        let daysSinceStart = profile?.daysSinceStart ?? 1
 
-        return VStack(spacing: 16) {
-            HStack(spacing: 14) {
-                ZStack {
-                    Circle().fill(.teal.opacity(0.16))
-                    Text(profile?.avatarEmoji ?? "🐟")
-                        .font(.system(size: 34))
-                }
-                .frame(width: 64, height: 64)
+        return HStack(spacing: 14) {
+            ZStack {
+                Circle().fill(.teal.opacity(0.16))
+                Text(profile?.avatarEmoji ?? "🐟")
+                    .font(.system(size: 34))
+            }
+            .frame(width: 64, height: 64)
+            .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(profile?.nickname ?? "あなた")
-                        .font(.title3.weight(.bold))
-                    Text("水やり \(profile?.daysSinceStart ?? 1)日目")
-                        .font(.caption)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(profile?.nickname ?? "あなた")
+                    .font(.title3.weight(.bold))
+                HStack(spacing: 4) {
+                    Image(systemName: "calendar")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text("\(daysSinceStart)")
+                        .font(.caption.weight(.bold))
+                        .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
-
-                Spacer()
-
-                Button {
-                    showProfileEditor = true
-                } label: {
-                    Image(systemName: "pencil")
-                        .font(.headline)
-                        .foregroundStyle(.teal)
-                        .frame(width: 38, height: 38)
-                        .background(Color.dewSurfaceSoft, in: Circle())
-                }
-                .buttonStyle(.plain)
+                .accessibilityLabel("水やり\(daysSinceStart)日目")
             }
 
-            HStack(spacing: 8) {
-                headerMetric(icon: "drop.fill", value: Aquarium.sizeName(for: aquarium?.sizeTier ?? 0), label: "水槽", tint: .teal)
-                headerMetric(icon: "book.fill", value: "\(dexCount)/\(totalSpecies)", label: "図鑑", tint: .purple)
-                headerMetric(icon: "drop.circle.fill", value: "\(aquarium?.totalDepartures ?? 0)", label: "累計しずく", tint: .cyan)
+            Spacer()
+
+            Button {
+                showProfileEditor = true
+            } label: {
+                Image(systemName: "pencil")
+                    .font(.headline)
+                    .foregroundStyle(.teal)
+                    .frame(width: 38, height: 38)
+                    .background(Color.dewSurfaceSoft, in: Circle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("プロフィールを編集")
         }
         .padding(16)
         .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .accessibilityElement(children: .contain)
     }
 
-    private func headerMetric(icon: String, value: String, label: String, tint: Color) -> some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon).font(.subheadline).foregroundStyle(tint)
-            Text(value)
-                .font(.subheadline.weight(.bold))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-            Text(label).font(.caption2).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
-        .background(Color.dewSurfaceSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
+    // MARK: - Week grid
 
-    private var periodPicker: some View {
-        Picker("期間", selection: $period) {
-            ForEach(ProfilePeriod.allCases) { period in
-                Text(period.title).tag(period)
+    private var weekGrid: some View {
+        LazyVGrid(columns: columns, spacing: 8) {
+            ForEach(recentWeekDays) { day in
+                weekDayCell(day)
             }
         }
-        .pickerStyle(.segmented)
-    }
-
-    // MARK: - Stats
-
-    private var statsSummary: some View {
-        HStack(spacing: 8) {
-            summaryCard(icon: "drop.fill", value: "\(Int(stats.totalWater.rounded()))", label: "水やり", tint: .cyan)
-            summaryCard(icon: "fish.fill", value: "\(stats.wateringCount)", label: "記録", tint: .teal)
-            summaryCard(icon: "sparkles", value: "\(stats.adultCount)", label: "成魚", tint: .orange)
-        }
-    }
-
-    private var statsInsights: some View {
-        let best = filteredRecords.max { $0.departuresAfter < $1.departuresAfter }
-
-        return VStack(spacing: 10) {
-            HStack {
-                insightRow(icon: "flame.fill", title: "連続記録", value: "\(stats.longestStreak)日", tint: .orange)
-                Divider().frame(height: 34)
-                insightRow(
-                    icon: "chart.line.uptrend.xyaxis",
-                    title: "平均進捗",
-                    value: "\(Int((stats.averageProgress * 100).rounded()))%",
-                    tint: .teal
-                )
-            }
-
-            if let best {
-                Button { selectedRecord = best } label: {
-                    HStack(spacing: 10) {
-                        recordSymbol(for: best, size: 22).frame(width: 28)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("しずく最多の日")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("\(best.recordedAt.formatted(.dateTime.month().day())) / \(best.departuresAfter)💧")
-                                .font(.subheadline.weight(.semibold))
-                                .monospacedDigit()
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(12)
-                    .background(Color.dewSurfaceSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(14)
-        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
-    // MARK: - Activity
-
-    @ViewBuilder
-    private var activitySection: some View {
-        switch period {
-        case .week:
-            VStack(spacing: 0) {
-                LazyVGrid(columns: columns, spacing: 8) {
-                    ForEach(recentWeekDays) { day in
-                        weekDayCell(day)
-                    }
-                }
-                .padding(.horizontal)
-            }
-        case .month:
-            NavigationLink(destination: MonthlyAquariumView()) {
-                HStack(spacing: 12) {
-                    Image(systemName: "calendar")
-                        .font(.title2)
-                        .foregroundStyle(.teal)
-                        .frame(width: 40, height: 40)
-                        .background(Color.dewSurfaceSoft, in: Circle())
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("今月の水槽をカレンダーで見る")
-                            .font(.subheadline.weight(.semibold))
-                        Text("日ごとの水やりをまとめて確認")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(14)
-                .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal)
-        case .all:
-            monthlySummary.padding(.horizontal)
-        }
-    }
-
-    private var monthlySummary: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("月別のふりかえり")
-                .font(.headline)
-
-            ForEach(monthlyBuckets, id: \.id) { bucket in
-                HStack(spacing: 12) {
-                    Text(bucket.title)
-                        .font(.subheadline.weight(.semibold))
-                        .frame(width: 84, alignment: .leading)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("\(bucket.count)回 / +\(Int(bucket.water.rounded()))pt")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        ProgressView(value: monthlyBuckets.map(\.water).max().map { $0 > 0 ? bucket.water / $0 : 0 } ?? 0)
-                            .tint(.teal)
-                    }
-                    if bucket.adults > 0 {
-                        Text("🎉\(bucket.adults)")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.orange)
-                    }
-                }
-                .padding(.vertical, 4)
-            }
-        }
-        .padding(14)
-        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func weekDayCell(_ day: ProfileWeekDay) -> some View {
@@ -315,9 +153,6 @@ struct ProfileView: View {
                     Circle()
                         .fill(.secondary.opacity(0.12))
                         .frame(width: 8, height: 8)
-                    Text("未記録")
-                        .font(.system(size: 9, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary.opacity(0.7))
                 }
 
                 Spacer(minLength: 0)
@@ -347,57 +182,30 @@ struct ProfileView: View {
         }
         .buttonStyle(.plain)
         .disabled(day.record == nil)
-    }
-
-    // MARK: - Recent records
-
-    private var recentRecords: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("水やりの記録")
-                .font(.headline)
-                .padding(.horizontal)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(filteredRecords) { record in
-                        Button { selectedRecord = record } label: {
-                            VStack(spacing: 6) {
-                                recordSymbol(for: record, size: 28)
-                                Text(record.recordedAt, format: .dateTime.month().day())
-                                    .font(.caption2.weight(.semibold))
-                                Text("+\(record.departuresAfter)💧")
-                                    .font(.caption2.bold())
-                                    .monospacedDigit()
-                                    .foregroundStyle(.secondary)
-                            }
-                            .frame(width: 82, height: 88)
-                            .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal)
-            }
-        }
+        .accessibilityLabel(weekDayAccessibilityLabel(for: day))
     }
 
     // MARK: - Achievements
 
     private var achievementsSection: some View {
         let unlockedCount = Achievement.allCases.filter { $0.isUnlocked(in: store) }.count
+        let totalCount = Achievement.allCases.count
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("実績")
+                Image(systemName: "trophy.fill")
                     .font(.headline)
+                    .foregroundStyle(.orange)
                 Spacer()
-                Text("\(unlockedCount)/\(Achievement.allCases.count)")
+                Text("\(unlockedCount)/\(totalCount)")
                     .font(.subheadline.weight(.bold))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("実績 \(unlockedCount)個獲得、全\(totalCount)個")
 
-            LazyVGrid(columns: badgeColumns, spacing: 10) {
+            LazyVGrid(columns: badgeColumns, spacing: 8) {
                 ForEach(Achievement.allCases) { achievement in
                     badgeCell(achievement)
                 }
@@ -412,51 +220,30 @@ struct ProfileView: View {
         return Button {
             selectedAchievement = achievement
         } label: {
-            VStack(spacing: 6) {
-                Text(achievement.emoji)
-                    .font(.system(size: 30))
-                    .saturation(unlocked ? 1 : 0)
-                    .opacity(unlocked ? 1 : 0.35)
-                Text(achievement.title)
-                    .font(.system(size: 10, weight: .semibold))
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .foregroundStyle(unlocked ? .primary : .secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 78)
-            .background(
-                unlocked ? achievement.tint.opacity(0.16) : Color.dewSurfaceSoft,
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-            )
-            .overlay {
-                if unlocked {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(achievement.tint.opacity(0.5), lineWidth: 1.5)
+            Text(achievement.emoji)
+                .font(.system(size: 28))
+                .saturation(unlocked ? 1 : 0)
+                .opacity(unlocked ? 1 : 0.35)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(
+                    unlocked ? achievement.tint.opacity(0.16) : Color.dewSurfaceSoft,
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+                .overlay {
+                    if unlocked {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(achievement.tint.opacity(0.5), lineWidth: 1.5)
+                    }
                 }
-            }
         }
         .buttonStyle(.plain)
-    }
-
-    // MARK: - Empty state
-
-    private var statsEmptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "fish")
-                .font(.system(size: 48))
-                .foregroundStyle(.teal)
-            Text(period == .all ? "まだ記録がありません" : "この期間はまだ静かです")
-                .font(.headline)
-            Text("タイマー画面で「いってきます！」を押すと、今日の魚に水やり記録が残ります")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
-        .padding(.horizontal)
-        .background(Color.dewSurfaceSoft, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .accessibilityLabel(
+            unlocked
+                ? "\(achievement.title)、獲得済み"
+                : "\(achievement.title)、未獲得"
+        )
+        .accessibilityHint("タップして詳細を表示")
     }
 
     // MARK: - Shared subviews
@@ -472,29 +259,6 @@ struct ProfileView: View {
                 .foregroundStyle(recordColor(for: record))
                 .symbolRenderingMode(.hierarchical)
         }
-    }
-
-    private func summaryCard(icon: String, value: String, label: String, tint: Color) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon).font(.title3).foregroundStyle(tint)
-            Text(value).font(.title3.weight(.bold)).monospacedDigit()
-            Text(label).font(.caption).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private func insightRow(icon: String, title: String, value: String, tint: Color) -> some View {
-        HStack(spacing: 9) {
-            Image(systemName: icon).font(.title3).foregroundStyle(tint).frame(width: 26)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.caption).foregroundStyle(.secondary)
-                Text(value).font(.headline).monospacedDigit()
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Helpers
@@ -515,21 +279,13 @@ struct ProfileView: View {
         }
     }
 
-    private var monthlyBuckets: [ProfileMonthBucket] {
-        let grouped = Dictionary(grouping: records) { record -> DateComponents in
-            calendar.dateComponents([.year, .month], from: record.recordedAt)
+    private func weekDayAccessibilityLabel(for day: ProfileWeekDay) -> String {
+        let dateLabel = day.date.formatted(.dateTime.month().day())
+        if let record = day.record {
+            let growth = record.completedGrowth ? "成魚" : record.growthStage.displayName
+            return "\(dateLabel)、しずく\(record.departuresAfter)、\(growth)"
         }
-        return grouped.compactMap { components, monthRecords -> ProfileMonthBucket? in
-            guard let date = calendar.date(from: components) else { return nil }
-            return ProfileMonthBucket(
-                date: date,
-                title: date.formatted(.dateTime.year().month()),
-                count: monthRecords.count,
-                water: Double(monthRecords.filter { $0.departuresAfter > 0 }.count),
-                adults: monthRecords.filter(\.completedGrowth).count
-            )
-        }
-        .sorted { $0.date > $1.date }
+        return "\(dateLabel)、記録なし"
     }
 
     private func recordColor(for record: FishCareRecord) -> Color {
@@ -543,15 +299,6 @@ private struct ProfileWeekDay: Identifiable {
     var isToday: Bool
     var record: FishCareRecord?
     var recordCount: Int
-    var id: Date { date }
-}
-
-private struct ProfileMonthBucket: Identifiable {
-    var date: Date
-    var title: String
-    var count: Int
-    var water: Double
-    var adults: Int
     var id: Date { date }
 }
 

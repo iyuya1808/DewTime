@@ -281,7 +281,6 @@ struct LiveAquariumView: View {
         aquarium.fishCapacity
     }
 
-    /// コレクション済みの成魚を遊泳メンバーに変換する。収容上限は水槽サイズで決まる。
     private var specs: [FishSpec] {
         var result: [FishSpec] = []
 
@@ -297,8 +296,8 @@ struct LiveAquariumView: View {
                     id: id,
                     name: FishSpecies.medaka.displayName,
                     species: .medaka,
-                    size: 38,
-                    speed: 0.13,
+                    size: FishSpecies.medaka.displaySize(for: .aquarium),
+                    speed: FishSpecies.medaka.aquariumSwimSpeed,
                     ghost: true
                 )
             }
@@ -312,17 +311,16 @@ struct LiveAquariumView: View {
     }
 
     private var aquariumSignature: String {
-        "\(aquarium.totalDepartures)-\(aquarium.sizeTier)-\(fishCapacity)"
+        "\(aquarium.totalDepartures)-\(aquarium.sizeTier)-\(fishCapacity)-\(swimmableFish.map(\.id.uuidString).joined())"
     }
 
     private func spec(for fish: CollectedFish, species: FishSpecies, ghost: Bool) -> FishSpec {
-        let ratio = species.requiredWaterRatio
-        return FishSpec(
+        FishSpec(
             id: fish.id,
             name: fish.name,
             species: species,
-            size: 38 + ratio * 56,          // 小型魚ほど小さく、大型魚ほど大きく
-            speed: 0.13 - ratio * 0.07,     // 小型魚ほど速く泳ぐ
+            size: species.displaySize(for: .aquarium),
+            speed: species.aquariumSwimSpeed,
             ghost: ghost
         )
     }
@@ -339,7 +337,10 @@ struct LiveAquariumView: View {
             .navigationBarHidden(true)
         }
         .sheet(isPresented: $showRecords) {
-            AquariumView()
+            NavigationStack {
+                MonthlyAquariumView()
+            }
+            .dewAppBackground()
         }
         .sheet(isPresented: $showUpgrade) {
             AquariumUpgradeSheet(
@@ -356,15 +357,10 @@ struct LiveAquariumView: View {
                 .presentationDragIndicator(.hidden)
         }
         .onAppear { engine.populate(specs) }
-        .onChange(of: collected.map { "\($0.id.uuidString):\($0.name):\($0.succeeded)" }) { _, _ in
-            engine.populate(specs)
-        }
         .onChange(of: aquariumSignature) { _, _ in
             engine.populate(specs)
         }
     }
-
-    // MARK: シーン
 
     private var aquariumScene: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
@@ -391,6 +387,107 @@ struct LiveAquariumView: View {
                 selectedFish = fish
             }
         }
+    }
+
+    // MARK: トップバー
+
+    private var topBar: some View {
+        VStack {
+            HStack(alignment: .top, spacing: 8) {
+                Button {
+                    showUpgrade = true
+                } label: {
+                    HStack(spacing: 6) {
+                        ZStack {
+                            let bowl = 14 + CGFloat(aquarium.sizeTier) * 2
+                            Circle()
+                                .strokeBorder(.teal.opacity(0.8), lineWidth: 1.5)
+                                .frame(width: bowl, height: bowl)
+                            Image(systemName: aquarium.isMaxTier ? "sparkles" : "drop.fill")
+                                .font(.system(size: aquarium.isMaxTier ? 9 : 8, weight: .bold))
+                                .foregroundStyle(aquarium.isMaxTier ? .yellow : .cyan)
+                        }
+                        .frame(width: 28, height: 28)
+
+                        Text("\(aquarium.sizeTier + 1)")
+                            .font(.subheadline.weight(.bold))
+                            .monospacedDigit()
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(.black.opacity(0.22), in: Capsule())
+                    .overlay(Capsule().strokeBorder(.teal.opacity(0.45), lineWidth: 1))
+                    .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("水槽レベル\(aquarium.sizeTier + 1)。タップで成長を確認")
+
+                HStack(spacing: 5) {
+                    Image(systemName: "fish.fill")
+                        .font(.subheadline.weight(.bold))
+                    Text("\(swimmingFishCount)")
+                        .font(.subheadline.weight(.bold))
+                        .monospacedDigit()
+                    Text("/")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.white.opacity(0.55))
+                    Text("\(fishCapacity)")
+                        .font(.subheadline.weight(.bold))
+                        .monospacedDigit()
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(.black.opacity(0.22), in: Capsule())
+                .overlay(
+                    Capsule().strokeBorder(
+                        swimmableFish.count > fishCapacity ? Color.orange.opacity(0.55) : Color.white.opacity(0.25),
+                        lineWidth: 1
+                    )
+                )
+                .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
+                .accessibilityLabel("\(swimmingFishCount)匹が泳いでいます。収容上限は\(fishCapacity)匹")
+
+                Spacer()
+
+                Button {
+                    showRecords = true
+                } label: {
+                    Image(systemName: "calendar")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .background(.white.opacity(0.22), in: Circle())
+                        .overlay(Circle().strokeBorder(.white.opacity(0.4), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("育成記録")
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+
+            Spacer()
+        }
+    }
+
+    private var emptyAquariumHint: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "fish")
+                .font(.system(size: 44, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.7))
+            Image(systemName: "arrow.up")
+                .font(.title3)
+                .foregroundStyle(.white.opacity(0.4))
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 20)
+        .background(.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(.white.opacity(0.22), lineWidth: 1)
+        }
+        .accessibilityLabel("成魚になった魚がここで泳ぎます")
     }
 
     // MARK: 描画ヘルパー
@@ -555,98 +652,6 @@ struct LiveAquariumView: View {
                 anchor: .center
             )
         }
-    }
-
-    // MARK: トップバー
-
-    private var topBar: some View {
-        VStack {
-            HStack(alignment: .top, spacing: 8) {
-                Button {
-                    showUpgrade = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "drop.fill")
-                            .font(.subheadline.weight(.bold))
-                        Text("\(aquarium.sizeTier + 1)")
-                            .font(.subheadline.weight(.bold))
-                            .monospacedDigit()
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(.black.opacity(0.22), in: Capsule())
-                    .overlay(Capsule().strokeBorder(.teal.opacity(0.45), lineWidth: 1))
-                    .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("水槽レベル\(aquarium.sizeTier + 1)。タップで成長を確認")
-
-                HStack(spacing: 5) {
-                    Image(systemName: "fish.fill")
-                        .font(.subheadline.weight(.bold))
-                    Text("\(swimmingFishCount)")
-                        .font(.subheadline.weight(.bold))
-                        .monospacedDigit()
-                    Text("/")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.white.opacity(0.55))
-                    Text("\(fishCapacity)")
-                        .font(.subheadline.weight(.bold))
-                        .monospacedDigit()
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(.black.opacity(0.22), in: Capsule())
-                .overlay(
-                    Capsule().strokeBorder(
-                        swimmableFish.count > fishCapacity ? Color.orange.opacity(0.55) : Color.white.opacity(0.25),
-                        lineWidth: 1
-                    )
-                )
-                .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
-                .accessibilityLabel("\(swimmingFishCount)匹が泳いでいます。収容上限は\(fishCapacity)匹")
-
-                Spacer()
-
-                Button {
-                    showRecords = true
-                } label: {
-                    Image(systemName: "calendar")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .frame(width: 40, height: 40)
-                        .background(.white.opacity(0.22), in: Circle())
-                        .overlay(Circle().strokeBorder(.white.opacity(0.4), lineWidth: 1))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("育成記録")
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-
-            Spacer()
-        }
-    }
-
-    private var emptyAquariumHint: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "fish")
-                .font(.system(size: 44, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.7))
-            Image(systemName: "arrow.up")
-                .font(.title3)
-                .foregroundStyle(.white.opacity(0.4))
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 20)
-        .background(.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(.white.opacity(0.22), lineWidth: 1)
-        }
-        .accessibilityLabel("成魚になった魚がここで泳ぎます")
     }
 }
 

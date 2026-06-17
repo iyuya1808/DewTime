@@ -16,15 +16,10 @@ struct MonthlyAquariumView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
+            VStack(spacing: 16) {
                 monthHeader
                     .padding(.horizontal)
                     .padding(.top, 12)
-
-                if !recordsInDisplayedMonth.isEmpty {
-                    monthlySummary
-                        .padding(.horizontal)
-                }
 
                 weekdayHeader
                     .padding(.horizontal)
@@ -35,21 +30,18 @@ struct MonthlyAquariumView: View {
                     }
                 }
                 .padding(.horizontal)
-
-                if recordsInDisplayedMonth.isEmpty {
-                    monthEmptyState
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-                } else {
-                    monthInsights
-                        .padding(.horizontal)
-                    monthlyRecords
-                }
             }
             .padding(.bottom, 24)
         }
-        .navigationTitle("月間カレンダー")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Image(systemName: "calendar")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.teal)
+                    .accessibilityLabel("育成記録")
+            }
+        }
         .dewAppBackground()
         .sheet(item: $selectedRecord) { record in
             FishCareDetailSheet(record: record)
@@ -69,21 +61,21 @@ struct MonthlyAquariumView: View {
                     .frame(width: 36, height: 36)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("前の月")
 
             Spacer()
 
-            VStack(spacing: 2) {
-                Text(displayedMonth, format: .dateTime.year().month(.wide))
-                    .font(.title3.weight(.bold))
-                Text("月単位で水やり記録を確認")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            .onTapGesture {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                    displayedMonth = Date()
+            Text(displayedMonth, format: .dateTime.year().month(.wide))
+                .font(.title3.weight(.bold))
+                .monospacedDigit()
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        displayedMonth = Date()
+                    }
                 }
-            }
+                .accessibilityLabel(displayedMonth.formatted(.dateTime.year().month(.wide)))
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint("タップで今月に戻ります")
 
             Spacer()
 
@@ -95,6 +87,7 @@ struct MonthlyAquariumView: View {
                     .frame(width: 36, height: 36)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("次の月")
         }
         .foregroundStyle(.primary)
         .padding(.horizontal, 6)
@@ -109,44 +102,29 @@ struct MonthlyAquariumView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
+                    .accessibilityHidden(true)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("曜日")
     }
 
     private func dayCell(_ day: AquariumCalendarDay) -> some View {
         Button {
             selectedRecord = day.record
         } label: {
-            VStack(spacing: 4) {
+            VStack(spacing: 6) {
                 Text("\(calendar.component(.day, from: day.date))")
                     .font(.caption.weight(day.isToday ? .bold : .medium))
                     .foregroundStyle(day.isCurrentMonth ? Color.primary : Color.secondary.opacity(0.45))
                     .frame(maxWidth: .infinity, alignment: .trailing)
+                    .monospacedDigit()
 
                 Spacer(minLength: 0)
 
                 if let record = day.record {
-                    recordSymbol(for: record, size: 23)
-                        .frame(height: 26)
-
-                    HStack(spacing: 2) {
-                        Text(record.earnedDrop ? "+1" : "–")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                        if day.recordCount > 1 {
-                            Text("+\(day.recordCount - 1)")
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(recordColor(for: record), in: Capsule())
-                        }
-                    }
-                    .foregroundStyle(.secondary)
-                } else {
-                    Circle()
-                        .fill(.secondary.opacity(day.isCurrentMonth ? 0.12 : 0.05))
-                        .frame(width: 6, height: 6)
+                    recordSymbol(for: record, size: 22)
+                        .frame(height: 24)
                 }
 
                 Spacer(minLength: 0)
@@ -178,128 +156,9 @@ struct MonthlyAquariumView: View {
         }
         .buttonStyle(.plain)
         .disabled(day.record == nil)
+        .accessibilityLabel(dayAccessibilityLabel(day))
     }
 
-    private var monthlySummary: some View {
-        let records = recordsInDisplayedMonth
-        return HStack(spacing: 8) {
-            summaryCard(icon: "drop.fill", value: "\(records.filter(\.earnedDrop).count)", label: "しずく", tint: .cyan)
-            summaryCard(icon: "fish.fill", value: "\(records.count)", label: "記録", tint: .teal)
-            summaryCard(icon: "sparkles", value: "\(records.filter(\.completedGrowth).count)", label: "成魚", tint: .orange)
-        }
-    }
-
-    private var monthInsights: some View {
-        let records = recordsInDisplayedMonth
-        let best = records.max { $0.departuresAfter < $1.departuresAfter }
-        let streak = longestStreak(in: records)
-
-        return VStack(spacing: 10) {
-            HStack {
-                insightRow(icon: "flame.fill", title: "最長連続", value: "\(streak)日", tint: .orange)
-                Divider().frame(height: 34)
-                insightRow(
-                    icon: "chart.line.uptrend.xyaxis",
-                    title: "平均進捗",
-                    value: "\(Int((averageProgress(in: records) * 100).rounded()))%",
-                    tint: .teal
-                )
-            }
-
-            if let best {
-                Button {
-                    selectedRecord = best
-                } label: {
-                    HStack(spacing: 10) {
-                        recordSymbol(for: best, size: 22)
-                            .frame(width: 28)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("今月しずくを多く獲得した日")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("\(best.recordedAt.formatted(.dateTime.month().day())) / \(best.departuresAfter)しずく")
-                                .font(.subheadline.weight(.semibold))
-                                .monospacedDigit()
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(12)
-                    .background(Color.dewSurfaceSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(14)
-        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
-    private var monthlyRecords: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("今月の水やり")
-                .font(.headline)
-                .padding(.horizontal)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(recordsInDisplayedMonth) { record in
-                        Button {
-                            selectedRecord = record
-                        } label: {
-                            VStack(spacing: 6) {
-                                recordSymbol(for: record, size: 28)
-                                Text(record.recordedAt, format: .dateTime.day())
-                                    .font(.caption2.weight(.semibold))
-                                Text(record.earnedDrop ? "+1しずく" : "–")
-                                    .font(.caption2.bold())
-                                    .monospacedDigit()
-                                    .foregroundStyle(.secondary)
-                            }
-                            .frame(width: 78, height: 86)
-                            .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal)
-            }
-        }
-    }
-
-    private var monthEmptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "calendar.badge.plus")
-                .font(.system(size: 38))
-                .foregroundStyle(.teal)
-            Text("この月はまだ静かです")
-                .font(.headline)
-            Text("別の月へ移動するか、次回に水やり記録を残しましょう")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                    displayedMonth = Date()
-                }
-            } label: {
-                Label("今月へ戻る", systemImage: "arrow.uturn.backward")
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
-                    .background(Color.dewSurface, in: Capsule())
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 4)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
-        .padding(.horizontal)
-        .background(Color.dewSurfaceSoft, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
-    /// 成魚なら魚の姿、それ以外は成長段階の SF Symbol を表示する。
     @ViewBuilder
     private func recordSymbol(for record: FishCareRecord, size: CGFloat) -> some View {
         if record.completedGrowth {
@@ -313,40 +172,17 @@ struct MonthlyAquariumView: View {
         }
     }
 
-    private func summaryCard(icon: String, value: String, label: String, tint: Color) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(tint)
-            Text(value)
-                .font(.title3.weight(.bold))
-                .monospacedDigit()
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    private func dayAccessibilityLabel(_ day: AquariumCalendarDay) -> String {
+        let dateText = day.date.formatted(.dateTime.month().day())
+        guard let record = day.record else {
+            return "\(dateText)、未記録"
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private func insightRow(icon: String, title: String, value: String, tint: Color) -> some View {
-        HStack(spacing: 9) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(tint)
-                .frame(width: 26)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(value)
-                    .font(.headline)
-                    .monospacedDigit()
-            }
-            Spacer(minLength: 0)
+        let dropText = record.earnedDrop ? "しずく1" : "しずくなし"
+        let stageText = record.completedGrowth ? "成魚" : record.growthStage.displayName
+        if day.recordCount > 1 {
+            return "\(dateText)、記録\(day.recordCount)件、\(dropText)、\(stageText)"
         }
-        .frame(maxWidth: .infinity)
+        return "\(dateText)、\(dropText)、\(stageText)"
     }
 
     private var calendarDays: [AquariumCalendarDay] {
@@ -374,42 +210,12 @@ struct MonthlyAquariumView: View {
         }
     }
 
-    private var recordsInDisplayedMonth: [FishCareRecord] {
-        records
-            .filter { calendar.isDate($0.recordedAt, equalTo: displayedMonth, toGranularity: .month) }
-            .sorted { $0.recordedAt > $1.recordedAt }
-    }
-
     private func moveMonth(by amount: Int) {
         displayedMonth = calendar.date(byAdding: .month, value: amount, to: displayedMonth) ?? displayedMonth
     }
 
     private func recordColor(for record: FishCareRecord) -> Color {
         record.completedGrowth ? WaterLevelTheme(waterRatio: 1).tintColor : .orange
-    }
-
-    private func averageProgress(in records: [FishCareRecord]) -> Double {
-        guard !records.isEmpty else { return 0 }
-        return records.reduce(0.0) { $0 + $1.progress } / Double(records.count)
-    }
-
-    private func longestStreak(in records: [FishCareRecord]) -> Int {
-        let days = Set(records.map { calendar.startOfDay(for: $0.recordedAt) }).sorted()
-        guard !days.isEmpty else { return 0 }
-
-        var best = 1
-        var current = 1
-        for index in days.indices.dropFirst() {
-            let previous = days[days.index(before: index)]
-            let distance = calendar.dateComponents([.day], from: previous, to: days[index]).day ?? 0
-            if distance == 1 {
-                current += 1
-            } else {
-                current = 1
-            }
-            best = max(best, current)
-        }
-        return best
     }
 }
 

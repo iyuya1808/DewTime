@@ -24,6 +24,7 @@ final class AppDataStore {
     var isDeveloperSupported = false
     var isLoading = false
     var isSaving = false
+    var isCloudSyncing = false
     var errorMessage: String?
 
     private let schemaVersion = 1
@@ -51,44 +52,12 @@ final class AppDataStore {
         UserSchedule.active(in: schedules)
     }
 
-    func load() async {
+    /// 起動直後に端末内キャッシュだけ読み込む（ネットワーク待ちなし）。
+    func loadLocalCache() async {
         guard !isLoading else { return }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
-
-        if enableCloudSync, let cloudDataService {
-            do {
-                let userId = try await cloudUserIdProvider()
-                
-                // Load developer support status
-                if let purchases = try? await cloudDataService.loadPurchases(userId: userId) {
-                    self.isDeveloperSupported = !purchases.isEmpty
-                } else {
-                    self.isDeveloperSupported = false
-                }
-                
-                let snapshot = try await cloudDataService.loadAll(userId: userId)
-                if snapshot.isEmpty {
-                    try loadFromLocal()
-                    if schedules.isEmpty {
-                        seedSampleSchedules()
-                    }
-                    try saveToLocal()
-                    try await cloudDataService.saveAll(
-                        snapshot: makeCloudSnapshot(userId: userId),
-                        userId: userId
-                    )
-                } else {
-                    applyCloudSnapshot(snapshot)
-                    try saveToLocal()
-                }
-                return
-            } catch {
-                errorMessage = "クラウド同期に失敗しました。端末内のデータを表示しています。"
-                print("[DewTime] Cloud load failed: \(error)")
-            }
-        }
 
         do {
             try loadFromLocal()
@@ -99,6 +68,48 @@ final class AppDataStore {
                 seedSampleDataLocally()
             }
         }
+    }
+
+    /// クラウドから最新データを取得してローカルへ反映する。
+    func syncFromCloud() async {
+        guard enableCloudSync, let cloudDataService else { return }
+        guard !isCloudSyncing else { return }
+        isCloudSyncing = true
+        errorMessage = nil
+        defer { isCloudSyncing = false }
+
+        do {
+            let userId = try await cloudUserIdProvider()
+
+            if let purchases = try? await cloudDataService.loadPurchases(userId: userId) {
+                self.isDeveloperSupported = !purchases.isEmpty
+            } else {
+                self.isDeveloperSupported = false
+            }
+
+            let snapshot = try await cloudDataService.loadAll(userId: userId)
+            if snapshot.isEmpty {
+                if schedules.isEmpty {
+                    seedSampleSchedules()
+                }
+                try saveToLocal()
+                try await cloudDataService.saveAll(
+                    snapshot: makeCloudSnapshot(userId: userId),
+                    userId: userId
+                )
+            } else {
+                applyCloudSnapshot(snapshot)
+                try saveToLocal()
+            }
+        } catch {
+            errorMessage = "クラウド同期に失敗しました。端末内のデータを表示しています。"
+            print("[DewTime] Cloud sync failed: \(error)")
+        }
+    }
+
+    func load() async {
+        await loadLocalCache()
+        await syncFromCloud()
     }
 
     func saveAll() async {

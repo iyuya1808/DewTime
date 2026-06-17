@@ -5,6 +5,18 @@ private enum UnlockFilter: String, CaseIterable {
     case all = "すべて"
     case unlocked = "解放済み"
     case locked = "未解放"
+
+    var icon: String {
+        switch self {
+        case .all: return "square.grid.2x2.fill"
+        case .unlocked: return "checkmark.seal"
+        case .locked: return "lock"
+        }
+    }
+
+    static var selectableCases: [UnlockFilter] {
+        [.unlocked, .locked]
+    }
 }
 
 private enum DifficultyFilter: String, CaseIterable {
@@ -12,13 +24,19 @@ private enum DifficultyFilter: String, CaseIterable {
     case easy = "やさしい"
     case normal = "ふつう"
     case hard = "むずかしい"
-}
 
-private enum SpeciesSortOrder: String, CaseIterable {
-    case `default` = "デフォルト"
-    case name = "名前順"
-    case difficulty = "難易度順"
-    case achievement = "達成率順"
+    var starCount: Int {
+        switch self {
+        case .all: return 0
+        case .easy: return 1
+        case .normal: return 2
+        case .hard: return 3
+        }
+    }
+
+    static var selectableCases: [DifficultyFilter] {
+        [.easy, .normal, .hard]
+    }
 }
 
 private struct SpeciesGrowthSnapshot {
@@ -134,10 +152,8 @@ struct CollectionView: View {
     @Environment(\.requestReview) private var requestReview
 
     @State private var selectedSpecies: FishSpecies?
-    @State private var selectedFish: CollectedFish?
     @State private var unlockFilter: UnlockFilter = .all
     @State private var difficultyFilter: DifficultyFilter = .all
-    @State private var sortOrder: SpeciesSortOrder = .default
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 2)
 
@@ -157,24 +173,11 @@ struct CollectionView: View {
         case .hard: result = result.filter { $0.difficultyLabel == "むずかしい" }
         }
 
-        switch sortOrder {
-        case .default:
-            break
-        case .name:
-            result = result.sorted { $0.displayName < $1.displayName }
-        case .difficulty:
-            result = result.sorted { $0.requiredWaterRatio < $1.requiredWaterRatio }
-        case .achievement:
-            result = result.sorted {
-                snapshot(for: $0).progress > snapshot(for: $1).progress
-            }
-        }
-
         return result
     }
 
     private var isFiltering: Bool {
-        unlockFilter != .all || difficultyFilter != .all || sortOrder != .default
+        unlockFilter != .all || difficultyFilter != .all
     }
 
     private var collected: [CollectedFish] {
@@ -205,27 +208,23 @@ struct CollectionView: View {
                         .padding(.horizontal)
                         .animation(.spring(duration: 0.3), value: filteredSpecies.map(\.id))
                     }
-
-                    if !collected.isEmpty {
-                        latestFishes
-                    }
                 }
                 .padding(.bottom, 24)
             }
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Picker("並び順", selection: $sortOrder) {
-                            ForEach(SpeciesSortOrder.allCases, id: \.self) { order in
-                                Text(order.rawValue).tag(order)
-                            }
-                        }
-                    } label: {
-                        Image(systemName: sortOrder == .default ? "arrow.up.arrow.down" : "arrow.up.arrow.down.circle.fill")
-                            .foregroundStyle(sortOrder == .default ? Color.secondary : Color.teal)
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "book.closed.fill")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(.teal)
+                        Text("図鑑")
+                            .font(.system(.title2, design: .rounded).weight(.bold))
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("図鑑")
                 }
             }
+            .navigationBarTitleDisplayMode(.inline)
             .dewAppBackground()
         .onAppear {
             guard !ReviewRequestManager.shared.hasRequestedThisSession else { return }
@@ -245,113 +244,113 @@ struct CollectionView: View {
             .presentationBackground(.clear)
             .presentationDragIndicator(.hidden)
         }
-        .sheet(item: $selectedFish) { fish in
-            FishDetailSheet(fish: fish)
-                .presentationDetents([.medium])
-                .presentationBackground(.clear)
-                .presentationDragIndicator(.hidden)
-        }
     }
 
     private var filterBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                iconFilterChip(icon: "square.grid.2x2", isSelected: unlockFilter == .all) {
-                    withAnimation(.spring(duration: 0.2)) { unlockFilter = .all }
-                }
-                .accessibilityLabel("すべて")
-                iconFilterChip(icon: "checkmark.seal.fill", isSelected: unlockFilter == .unlocked) {
-                    withAnimation(.spring(duration: 0.2)) { unlockFilter = .unlocked }
-                }
-                .accessibilityLabel("解放済み")
-                iconFilterChip(icon: "lock.fill", isSelected: unlockFilter == .locked) {
-                    withAnimation(.spring(duration: 0.2)) { unlockFilter = .locked }
-                }
-                .accessibilityLabel("未解放")
-
-                Rectangle()
-                    .fill(.secondary.opacity(0.25))
-                    .frame(width: 1, height: 20)
-                    .padding(.horizontal, 2)
-
-                filterChip(isSelected: difficultyFilter == .all, accessibilityLabel: "難易度すべて") {
-                    Image(systemName: "star.circle.fill")
-                        .font(.system(size: 14))
-                } action: {
-                    withAnimation(.spring(duration: 0.2)) { difficultyFilter = .all }
-                }
-
-                filterChip(isSelected: difficultyFilter == .easy, accessibilityLabel: "やさしい") {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 10))
-                } action: {
-                    withAnimation(.spring(duration: 0.2)) { difficultyFilter = .easy }
-                }
-
-                filterChip(isSelected: difficultyFilter == .normal, accessibilityLabel: "ふつう") {
-                    HStack(spacing: 2) {
-                        Image(systemName: "star.fill")
-                        Image(systemName: "star.fill")
-                    }
-                    .font(.system(size: 10))
-                } action: {
-                    withAnimation(.spring(duration: 0.2)) { difficultyFilter = .normal }
-                }
-
-                filterChip(isSelected: difficultyFilter == .hard, accessibilityLabel: "むずかしい") {
-                    HStack(spacing: 2) {
-                        Image(systemName: "star.fill")
-                        Image(systemName: "star.fill")
-                        Image(systemName: "star.fill")
-                    }
-                    .font(.system(size: 10))
-                } action: {
-                    withAnimation(.spring(duration: 0.2)) { difficultyFilter = .hard }
-                }
-
-                if isFiltering {
-                    Button {
-                        withAnimation(.spring(duration: 0.25)) {
-                            unlockFilter = .all
-                            difficultyFilter = .all
-                            sortOrder = .default
+        HStack(spacing: 10) {
+            filterSegmentGroup {
+                ForEach(UnlockFilter.selectableCases, id: \.self) { filter in
+                    filterSegmentButton(
+                        icon: filter.icon,
+                        isSelected: unlockFilter == filter,
+                        accessibilityLabel: filter.rawValue
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            unlockFilter = unlockFilter == filter ? .all : filter
                         }
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.leading, 4)
                     }
-                    .transition(.scale.combined(with: .opacity))
-                    .accessibilityLabel("フィルターをリセット")
                 }
             }
-            .padding(.vertical, 2)
+
+            filterSegmentGroup {
+                ForEach(DifficultyFilter.selectableCases, id: \.self) { filter in
+                    difficultySegmentButton(
+                        filter: filter,
+                        isSelected: difficultyFilter == filter
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            difficultyFilter = difficultyFilter == filter ? .all : filter
+                        }
+                    }
+                }
+            }
+
+            if isFiltering {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        unlockFilter = .all
+                        difficultyFilter = .all
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 36, height: 36)
+                        .background(Color.primary.opacity(0.06), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .transition(.opacity)
+                .accessibilityLabel("フィルターをリセット")
+            }
         }
     }
 
-    private func filterChip<Content: View>(isSelected: Bool, accessibilityLabel: String, @ViewBuilder content: () -> Content, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    private func filterSegmentGroup<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: 2) {
             content()
-                .padding(.horizontal, 11)
-                .padding(.vertical, 8)
+        }
+        .padding(3)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+        }
+    }
+
+    private func filterSegmentButton(
+        icon: String,
+        isSelected: Bool,
+        accessibilityLabel: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+                .frame(width: 44, height: 36)
                 .background(
-                    isSelected
-                        ? AnyShapeStyle(Color.teal.opacity(0.85))
-                        : AnyShapeStyle(Color.dewSurfaceSoft),
-                    in: Capsule()
+                    isSelected ? Color.primary.opacity(0.1) : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
                 )
-                .foregroundStyle(isSelected ? .white : .secondary)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    private func iconFilterChip(icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        filterChip(isSelected: isSelected, accessibilityLabel: "", content: {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: isSelected ? .semibold : .regular))
-        }, action: action)
+    private func difficultySegmentButton(
+        filter: DifficultyFilter,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 2) {
+                ForEach(0..<filter.starCount, id: \.self) { _ in
+                    Image(systemName: "star.fill")
+                }
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(isSelected ? Color.orange : Color.secondary.opacity(0.65))
+            .frame(minWidth: 44, minHeight: 36)
+            .padding(.horizontal, 6)
+            .background(
+                isSelected ? Color.orange.opacity(0.12) : Color.clear,
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(filter.rawValue)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var emptyFilterResult: some View {
@@ -360,15 +359,14 @@ struct CollectionView: View {
                 .font(.title2)
                 .foregroundStyle(.secondary)
             Button {
-                withAnimation(.spring(duration: 0.25)) {
+                withAnimation(.easeInOut(duration: 0.2)) {
                     unlockFilter = .all
                     difficultyFilter = .all
-                    sortOrder = .default
                 }
             } label: {
-                Image(systemName: "xmark.circle.fill")
+                Image(systemName: "xmark.circle")
                     .font(.title3)
-                    .foregroundStyle(.teal)
+                    .foregroundStyle(.secondary)
             }
             .accessibilityLabel("フィルターをリセット")
         }
@@ -417,34 +415,35 @@ struct CollectionView: View {
 
                     if !isUnlocked && !isGrowing {
                         Image(systemName: "lock.fill")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(.secondary)
-                            .padding(7)
-                            .background(Color.white.opacity(0.85), in: Circle())
+                            .padding(8)
+                            .background(Color.white.opacity(0.9), in: Circle())
                             .padding(8)
                     } else if isGrowing {
                         Image(systemName: "drop.fill")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(.white)
-                            .padding(7)
+                            .padding(8)
                             .background(Color.blue, in: Circle())
                             .padding(8)
                     }
                 }
                 .frame(height: 120)
 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .firstTextBaseline) {
                         Text(isUnlocked || isGrowing ? species.displayName : "???")
-                            .font(.system(.subheadline, design: .rounded).weight(.bold))
+                            .font(.system(.body, design: .rounded).weight(.bold))
                             .foregroundStyle(isUnlocked || isGrowing ? Color.primary : Color.secondary.opacity(0.7))
                             .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                         
                         Spacer()
                         
                         if isUnlocked || isGrowing {
                             Image(systemName: snapshot.currentStage.icon)
-                                .font(.caption2)
+                                .font(.body.weight(.semibold))
                                 .foregroundStyle(isGrowing ? Color.blue : snapshot.accentColor)
                         } else {
                             difficultyStars(for: species)
@@ -455,27 +454,26 @@ struct CollectionView: View {
                         compactGrowthLane(snapshot: snapshot)
                     } else {
                         HStack(spacing: 8) {
-                            HStack(spacing: 3) {
+                            HStack(spacing: 5) {
                                 Image(systemName: "drop.fill")
-                                    .font(.system(size: 8))
+                                    .font(.footnote.weight(.bold))
                                     .foregroundStyle(.cyan)
                                 Text("水 \(species.requiredWaterPercentText)")
-                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .font(.system(.footnote, design: .rounded).weight(.bold))
                                     .foregroundStyle(.secondary)
                             }
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(Color.cyan.opacity(0.08), in: Capsule())
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.cyan.opacity(0.12), in: Capsule())
 
                             Spacer()
                         }
-                        .padding(.top, 2)
                     }
                 }
                 .padding(.horizontal, 4)
             }
             .padding(10)
-            .frame(maxWidth: .infinity, minHeight: 180, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 190, alignment: .topLeading)
             .background(
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
                     .fill(isUnlocked || isGrowing ? .ultraThinMaterial : .thinMaterial)
@@ -506,89 +504,53 @@ struct CollectionView: View {
             }
         }()
         
-        HStack(spacing: 1) {
+        HStack(spacing: 2) {
             ForEach(0..<count, id: \.self) { _ in
                 Image(systemName: "star.fill")
-                    .font(.system(size: 8))
+                    .font(.footnote.weight(.bold))
                     .foregroundStyle(.orange)
             }
         }
     }
 
     private func compactGrowthLane(snapshot: SpeciesGrowthSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             GeometryReader { geo in
                 let width = geo.size.width
+                let laneHeight: CGFloat = 16
                 ZStack(alignment: .leading) {
                     Capsule()
                         .fill(Color.primary.opacity(0.07))
-                        .frame(height: 12)
+                        .frame(height: laneHeight)
 
                     Capsule()
                         .fill(snapshot.progressGradient)
-                        .frame(width: snapshot.progress > 0 ? max(18, width * snapshot.progress) : 0, height: 12)
+                        .frame(width: snapshot.progress > 0 ? max(22, width * snapshot.progress) : 0, height: laneHeight)
                         .animation(.spring(duration: 0.6, bounce: 0.2), value: snapshot.progress)
 
                     ForEach(GrowthStage.allCases) { stage in
                         let isReached = stage.thresholdProgress <= snapshot.progress
                         Image(systemName: stage.icon)
-                            .font(.system(size: 8, weight: .bold))
+                            .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(isReached ? .white : Color.secondary.opacity(0.5))
-                            .frame(width: 14, height: 14)
+                            .frame(width: 18, height: 18)
                             .background(
                                 Circle()
                                     .fill(isReached ? snapshot.accentColor : Color.white.opacity(0.9))
                             )
                             .overlay {
                                 Circle()
-                                    .strokeBorder(snapshot.accentColor.opacity(isReached ? 0 : 0.26), lineWidth: 0.8)
+                                    .strokeBorder(snapshot.accentColor.opacity(isReached ? 0 : 0.26), lineWidth: 1)
                             }
-                            .position(x: max(7, min(width - 7, width * stage.thresholdProgress)), y: 6)
+                            .position(x: max(9, min(width - 9, width * stage.thresholdProgress)), y: laneHeight / 2)
                             .animation(.spring(duration: 0.4), value: isReached)
                     }
                 }
             }
-            .frame(height: 12)
+            .frame(height: 16)
         }
     }
 
-
-    private var latestFishes: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Image(systemName: "clock.arrow.circlepath")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal)
-                .accessibilityLabel("最近育った魚")
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(Array(collected.prefix(16))) { fish in
-                        Button {
-                            selectedFish = fish
-                        } label: {
-                            VStack(spacing: 6) {
-                                FishArtworkView(
-                                    species: species(for: fish),
-                                    tint: fish.succeeded ? nil : .secondary,
-                                    isLocked: !fish.succeeded
-                                )
-                                .frame(width: 44, height: 40)
-                                Text(fish.name)
-                                    .font(.caption2.weight(.semibold))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.72)
-                            }
-                            .frame(width: 76, height: 84)
-                            .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal)
-            }
-        }
-    }
 
     private func records(for species: FishSpecies) -> [CollectedFish] {
         collected.filter { $0.speciesId == species.rawValue && $0.succeeded }
@@ -606,10 +568,6 @@ struct CollectionView: View {
             unlockedRecordCount: speciesRecords.count,
             bestUnlockedRatio: speciesRecords.map(\.waterRatio).max() ?? 0
         )
-    }
-
-    private func species(for fish: CollectedFish) -> FishSpecies {
-        FishSpecies(rawValue: fish.speciesId) ?? .medaka
     }
 }
 

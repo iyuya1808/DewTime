@@ -64,7 +64,7 @@ struct TimerFishOverlay: View {
 
     @State private var engine = TimerFishEngine()
 
-    private let fishSize: CGFloat = 70
+    private var renderSize: CGFloat { species.displaySize(for: .timer) }
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
@@ -74,6 +74,7 @@ struct TimerFishOverlay: View {
                     waterLevel: waterLevel
                 )
                 let f = engine.fish
+                let fishSize = renderSize
                 let bob = sin(f.bobPhase) * (fishSize * 0.055)
                 let x = f.x * size.width
                 let y = f.y * size.height + bob

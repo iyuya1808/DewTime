@@ -14,7 +14,8 @@ final class AuthService {
     var errorMessage: String?
     
     private let supabase = SupabaseManager.shared.client
-    
+    private var authenticationTask: Task<User, Error>?
+
     init() {
         // 現在のログインセッションを監視
         Task {
@@ -55,7 +56,16 @@ final class AuthService {
             return session.user
         }
 
-        return try await signInAnonymouslyForUser()
+        if let authenticationTask {
+            return try await authenticationTask.value
+        }
+
+        let task = Task { @MainActor in
+            try await self.signInAnonymouslyForUser()
+        }
+        authenticationTask = task
+        defer { authenticationTask = nil }
+        return try await task.value
     }
 
     func ensureAuthenticatedUserId() async throws -> UUID {
