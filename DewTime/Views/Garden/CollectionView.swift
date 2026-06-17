@@ -423,13 +423,6 @@ struct CollectionView: View {
                             .padding(7)
                             .background(Color.blue, in: Circle())
                             .padding(8)
-                    } else {
-                        Image(systemName: "checkmark.seal.fill")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-                            .padding(6)
-                            .background(snapshot.accentColor, in: Circle())
-                            .padding(8)
                     }
                 }
                 .frame(height: 120)
@@ -754,13 +747,6 @@ private struct SpeciesDetailSheet: View {
                         .foregroundStyle(.white)
                         .padding(9)
                         .background(Color.blue, in: Circle())
-                        .offset(x: 40, y: 40)
-                } else {
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(9)
-                        .background(snapshot.accentColor, in: Circle())
                         .offset(x: 40, y: 40)
                 }
             }
