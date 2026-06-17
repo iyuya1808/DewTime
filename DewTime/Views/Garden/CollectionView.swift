@@ -40,8 +40,14 @@ private struct SpeciesGrowthSnapshot {
     }
 
     var progress: Double {
-        guard requiredTotalWater > 0 else { return 0 }
-        return min(1.0, max(0.0, currentWater / requiredTotalWater))
+        if activeFish != nil {
+            guard requiredTotalWater > 0 else { return 0 }
+            return min(1.0, max(0.0, currentWater / requiredTotalWater))
+        }
+        if isUnlocked {
+            return 1.0
+        }
+        return 0.0
     }
 
     var currentStage: GrowthStage {
