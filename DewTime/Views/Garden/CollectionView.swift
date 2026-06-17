@@ -233,13 +233,7 @@ struct CollectionView: View {
             SpeciesDetailSheet(
                 species: species,
                 fishes: records(for: species),
-                snapshot: snapshot(for: species),
-                onSelectFish: { fish in
-                    selectedSpecies = nil
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                        selectedFish = fish
-                    }
-                }
+                snapshot: snapshot(for: species)
             )
             .presentationDetents([.large])
             .presentationBackground(.clear)
@@ -622,11 +616,18 @@ private struct SpeciesDetailSheet: View {
     let species: FishSpecies
     let fishes: [CollectedFish]
     let snapshot: SpeciesGrowthSnapshot
-    let onSelectFish: (CollectedFish) -> Void
 
+    @State private var selectedFish: CollectedFish?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
+
+    init(species: FishSpecies, fishes: [CollectedFish], snapshot: SpeciesGrowthSnapshot) {
+        self.species = species
+        self.fishes = fishes
+        self.snapshot = snapshot
+        self._selectedFish = State(initialValue: nil)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -662,7 +663,7 @@ private struct SpeciesDetailSheet: View {
                             LazyVGrid(columns: columns, spacing: 10) {
                                 ForEach(fishes) { fish in
                                     Button {
-                                        onSelectFish(fish)
+                                        selectedFish = fish
                                     } label: {
                                         fishTile(fish)
                                     }
@@ -685,6 +686,12 @@ private struct SpeciesDetailSheet: View {
                 )
                 .ignoresSafeArea()
         )
+        .sheet(item: $selectedFish) { fish in
+            FishDetailSheet(fish: fish)
+                .presentationDetents([.medium])
+                .presentationBackground(.clear)
+                .presentationDragIndicator(.hidden)
+        }
     }
 
     private var header: some View {
