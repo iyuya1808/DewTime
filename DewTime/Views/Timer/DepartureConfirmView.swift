@@ -12,151 +12,187 @@ struct DepartureConfirmView: View {
     let onConfirm: () -> Void
     let onCancel: () -> Void
 
-    @State private var fishScale: CGFloat = 0.8
+    @State private var fishScale: CGFloat = 0.85
 
     var body: some View {
         ZStack {
             LinearGradient.dewTimeSheet
                 .ignoresSafeArea()
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    // 魚アートワーク（成魚達成時は輝きエフェクト）
-                    ZStack {
-                        if completesGrowth {
-                            Circle()
-                                .fill(waterLevelColor.opacity(0.20))
-                                .frame(width: 140, height: 140)
-                                .blur(radius: 18)
-                        }
-                        FishArtworkView(species: selectedSpecies)
-                            .frame(width: 100, height: 94)
-                            .scaleEffect(fishScale)
-                            .animation(.spring(response: 0.4, dampingFraction: 0.5), value: fishScale)
-                    }
-                    .onAppear {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { fishScale = 1.0 }
-                    }
-                    .padding(.top, 24)
+            VStack(spacing: 0) {
+                DragHandle()
 
-                    // 成長段階アイコン群
-                    HStack(spacing: 16) {
-                        ForEach(GrowthStage.allCases, id: \.self) { stage in
-                            let progress = requiredDepartures > 0
-                                ? Double(departuresAfter) / Double(requiredDepartures)
-                                : 0
-                            let reached = stage.thresholdProgress <= progress
-                            Image(systemName: stage.icon)
-                                .font(.title3)
-                                .foregroundStyle(reached ? stageColor : .white.opacity(0.22))
-                                .scaleEffect(stage == growthStage ? 1.25 : 1.0)
-                        }
-                    }
-                    .padding(.top, 20)
-                    .padding(.bottom, 28)
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 24) {
+                        statusBadge
+                            .padding(.top, 12)
 
-                    // インジケーターバッジ
-                    HStack(spacing: 12) {
-                        indicatorView(
-                            icon: "drop.fill",
-                            ratio: waterLevel,
-                            color: waterLevelColor,
-                            accessibilityText: "残水量 \(Int(waterLevel * 100))%"
-                        )
-                        indicatorView(
-                            icon: isOnTime ? "checkmark.circle.fill" : "exclamationmark.circle.fill",
-                            ratio: isOnTime ? 1.0 : 0.3,
-                            color: isOnTime ? .teal : .orange,
-                            accessibilityText: isOnTime ? "オンタイム" : "遅延あり"
-                        )
-                        // しずく進捗
-                        dropProgressView(
-                            before: departuresBefore,
-                            after: departuresAfter,
-                            required: requiredDepartures
-                        )
+                        heroSection
+
+                        growthTimeline
+
+                        dropGainSection
                     }
                     .padding(.horizontal, 24)
-                    .padding(.bottom, 28)
+                    .padding(.bottom, 16)
+                }
 
-                    // ボタン（アイコンのみ）
-                    VStack(spacing: 14) {
-                        Button(action: onConfirm) {
-                            Image(systemName: "figure.walk.departure")
-                                .font(.system(size: 38, weight: .medium))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 20)
-                                .background(
-                                    LinearGradient(colors: confirmColors, startPoint: .leading, endPoint: .trailing)
-                                )
-                                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                                .shadow(color: confirmColors.first!.opacity(0.4), radius: 10, y: 4)
-                        }
-                        .accessibilityLabel("いってきます")
-
-                        Button(action: onCancel) {
-                            Image(systemName: "arrow.uturn.backward.circle")
-                                .font(.system(size: 28))
-                                .foregroundStyle(.white.opacity(0.45))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                        }
-                        .accessibilityLabel("戻る")
-                    }
+                actionButtons
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
-                }
             }
         }
         .foregroundStyle(.white)
     }
 
-    private func indicatorView(icon: String, ratio: Double, color: Color, accessibilityText: String) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .foregroundStyle(color)
-                .font(.title2)
+    // MARK: - Sections
 
-            GeometryReader { geo in
-                ZStack(alignment: .bottom) {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(.white.opacity(0.12))
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(color.opacity(0.75))
-                        .frame(height: geo.size.height * max(0.05, min(1.0, ratio)))
-                }
-            }
-            .frame(height: 40)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .accessibilityLabel(accessibilityText)
+    private var statusBadge: some View {
+        Image(systemName: isOnTime ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+            .font(.system(size: 52))
+            .foregroundStyle(isOnTime ? Color.teal : Color.orange)
+            .shadow(color: (isOnTime ? Color.teal : Color.orange).opacity(0.45), radius: 14, y: 4)
+            .accessibilityLabel(isOnTime ? "オンタイム" : "遅延あり")
     }
 
-    private func dropProgressView(before: Int, after: Int, required: Int) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: "drop.fill")
-                .foregroundStyle(stageColor)
-                .font(.title2)
+    private var heroSection: some View {
+        HStack(alignment: .center, spacing: 20) {
+            ZStack {
+                if completesGrowth {
+                    Circle()
+                        .fill(waterLevelColor.opacity(0.22))
+                        .frame(width: 118, height: 118)
+                        .blur(radius: 16)
+                }
+                FishArtworkView(species: selectedSpecies)
+                    .frame(width: 96, height: 90)
+                    .scaleEffect(fishScale)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.5), value: fishScale)
+            }
+            .onAppear {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { fishScale = 1.0 }
+            }
 
-            // しずく粒アイコン列
-            HStack(spacing: 4) {
-                ForEach(0..<max(1, required), id: \.self) { index in
-                    Image(systemName: index < after ? "drop.fill" : (index < before ? "drop.fill" : "drop"))
-                        .font(.system(size: 10))
-                        .foregroundStyle(
-                            index < after ? stageColor : (index < before ? stageColor.opacity(0.5) : .white.opacity(0.22))
+            VStack(spacing: 10) {
+                WaterTankView(waterLevel: waterLevel, cornerRadius: 24)
+                    .frame(width: 96, height: 148)
+
+                HStack(alignment: .lastTextBaseline, spacing: 2) {
+                    Text("\(Int(waterLevel * 100))")
+                        .font(.system(size: 36, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                    Text("%")
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .padding(.bottom, 4)
+                }
+                .foregroundStyle(waterLevelColor)
+                .accessibilityLabel("残水量 \(Int(waterLevel * 100))パーセント")
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity)
+        .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    private var growthTimeline: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(GrowthStage.allCases.enumerated()), id: \.element) { index, stage in
+                let progress = requiredDepartures > 0
+                    ? Double(departuresAfter) / Double(requiredDepartures)
+                    : 0
+                let reached = stage.thresholdProgress <= progress
+
+                if index > 0 {
+                    Rectangle()
+                        .fill(reached ? stageColor.opacity(0.7) : .white.opacity(0.15))
+                        .frame(height: 3)
+                        .frame(maxWidth: .infinity)
+                }
+
+                VStack(spacing: 8) {
+                    Image(systemName: stage.icon)
+                        .font(.system(size: stage == growthStage ? 28 : 22, weight: .semibold))
+                        .foregroundStyle(reached ? stageColor : .white.opacity(0.22))
+                        .scaleEffect(stage == growthStage ? 1.15 : 1.0)
+                        .frame(width: 44, height: 44)
+                        .background(
+                            Circle()
+                                .fill(stage == growthStage ? stageColor.opacity(0.18) : .white.opacity(0.06))
                         )
                 }
+                .accessibilityLabel(stage.displayName)
             }
-            .frame(height: 40)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 16)
+        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var dropGainSection: some View {
+        HStack(spacing: 16) {
+            dropCluster(count: departuresBefore, highlightUpTo: departuresBefore)
+                .accessibilityLabel("現在 \(departuresBefore)しずく")
+
+            Image(systemName: "arrow.right")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(.white.opacity(0.45))
+
+            dropCluster(count: departuresAfter, highlightUpTo: departuresAfter, emphasizeNewFrom: departuresBefore)
+                .accessibilityLabel("あと \(departuresAfter)しずく")
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .accessibilityLabel("\(after)/\(required)しずく")
+        .padding(.vertical, 18)
+        .padding(.horizontal, 16)
+        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
+
+    private func dropCluster(count: Int, highlightUpTo: Int, emphasizeNewFrom: Int = 0) -> some View {
+        HStack(spacing: 5) {
+            ForEach(0..<max(1, requiredDepartures), id: \.self) { index in
+                let filled = index < highlightUpTo
+                let isNew = index >= emphasizeNewFrom && index < highlightUpTo
+
+                Image(systemName: filled ? "drop.fill" : "drop")
+                    .font(.system(size: isNew ? 18 : 14, weight: .semibold))
+                    .foregroundStyle(
+                        filled
+                            ? (isNew ? stageColor : stageColor.opacity(0.75))
+                            : .white.opacity(0.22)
+                    )
+                    .scaleEffect(isNew ? 1.2 : 1.0)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var actionButtons: some View {
+        HStack(spacing: 16) {
+            Button(action: onCancel) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 52))
+                    .foregroundStyle(.white.opacity(0.40))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("戻る")
+
+            Button(action: onConfirm) {
+                Image(systemName: "figure.walk.departure")
+                    .font(.system(size: 32, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
+                    .background(
+                        LinearGradient(colors: confirmColors, startPoint: .leading, endPoint: .trailing)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .shadow(color: confirmColors.first!.opacity(0.45), radius: 12, y: 4)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("いってきます")
+        }
+    }
+
+    // MARK: - Helpers
 
     private var theme: WaterLevelTheme { WaterLevelTheme(waterRatio: waterLevel) }
     private var waterLevelColor: Color { theme.tintColor }
@@ -182,7 +218,6 @@ struct DepartureConfirmView: View {
                 onConfirm: {},
                 onCancel: {}
             )
-            .presentationDetents([.medium])
-            .presentationBackground(.clear)
+            .presentationDetents([.large])
         }
 }

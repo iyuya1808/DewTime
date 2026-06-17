@@ -70,12 +70,6 @@ struct TimerView: View {
         } message: {
             Text(viewModel?.saveError ?? "")
         }
-        .alert("タイマーをキャンセルしますか？", isPresented: $showCancelConfirm) {
-            Button("キャンセルする", role: .destructive) { viewModel?.reset() }
-            Button("続ける", role: .cancel) {}
-        } message: {
-            Text("タイマーをリセットして最初の状態に戻ります。")
-        }
         .alert("魚の名前", isPresented: $showFishNameEditor) {
             TextField("名前", text: $fishNameDraft)
             Button("保存") {
@@ -107,9 +101,22 @@ struct TimerView: View {
                     },
                     onCancel: { showConfirm = false }
                 )
-                .presentationDetents([.fraction(0.75), .large])
-                .presentationBackground(.clear)
-                .presentationDragIndicator(.visible)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
+            }
+        }
+        .sheet(isPresented: $showCancelConfirm) {
+            if let vm = viewModel {
+                TimerCancelConfirmView(
+                    waterLevel: vm.waterLevel,
+                    onReset: {
+                        vm.reset()
+                        showCancelConfirm = false
+                    },
+                    onContinue: { showCancelConfirm = false }
+                )
+                .presentationDetents([.height(340)])
+                .presentationDragIndicator(.hidden)
             }
         }
         .sheet(isPresented: $showResult, onDismiss: {
@@ -134,7 +141,6 @@ struct TimerView: View {
                     }
                 )
                 .presentationDetents([.large])
-                .presentationBackground(.clear)
                 .presentationDragIndicator(.hidden)
                 .interactiveDismissDisabled()
             }

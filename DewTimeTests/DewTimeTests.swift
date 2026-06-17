@@ -193,6 +193,15 @@ struct DewTimeTests {
         #expect(FishSpecies.whaleShark.requiredAquariumName == "大水族館")
     }
 
+    @Test func aquariumFishCapacityGrowsWithTier() {
+        #expect(Aquarium(totalDepartures: 0).fishCapacity == 5)
+        #expect(Aquarium(totalDepartures: 10).fishCapacity == 10)
+        #expect(Aquarium(totalDepartures: 30).fishCapacity == 20)
+        #expect(Aquarium(totalDepartures: 200).fishCapacity == 100)
+        #expect(Aquarium(totalDepartures: 45).departuresUntilNextTier == 15)
+        #expect(Aquarium(totalDepartures: 200).isMaxTier)
+    }
+
     @MainActor
     @Test func liveActivityAttributesContainRoutineSegments() async throws {
         resetLocalTestState()

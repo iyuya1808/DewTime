@@ -257,33 +257,62 @@ struct LiveAquariumView: View {
 
     @State private var engine = AquariumEngine()
     @State private var showRecords = false
+    @State private var showUpgrade = false
     @State private var selectedFish: CollectedFish?
     @State private var canvasSize: CGSize = .zero
+
+    private static let ghostMedakaIDs: [UUID] = [
+        UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-000000000001")!,
+        UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-000000000002")!,
+        UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-000000000003")!
+    ]
 
     private var collected: [CollectedFish] {
         store.collectedFishes.sorted { $0.recordedAt > $1.recordedAt }
     }
 
-    private var aquarium: Aquarium? { store.aquariums.first }
+    private var swimmableFish: [CollectedFish] {
+        collected.filter(\.succeeded)
+    }
 
-    /// コレクション済みの魚（成功記録のある種）を遊泳メンバーに変換する。
-    /// 1種につき最大3匹、合計18匹まで。
+    private var aquarium: Aquarium { store.aquarium() }
+
+    private var fishCapacity: Int {
+        aquarium.fishCapacity
+    }
+
+    /// コレクション済みの成魚を遊泳メンバーに変換する。収容上限は水槽サイズで決まる。
     private var specs: [FishSpec] {
-        let succeeded = collected.filter(\.succeeded)
-        var counts: [String: Int] = [:]
         var result: [FishSpec] = []
 
-        for fish in succeeded {
-            guard counts[fish.speciesId, default: 0] < 3,
-                  let species = FishSpecies(rawValue: fish.speciesId) else {
-                continue
-            }
-            counts[fish.speciesId, default: 0] += 1
+        for fish in swimmableFish {
+            guard let species = FishSpecies(rawValue: fish.speciesId) else { continue }
             result.append(spec(for: fish, species: species, ghost: false))
-            if result.count >= 18 { break }
+            if result.count >= fishCapacity { break }
+        }
+
+        if result.isEmpty {
+            return Self.ghostMedakaIDs.map { id in
+                FishSpec(
+                    id: id,
+                    name: FishSpecies.medaka.displayName,
+                    species: .medaka,
+                    size: 38,
+                    speed: 0.13,
+                    ghost: true
+                )
+            }
         }
 
         return result
+    }
+
+    private var swimmingFishCount: Int {
+        min(swimmableFish.count, fishCapacity)
+    }
+
+    private var aquariumSignature: String {
+        "\(aquarium.totalDepartures)-\(aquarium.sizeTier)-\(fishCapacity)"
     }
 
     private func spec(for fish: CollectedFish, species: FishSpecies, ghost: Bool) -> FishSpec {
@@ -292,7 +321,7 @@ struct LiveAquariumView: View {
             id: fish.id,
             name: fish.name,
             species: species,
-            size: 30 + ratio * 46,          // 小型魚ほど小さく、大型魚ほど大きく
+            size: 38 + ratio * 56,          // 小型魚ほど小さく、大型魚ほど大きく
             speed: 0.13 - ratio * 0.07,     // 小型魚ほど速く泳ぐ
             ghost: ghost
         )
@@ -302,7 +331,7 @@ struct LiveAquariumView: View {
         NavigationStack {
             ZStack {
                 aquariumScene
-                if activeFishCount == 0 {
+                if swimmableFish.isEmpty {
                     emptyAquariumHint
                 }
                 topBar
@@ -312,6 +341,14 @@ struct LiveAquariumView: View {
         .sheet(isPresented: $showRecords) {
             AquariumView()
         }
+        .sheet(isPresented: $showUpgrade) {
+            AquariumUpgradeSheet(
+                aquarium: aquarium,
+                swimmingCount: swimmingFishCount,
+                totalSwimmableCount: swimmableFish.count,
+                onDismiss: { showUpgrade = false }
+            )
+        }
         .sheet(item: $selectedFish) { fish in
             FishDetailSheet(fish: fish)
                 .presentationDetents([.medium])
@@ -320,6 +357,9 @@ struct LiveAquariumView: View {
         }
         .onAppear { engine.populate(specs) }
         .onChange(of: collected.map { "\($0.id.uuidString):\($0.name):\($0.succeeded)" }) { _, _ in
+            engine.populate(specs)
+        }
+        .onChange(of: aquariumSignature) { _, _ in
             engine.populate(specs)
         }
     }
@@ -521,12 +561,37 @@ struct LiveAquariumView: View {
 
     private var topBar: some View {
         VStack {
-            HStack(alignment: .top) {
-                // 魚数バッジ（アイコン＋数字のみ）
+            HStack(alignment: .top, spacing: 8) {
+                Button {
+                    showUpgrade = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "drop.fill")
+                            .font(.subheadline.weight(.bold))
+                        Text("\(aquarium.sizeTier + 1)")
+                            .font(.subheadline.weight(.bold))
+                            .monospacedDigit()
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(.black.opacity(0.22), in: Capsule())
+                    .overlay(Capsule().strokeBorder(.teal.opacity(0.45), lineWidth: 1))
+                    .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("水槽レベル\(aquarium.sizeTier + 1)。タップで成長を確認")
+
                 HStack(spacing: 5) {
                     Image(systemName: "fish.fill")
                         .font(.subheadline.weight(.bold))
-                    Text("\(activeFishCount)")
+                    Text("\(swimmingFishCount)")
+                        .font(.subheadline.weight(.bold))
+                        .monospacedDigit()
+                    Text("/")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.white.opacity(0.55))
+                    Text("\(fishCapacity)")
                         .font(.subheadline.weight(.bold))
                         .monospacedDigit()
                 }
@@ -534,9 +599,14 @@ struct LiveAquariumView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
                 .background(.black.opacity(0.22), in: Capsule())
-                .overlay(Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 1))
+                .overlay(
+                    Capsule().strokeBorder(
+                        swimmableFish.count > fishCapacity ? Color.orange.opacity(0.55) : Color.white.opacity(0.25),
+                        lineWidth: 1
+                    )
+                )
                 .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
-                .accessibilityLabel("\(activeFishCount)匹が泳いでいます")
+                .accessibilityLabel("\(swimmingFishCount)匹が泳いでいます。収容上限は\(fishCapacity)匹")
 
                 Spacer()
 
@@ -577,11 +647,6 @@ struct LiveAquariumView: View {
                 .strokeBorder(.white.opacity(0.22), lineWidth: 1)
         }
         .accessibilityLabel("成魚になった魚がここで泳ぎます")
-    }
-
-    private var activeFishCount: Int {
-        let succeeded = collected.filter(\.succeeded).count
-        return min(succeeded, 18)
     }
 }
 
