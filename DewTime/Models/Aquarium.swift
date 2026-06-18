@@ -77,14 +77,6 @@ final class Aquarium: Identifiable {
     }
 
     static func sizeName(for tier: Int) -> String {
-        switch tier {
-        case 0: return "ミニ水槽"
-        case 1: return "小型水槽"
-        case 2: return "中型水槽"
-        case 3: return "大型水槽"
-        case 4: return "特大水槽"
-        case 5: return "アクアリウム"
-        default: return "大水族館"
-        }
+        L10n.AquariumSize.name(tier: tier)
     }
 }

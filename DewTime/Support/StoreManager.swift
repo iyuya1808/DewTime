@@ -34,7 +34,7 @@ class StoreManager {
             self.products = loadedProducts.sorted(by: { $0.price < $1.price })
         } catch {
             print("Failed to load products: \(error)")
-            self.errorMessage = "商品の情報を取得できませんでした。"
+            self.errorMessage = L10n.Store.loadProductsFailed
         }
     }
     
@@ -55,21 +55,21 @@ class StoreManager {
                 await transaction.finish()
                 
                 // 応援へのお礼メッセージを設定
-                self.purchaseSuccessMessage = "「\(product.displayName)」での応援、ありがとうございます！温かいお気持ちに感謝いたします。"
+                self.purchaseSuccessMessage = L10n.Support.purchaseThanks(product.displayName)
                 
             case .userCancelled:
                 // ユーザーによるキャンセル
                 break
                 
             case .pending:
-                self.errorMessage = "購入処理が保留中です。承認されるまでお待ちください。"
+                self.errorMessage = L10n.Store.purchasePending
                 
             @unknown default:
                 break
             }
         } catch {
             print("Purchase failed: \(error)")
-            self.errorMessage = "購入処理中にエラーが発生しました。"
+            self.errorMessage = L10n.Store.purchaseFailed
         }
         
         isPurchasing = false

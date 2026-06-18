@@ -1,0 +1,35 @@
+---
+description: ユーザー向け文字列のローカライズ規約（ja/en 必須）
+alwaysApply: true
+---
+
+# Localization (DewTime)
+
+All user-facing strings must support Japanese and English.
+
+## Adding new UI text
+
+1. Add a key to `DewTimeLiveActivityShared/L10n.swift` (or `DewTime/Support/L10nModels.swift` / `L10nGarden.swift` for app-only domains)
+2. Register **both** `ja` and `en` in `DewTimeLiveActivityShared/Localizable.xcstrings`
+3. Use `Text(L10n.Domain.key)` or `L10n.tr("key", default: "日本語")` — never hardcode Japanese in Views/Models/Services/Extensions
+4. Use `L10n` for accessibility labels and notification text too
+
+## Logic vs display
+
+- Never compare localized strings (`==`, `switch` on display names, `filter { $0.label == "易しい" }`)
+- Use stable enums / IDs: `FishDifficulty`, `DifficultyFilterBand`, product IDs, `Achievement.rawValue`
+
+## Extensions
+
+- `Localizable.xcstrings` must stay in **DewTimeLiveActivityShared** with membership on App + Live Activity Extension targets
+- Extension code uses `LocalizationManager.shared` (reads language from App Group `UserDefaults`)
+
+## Glossary
+
+Follow `docs/LOCALIZATION_GLOSSARY.md` for brand terms (しずく → Dew Drop, いってきます → I'm off!, etc.)
+
+## Checklist before finishing
+
+- [ ] xcstrings has ja + en for every new key
+- [ ] No hardcoded Japanese in user-facing Swift (except `default:` in L10n and tests)
+- [ ] `LocalizationGuardTests` passes

@@ -37,7 +37,7 @@ struct DepartureRecordCalendarView: View {
                     .frame(width: 36, height: 36)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("前の月")
+            .accessibilityLabel(L10n.Calendar.prevMonth)
 
             Spacer()
 
@@ -51,7 +51,7 @@ struct DepartureRecordCalendarView: View {
                 }
                 .accessibilityLabel(displayedMonth.formatted(.dateTime.year().month(.wide)))
                 .accessibilityAddTraits(.isButton)
-                .accessibilityHint("タップで今月に戻ります")
+                .accessibilityHint(L10n.Calendar.backToThisMonth)
 
             Spacer()
 
@@ -63,7 +63,7 @@ struct DepartureRecordCalendarView: View {
                     .frame(width: 36, height: 36)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("次の月")
+            .accessibilityLabel(L10n.Calendar.nextMonth)
         }
         .foregroundStyle(.primary)
         .padding(.horizontal, 6)
@@ -82,7 +82,7 @@ struct DepartureRecordCalendarView: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("曜日")
+        .accessibilityLabel(L10n.Calendar.weekdays)
     }
 
     private func dayCell(_ day: DepartureCalendarDay) -> some View {
@@ -146,14 +146,14 @@ struct DepartureRecordCalendarView: View {
     private func dayAccessibilityLabel(_ day: DepartureCalendarDay) -> String {
         let dateText = day.date.formatted(.dateTime.month().day())
         guard let record = day.record else {
-            return "\(dateText)、未記録"
+            return L10n.Calendar.dayAccessibility(dateText, status: L10n.Calendar.noRecord)
         }
-        let dropText = record.earnedDrop ? "しずく+1" : "遅延"
-        let bonusText = record.bonusFeedAwarded ? "、餌" : ""
+        let dropText = record.earnedDrop ? L10n.Calendar.dewDrop : L10n.Calendar.late
+        let bonusText = record.bonusFeedAwarded ? L10n.Calendar.feedBonus : ""
         if day.recordCount > 1 {
-            return "\(dateText)、記録\(day.recordCount)件、\(dropText)\(bonusText)"
+            return L10n.Calendar.recordCount(dateText, count: day.recordCount, status: "\(dropText)\(bonusText)")
         }
-        return "\(dateText)、\(dropText)\(bonusText)"
+        return L10n.Calendar.dayAccessibility(dateText, status: "\(dropText)\(bonusText)")
     }
 
     private var calendarDays: [DepartureCalendarDay] {

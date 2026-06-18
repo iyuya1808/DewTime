@@ -78,13 +78,13 @@ struct AccountRegistrationView: View {
         .dewAppBackground()
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Text("クラウド保存の設定")
+                Text(L10n.Account.cloudSetupTitle)
                     .font(.headline)
                     .foregroundStyle(.primary)
             }
         }
         .alert(successAlertTitle, isPresented: $isShowingSuccessAlert) {
-            Button("OK") {
+            Button(L10n.Common.ok) {
                 dismiss()
             }
         } message: {
@@ -126,11 +126,11 @@ struct AccountRegistrationView: View {
             }
             .shadow(color: .dewBlue.opacity(0.25), radius: 12, x: 0, y: 6)
             
-            Text("大切なデータをクラウドへ")
+            Text(L10n.Account.cloudHeaderTitle)
                 .font(.title3.weight(.bold))
                 .foregroundStyle(.primary)
             
-            Text("アカウントを連携すると、毎朝の水やりデータや水槽・図鑑の記録を安全に保存し、機種変更時にも引き継ぐことができます。")
+            Text(L10n.Account.cloudHeaderMessage)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -154,12 +154,12 @@ struct AccountRegistrationView: View {
                 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
-                        Text("Apple IDで連携")
+                        Text(L10n.Account.appleLink)
                             .font(.headline)
                             .foregroundStyle(.primary)
                         
                         // 「推奨」バッジ
-                        Text("推奨")
+                        Text(L10n.Account.recommended)
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 8)
@@ -170,7 +170,7 @@ struct AccountRegistrationView: View {
                             )
                     }
                     
-                    Text("パスワード不要。最も安全で、1タップで瞬時にクラウド同期を開始できます。")
+                    Text(L10n.Account.appleLinkDetail)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineSpacing(3)
@@ -205,8 +205,8 @@ struct AccountRegistrationView: View {
                                     await authService.signInWithApple(idToken: tokenString, nonce: currentNonce)
                                     if authService.errorMessage == nil {
                                         await store.load()
-                                        successAlertTitle = "連携完了"
-                                        successAlertMessage = "Apple IDとの連携が完了しました！これで大事な育成データを安全にバックアップ・同期できます。"
+                                        successAlertTitle = L10n.Account.linkComplete
+                                        successAlertMessage = L10n.Account.linkCompleteApple
                                         isShowingSuccessAlert = true
                                     }
                                 }
@@ -216,7 +216,7 @@ struct AccountRegistrationView: View {
                             if let authError = error as? ASAuthorizationError, authError.code == .canceled {
                                 // ユーザーがキャンセルした場合は何もしない
                             } else {
-                                authService.errorMessage = "Appleサインインに失敗しました。設定やネットワーク状況を確認してください。"
+                                authService.errorMessage = L10n.Account.appleSignInFailed
                             }
                         }
                     }
@@ -249,7 +249,7 @@ struct AccountRegistrationView: View {
     private var orSeparator: some View {
         HStack(spacing: 16) {
             VStack { Divider().background(Color.secondary.opacity(0.2)) }
-            Text("または")
+            Text(L10n.Account.orSeparator)
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(.secondary)
             VStack { Divider().background(Color.secondary.opacity(0.2)) }
@@ -274,7 +274,7 @@ struct AccountRegistrationView: View {
                             .foregroundStyle(.secondary)
                     }
                     
-                    Text("メールアドレスを使用する")
+                    Text(L10n.Account.useEmail)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
                     
@@ -304,7 +304,7 @@ struct AccountRegistrationView: View {
                     
                     VStack(spacing: 16) {
                         customTextField(
-                            title: "メールアドレス",
+                            title: L10n.Account.email,
                             placeholder: "example@email.com",
                             text: $email,
                             fieldType: .email,
@@ -312,14 +312,14 @@ struct AccountRegistrationView: View {
                         )
                         
                         customSecureField(
-                            title: "パスワード (6文字以上)",
+                            title: L10n.Account.password,
                             text: $password,
                             fieldType: .password
                         )
                         
                         if emailMode == .signUp {
                             customSecureField(
-                                title: "パスワードの確認",
+                                title: L10n.Account.passwordConfirm,
                                 text: $confirmPassword,
                                 fieldType: .confirmPassword
                             )
@@ -343,7 +343,7 @@ struct AccountRegistrationView: View {
                             focusedField = nil
                             handleEmailAction()
                         } label: {
-                            Text(emailMode == .signUp ? "登録してクラウド保存を開始" : "ログインしてクラウド保存を開始")
+                            Text(emailMode == .signUp ? L10n.Account.signUpButton : L10n.Account.signInButton)
                                 .font(.subheadline.weight(.bold))
                                 .foregroundStyle(isFormValid ? .white : .secondary)
                                 .frame(maxWidth: .infinity)
@@ -383,7 +383,7 @@ struct AccountRegistrationView: View {
                     emailMode = .signUp
                 }
             } label: {
-                Text("新規作成")
+                Text(L10n.Account.signUpTab)
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(emailMode == .signUp ? .white : .secondary)
                     .frame(maxWidth: .infinity)
@@ -408,7 +408,7 @@ struct AccountRegistrationView: View {
                     emailMode = .signIn
                 }
             } label: {
-                Text("ログイン")
+                Text(L10n.Account.signInTab)
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(emailMode == .signIn ? .white : .secondary)
                     .frame(maxWidth: .infinity)
@@ -536,8 +536,8 @@ struct AccountRegistrationView: View {
             await authService.signUpWithEmail(email: email, password: password)
             if authService.errorMessage == nil {
                 await store.load()
-                successAlertTitle = "アカウント作成完了"
-                successAlertMessage = "メールアドレスでのアカウント登録が完了しました！これで大事な育成データを安全に同期できます。"
+                successAlertTitle = L10n.Account.accountCreated
+                successAlertMessage = L10n.Account.accountCreatedMessage
                 isShowingSuccessAlert = true
             }
         }
@@ -548,8 +548,8 @@ struct AccountRegistrationView: View {
             await authService.signInWithEmail(email: email, password: password)
             if authService.errorMessage == nil {
                 await store.load()
-                successAlertTitle = "ログイン完了"
-                successAlertMessage = "ログインに成功し、クラウドのデータ同期が有効になりました。"
+                successAlertTitle = L10n.Account.loginComplete
+                successAlertMessage = L10n.Account.loginCompleteMessage
                 isShowingSuccessAlert = true
             }
         }

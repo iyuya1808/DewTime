@@ -57,14 +57,7 @@ enum AchievementCategory: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     var title: String {
-        switch self {
-        case .departure:    return "しずく"
-        case .streak:       return "連続出発"
-        case .encyclopedia: return "図鑑"
-        case .fishHerd:     return "仲間"
-        case .aquarium:     return "水槽"
-        case .journey:      return "記念日"
-        }
+        L10n.Achievements.categoryTitle(self)
     }
 
     var tint: Color {
@@ -164,87 +157,11 @@ enum Achievement: String, CaseIterable, Identifiable {
     }
 
     var title: String {
-        switch self {
-        case .firstWatering:  return "初めてのしずく"
-        case .departures10:   return "しずく 10回"
-        case .departures25:   return "しずく 25回"
-        case .departures50:   return "しずく 50回"
-        case .departures100:  return "しずく 100回"
-        case .departures200:  return "しずく 200回"
-        case .departures500:  return "しずく 500回"
-        case .departures1000: return "しずく 1000回"
-        case .streak3:        return "3日連続"
-        case .streak7:        return "1週間連続"
-        case .streak14:       return "2週間連続"
-        case .streak30:       return "1か月連続"
-        case .streak60:       return "2か月連続"
-        case .streak100:      return "100日連続"
-        case .firstAdult:     return "はじめの仲間"
-        case .dex3:           return "図鑑3種"
-        case .dex5:           return "コレクター"
-        case .dex8:           return "図鑑8種"
-        case .dex10:          return "図鑑の達人"
-        case .dex12:          return "図鑑12種"
-        case .dexAll:         return "コンプリート"
-        case .fish5:          return "5匹の仲間"
-        case .fish10:         return "10匹の仲間"
-        case .fish25:         return "25匹の仲間"
-        case .fish50:         return "50匹の仲間"
-        case .fish100:        return "100匹の仲間"
-        case .aquariumLv2:    return "小型水槽"
-        case .aquariumMid:    return "中型水槽"
-        case .aquariumLarge:  return "大型水槽"
-        case .aquariumLv5:    return "特大水槽"
-        case .aquariumLv6:    return "アクアリウム"
-        case .aquariumMax:    return "大水族館"
-        case .days7:          return "1週間の旅"
-        case .days30:         return "1か月の旅"
-        case .days100:        return "100日の旅"
-        case .days200:        return "200日の旅"
-        case .days365:        return "1年の旅"
-        }
+        L10n.Achievements.title(self)
     }
 
     var detail: String {
-        switch self {
-        case .firstWatering:  return "はじめてオンタイム出発した"
-        case .departures10:   return "累計10しずく獲得した"
-        case .departures25:   return "累計25しずく獲得した"
-        case .departures50:   return "累計50しずく獲得した"
-        case .departures100:  return "累計100しずく獲得した"
-        case .departures200:  return "累計200しずく獲得した"
-        case .departures500:  return "累計500しずく獲得した"
-        case .departures1000: return "累計1000しずく獲得した"
-        case .streak3:        return "3日続けてオンタイム出発した"
-        case .streak7:        return "7日続けてオンタイム出発した"
-        case .streak14:       return "14日続けてオンタイム出発した"
-        case .streak30:       return "30日続けてオンタイム出発した"
-        case .streak60:       return "60日続けてオンタイム出発した"
-        case .streak100:      return "100日続けてオンタイム出発した"
-        case .firstAdult:     return "餌やりで魚を1匹獲得した"
-        case .dex3:           return "図鑑に3種類登録した"
-        case .dex5:           return "図鑑に5種類登録した"
-        case .dex8:           return "図鑑に8種類登録した"
-        case .dex10:          return "図鑑に10種類登録した"
-        case .dex12:          return "図鑑に12種類登録した"
-        case .dexAll:         return "図鑑を全15種コンプリートした"
-        case .fish5:          return "魚を累計5匹獲得した"
-        case .fish10:         return "魚を累計10匹獲得した"
-        case .fish25:         return "魚を累計25匹獲得した"
-        case .fish50:         return "魚を累計50匹獲得した"
-        case .fish100:        return "魚を累計100匹獲得した"
-        case .aquariumLv2:    return "水槽が小型（Lv.2）まで育った"
-        case .aquariumMid:    return "水槽が中型（Lv.3）まで育った"
-        case .aquariumLarge:  return "水槽が大型（Lv.4）まで育った"
-        case .aquariumLv5:    return "水槽が特大（Lv.5）まで育った"
-        case .aquariumLv6:    return "水槽がアクアリウム（Lv.6）まで育った"
-        case .aquariumMax:    return "水槽が大水族館（Lv.7）まで育った"
-        case .days7:          return "アプリを7日間使った"
-        case .days30:         return "アプリを30日間使った"
-        case .days100:        return "アプリを100日間使った"
-        case .days200:        return "アプリを200日間使った"
-        case .days365:        return "アプリを365日間使った"
-        }
+        L10n.Achievements.detail(self)
     }
 
     var emoji: String {
@@ -376,14 +293,6 @@ enum Achievement: String, CaseIterable, Identifiable {
     }
 
     var progressText: String {
-        switch self {
-        case .aquariumLv2:   return "Lv.2到達"
-        case .aquariumMid:   return "Lv.3到達"
-        case .aquariumLarge: return "Lv.4到達"
-        case .aquariumLv5:   return "Lv.5到達"
-        case .aquariumLv6:   return "Lv.6到達"
-        case .aquariumMax:   return "Lv.7到達"
-        default:             return ""
-        }
+        L10n.Achievements.progressText(self)
     }
 }

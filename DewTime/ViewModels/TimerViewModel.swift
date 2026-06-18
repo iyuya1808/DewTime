@@ -31,6 +31,11 @@ final class TimerViewModel {
         didPlayOverdueWarning = isOverdue
     }
 
+    func handleLanguageChange() {
+        syncLiveActivity(store: activityStore, force: true)
+        saveWidgetStateIfNeeded()
+    }
+
     func bindStore(_ store: AppDataStore) {
         activityStore = store
     }
@@ -149,7 +154,7 @@ final class TimerViewModel {
         saveState()
 
         if let error = store.errorMessage {
-            saveError = "記録の保存に失敗しました"
+            saveError = L10n.Timer.saveFailed
             print("[DewTime] 出発記録の保存に失敗しました: \(error)")
         }
     }
@@ -201,7 +206,7 @@ final class TimerViewModel {
             saveState()
 
             if let error = store.errorMessage {
-                saveError = "記録の保存に失敗しました"
+                saveError = L10n.Timer.saveFailed
                 print("[DewTime] 出発記録の再保存に失敗しました: \(error)")
             }
         } else {
@@ -237,6 +242,8 @@ final class TimerViewModel {
     }
 
     func clearError() { saveError = nil }
+
+    func reportSaveError(_ message: String) { saveError = message }
 
     func updateDepartureTime(_ newTime: Date) {
         targetDepartureTime = newTime
@@ -353,6 +360,7 @@ final class TimerViewModel {
             if AppPreferences.hapticsEnabled {
                 ScheduleHaptics.playOverdueWarning()
             }
+            syncLiveActivity(store: activityStore, force: true)
         }
     }
 }
@@ -365,7 +373,8 @@ extension TimerViewModel {
             scheduleName: "DewTime",
             startedAt: startedAt,
             targetDepartureTime: targetDepartureTime,
-            segments: []
+            segments: [],
+            initialWaterLevel: initialWaterLevel
         )
     }
 
@@ -401,13 +410,13 @@ extension TimerViewModel {
     private func liveActivityCurrentTaskName(status: DewTimerActivityAttributes.TimerStatus) -> String {
         switch status {
         case .departed:
-            return "出発完了"
+            return L10n.Timer.statusDeparted
         case .cancelled:
-            return "キャンセル"
+            return L10n.Timer.statusCancelled
         case .running:
-            return "残り \(countdownText)"
+            return L10n.Timer.statusRemaining(countdownText)
         case .overdue:
-            return "遅刻 \(countdownText)"
+            return L10n.Timer.statusOverdue(countdownText)
         }
     }
 
@@ -418,6 +427,7 @@ extension TimerViewModel {
         if force {
             shouldUpdate = true
         } else if let lastLiveActivityUpdate {
+            // タイマーは Text(timerInterval:) に任せる。水位だけ15秒ごとに更新。
             shouldUpdate = now.timeIntervalSince(lastLiveActivityUpdate) >= 15
         } else {
             shouldUpdate = true
@@ -440,13 +450,18 @@ extension TimerViewModel {
             return
         }
 
+        let fish = activityStore?.latestActiveFish()
+        let species = fish.flatMap { FishSpecies(rawValue: $0.speciesId) }
+        let fishEmoji = species?.emoji ?? "🐟"
+        let speciesName = species.map { L10n.Fish.name($0) } ?? L10n.Fish.generic
+
         SharedTimerWidgetState.save(
             SharedTimerWidgetState(
                 scheduleName: "DewTime",
                 startedAt: startedAt,
                 targetDepartureTime: targetDepartureTime,
-                fishEmoji: "🐟",
-                selectedSpeciesName: "水槽",
+                fishEmoji: fishEmoji,
+                selectedSpeciesName: speciesName,
                 segments: []
             )
         )

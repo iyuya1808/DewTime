@@ -60,7 +60,7 @@ struct AquariumStatusGuideSheet: View {
 
     private var closeButton: some View {
         Button(action: onDismiss) {
-            Text("閉じる")
+            Text(L10n.Common.close)
                 .font(.headline)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
@@ -81,7 +81,7 @@ struct AquariumStatusGuideSheet: View {
                     .foregroundStyle(.white.opacity(0.9))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("閉じる")
+            .accessibilityLabel(L10n.Common.close)
         }
         .padding(.horizontal, 20)
         .padding(.top, 10)
@@ -100,7 +100,7 @@ struct AquariumStatusGuideSheet: View {
                         .foregroundStyle(aquarium.isMaxTier ? .yellow : .cyan)
                 }
 
-                Text("水槽レベル \(aquarium.sizeTier + 1)")
+                Text(L10n.Aquarium.Guide.levelTitle(aquarium.sizeTier + 1))
                     .font(.title2.weight(.bold))
                     .foregroundStyle(.white)
 
@@ -108,7 +108,7 @@ struct AquariumStatusGuideSheet: View {
                     Text(aquarium.sizeName)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.92))
-                    Text("泳がせられる魚 \(swimmingCount)/\(aquarium.fishCapacity)匹")
+                    Text(L10n.Aquarium.Guide.swimmingCount(swimmingCount, aquarium.fishCapacity))
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.white.opacity(0.82))
                 }
@@ -120,11 +120,11 @@ struct AquariumStatusGuideSheet: View {
                     FeedPelletGlyph(size: 22)
                 }
 
-                Text("餌について")
+                Text(L10n.Aquarium.Guide.feedAbout)
                     .font(.title2.weight(.bold))
                     .foregroundStyle(.white)
 
-                Text("所持 \(aquarium.bonusFeedStock)個")
+                Text(L10n.Aquarium.Guide.feedOwned(aquarium.bonusFeedStock))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.92))
             }
@@ -136,7 +136,7 @@ struct AquariumStatusGuideSheet: View {
 
     private var growthStageCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle("成長ステージ")
+            sectionTitle(L10n.Aquarium.Guide.growthStage)
             AquariumGrowthStageView(aquarium: aquarium)
         }
         .padding(16)
@@ -146,40 +146,40 @@ struct AquariumStatusGuideSheet: View {
 
     private var benefitsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle(kind == .level ? "レベルを上げると" : "餌をあげると")
+            sectionTitle(kind == .level ? L10n.Aquarium.Guide.levelBenefits : L10n.Aquarium.Guide.feedBenefits)
 
             switch kind {
             case .level:
                 benefitRow(
                     icon: "fish.fill",
                     tint: .white,
-                    title: "泳がせられる魚が増える",
+                    title: L10n.Aquarium.Guide.benefitMoreFish,
                     detail: levelCapacityDetail
                 )
                 benefitRow(
                     icon: "sparkles",
                     tint: .yellow,
-                    title: "出会える魚種が増える",
+                    title: L10n.Aquarium.Guide.benefitMoreSpecies,
                     detail: levelSpeciesDetail
                 )
             case .feed:
                 benefitRow(
                     icon: "hand.tap.fill",
                     tint: .cyan,
-                    title: "画面をタップして餌を落とせる",
-                    detail: "水槽の好きな場所をタップすると、餌が落ちて魚が集まります。"
+                    title: L10n.Aquarium.Guide.feedTap,
+                    detail: L10n.Aquarium.Guide.feedTapDetail
                 )
                 benefitRow(
                     icon: "fish.fill",
                     tint: .white,
-                    title: "新しい魚が仲間入りする",
-                    detail: "魚が餌を食べたタイミングで、ランダムな魚種が1匹加わります。"
+                    title: L10n.Aquarium.Guide.feedNewFish,
+                    detail: L10n.Aquarium.Guide.feedNewFishDetail
                 )
                 benefitRow(
                     icon: "book.fill",
                     tint: .purple,
-                    title: "図鑑に魚種が記録される",
-                    detail: "はじめて出会った魚種は図鑑に登録され、コレクションが広がります。"
+                    title: L10n.Aquarium.Guide.feedDex,
+                    detail: L10n.Aquarium.Guide.feedDexDetail
                 )
             }
         }
@@ -190,28 +190,28 @@ struct AquariumStatusGuideSheet: View {
 
     private var howToCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle(kind == .level ? "レベルの上げ方" : "餌の入手方法")
+            sectionTitle(kind == .level ? L10n.Aquarium.Guide.levelHow : L10n.Aquarium.Guide.feedHow)
 
             switch kind {
             case .level:
                 benefitRow(
                     icon: "drop.fill",
                     tint: .cyan,
-                    title: "オンタイム出発を重ねる",
-                    detail: "出発時刻ぴったりに出発するとしずくが貯まり、水槽が成長します。"
+                    title: L10n.Aquarium.Guide.levelHowDepart,
+                    detail: L10n.Aquarium.Guide.levelHowDepartDetail
                 )
             case .feed:
                 benefitRow(
                     icon: "clock.badge.checkmark.fill",
                     tint: .cyan,
-                    title: "オンタイム出発で +1",
-                    detail: "タイマーで出発時刻ぴったりに出発すると、餌を1個獲得できます。"
+                    title: L10n.Aquarium.Guide.feedHowOnTime,
+                    detail: L10n.Aquarium.Guide.feedHowOnTimeDetail
                 )
                 benefitRow(
                     icon: "trophy.fill",
                     tint: .orange,
-                    title: "実績解除で獲得",
-                    detail: "プロフィールの実績を達成すると、餌がもらえることがあります。"
+                    title: L10n.Aquarium.Guide.feedHowAchievement,
+                    detail: L10n.Aquarium.Guide.feedHowAchievementDetail
                 )
             }
         }
@@ -258,17 +258,17 @@ struct AquariumStatusGuideSheet: View {
 
     private var levelCapacityDetail: String {
         if aquarium.isMaxTier {
-            return "現在の上限は\(aquarium.fishCapacity)匹。これ以上は増えません。"
+            return L10n.Aquarium.Guide.levelCapacityMax(aquarium.fishCapacity)
         }
         let nextCapacity = Aquarium.fishCapacity(for: aquarium.sizeTier + 1)
-        return "次のレベルでは\(nextCapacity)匹まで泳がせられます（現在\(aquarium.fishCapacity)匹）。"
+        return L10n.Aquarium.Guide.levelCapacityNext(next: nextCapacity, current: aquarium.fishCapacity)
     }
 
     private var levelSpeciesDetail: String {
         if let nextCount = nextTierEligibleSpeciesCount, nextCount > eligibleSpeciesCount {
-            return "餌やりで出る魚種が\(eligibleSpeciesCount)種から\(nextCount)種に増え、レアな魚にも出会えます。"
+            return L10n.Aquarium.Guide.levelSpeciesMore(from: eligibleSpeciesCount, to: nextCount)
         }
-        return "餌やりで\(eligibleSpeciesCount)種類の魚が出るようになっています。"
+        return L10n.Aquarium.Guide.levelSpeciesCurrent(eligibleSpeciesCount)
     }
 }
 

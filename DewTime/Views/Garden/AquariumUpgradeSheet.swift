@@ -34,7 +34,7 @@ struct AquariumUpgradeSheet: View {
                             .foregroundStyle(.white.opacity(0.75))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("閉じる")
+                    .accessibilityLabel(L10n.Common.close)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 4)
@@ -60,7 +60,7 @@ struct AquariumUpgradeSheet: View {
 
     private var growthCard: some View {
         VStack(spacing: 12) {
-            sectionDivider(icon: "drop.fill", title: "水槽の成長")
+            sectionDivider(icon: "drop.fill", title: L10n.Aquarium.Upgrade.growthSection)
 
             AquariumGrowthStageView(aquarium: aquarium)
         }
@@ -72,7 +72,7 @@ struct AquariumUpgradeSheet: View {
 
     private var occupancyCard: some View {
         VStack(spacing: 10) {
-            sectionDivider(icon: "fish.fill", title: "魚の収容")
+            sectionDivider(icon: "fish.fill", title: L10n.Aquarium.Upgrade.occupancySection)
 
             fishOccupancySection
         }
@@ -149,7 +149,7 @@ struct AquariumUpgradeSheet: View {
                 }
             }
             .frame(height: 10)
-            .accessibilityLabel("水槽の\(Int((occupancyRatio * 100).rounded()))パーセントが埋まっています")
+            .accessibilityLabel(L10n.Aquarium.Upgrade.occupancyPercentA11y(Int((occupancyRatio * 100).rounded())))
 
             HStack(spacing: 6) {
                 Label {
@@ -172,14 +172,14 @@ struct AquariumUpgradeSheet: View {
                         .monospacedDigit()
                         .foregroundStyle(.white.opacity(0.85))
                 } icon: {
-                    Text("上限")
+                    Text(L10n.Aquarium.Upgrade.capacityLabel)
                         .font(.caption2.weight(.semibold))
                 }
                 .labelStyle(.titleAndIcon)
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
-            .accessibilityLabel("\(swimmingCount)匹が泳いでいます。収容上限は\(aquarium.fishCapacity)匹")
+            .accessibilityLabel(L10n.Aquarium.Upgrade.swimmingA11y(swimming: swimmingCount, capacity: aquarium.fishCapacity))
         }
     }
 
@@ -188,11 +188,11 @@ struct AquariumUpgradeSheet: View {
             Image(systemName: "archivebox.fill")
                 .font(.body.weight(.semibold))
                 .foregroundStyle(.orange)
-            Text("図鑑に保管")
+            Text(L10n.Aquarium.Upgrade.storageCollection)
                 .font(.subheadline.weight(.semibold))
             Image(systemName: "fish.fill")
                 .font(.caption.weight(.bold))
-            Text("\(waitingCount)匹")
+            Text(L10n.Collection.fishCount(waitingCount))
                 .font(.subheadline.weight(.bold))
                 .monospacedDigit()
         }
@@ -205,7 +205,7 @@ struct AquariumUpgradeSheet: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(Color.orange.opacity(0.35), lineWidth: 1)
         }
-        .accessibilityLabel("収容上限を超えて\(waitingCount)匹が図鑑に保管されています")
+        .accessibilityLabel(L10n.Aquarium.Upgrade.overflowA11y(waitingCount))
     }
 }
 

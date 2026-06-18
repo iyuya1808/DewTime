@@ -28,6 +28,7 @@ final class AppDataStore {
 
     private var isFeedGachaInFlight = false
     private let schemaVersion = 1
+    private let cloudUserIdDefaultsKey = "local_cloud_user_id"
     private let cloudDataService: CloudDataServicing?
     private let enableCloudSync: Bool
     private let cloudUserIdProvider: () async throws -> UUID
@@ -73,6 +74,7 @@ final class AppDataStore {
 
         do {
             let userId = try await cloudUserIdProvider()
+            noteCloudUserChangeIfNeeded(currentUserId: userId)
 
             if let purchases = try? await cloudDataService.loadPurchases(userId: userId) {
                 self.isDeveloperSupported = !purchases.isEmpty
@@ -87,9 +89,11 @@ final class AppDataStore {
                     snapshot: makeCloudSnapshot(userId: userId),
                     userId: userId
                 )
+                markCloudUserSynced(userId)
             } else {
                 applyCloudSnapshot(snapshot)
                 try saveToLocal()
+                markCloudUserSynced(userId)
             }
         } catch {
             errorMessage = "クラウド同期に失敗しました。端末内のデータを表示しています。"
@@ -112,10 +116,12 @@ final class AppDataStore {
             try saveToLocal()
             if enableCloudSync, let cloudDataService {
                 let userId = try await cloudUserIdProvider()
+                noteCloudUserChangeIfNeeded(currentUserId: userId)
                 try await cloudDataService.saveAll(
                     snapshot: makeCloudSnapshot(userId: userId),
                     userId: userId
                 )
+                markCloudUserSynced(userId)
             }
         } catch {
             errorMessage = "データの保存に失敗しました"
@@ -278,7 +284,7 @@ final class AppDataStore {
     func updateProfile(nickname: String, avatarEmoji: String) async {
         let profile = profile()
         let trimmed = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
-        profile.nickname = trimmed.isEmpty ? "あなた" : trimmed
+        profile.nickname = trimmed.isEmpty ? L10n.Profile.defaultNickname : trimmed
         profile.avatarEmoji = avatarEmoji
         await saveAll()
     }
@@ -291,7 +297,7 @@ final class AppDataStore {
 
     func renameCollectedFish(_ fish: CollectedFish, name: String) async {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let speciesName = FishSpecies(rawValue: fish.speciesId)?.displayName ?? "魚"
+        let speciesName = FishSpecies(rawValue: fish.speciesId)?.displayName ?? L10n.Fish.generic
         fish.name = trimmed.isEmpty ? speciesName : trimmed
         await saveAll()
     }
@@ -656,7 +662,7 @@ final class AppDataStore {
     private func decodeProfile(id: String, data: [String: Any]) throws -> UserProfile {
         UserProfile(
             id: try uuid(id, label: "profile.id"),
-            nickname: string(data["nickname"], default: "あなた"),
+            nickname: string(data["nickname"], default: L10n.Profile.defaultNickname),
             avatarEmoji: string(data["avatarEmoji"], default: "🐟"),
             createdAt: try date(data["createdAt"], label: "profile.createdAt"),
             claimedAchievementRewardIds: stringArray(data["claimedAchievementRewardIds"])
@@ -716,6 +722,20 @@ final class AppDataStore {
             print("[DewTime] Auth lookup failed: \(error)")
             return nil
         }
+    }
+
+    private func storedCloudUserId() -> UUID? {
+        guard let raw = UserDefaults.standard.string(forKey: cloudUserIdDefaultsKey) else { return nil }
+        return UUID(uuidString: raw)
+    }
+
+    private func noteCloudUserChangeIfNeeded(currentUserId: UUID) {
+        guard let previousUserId = storedCloudUserId(), previousUserId != currentUserId else { return }
+        print("[DewTime] Cloud user changed: \(previousUserId) → \(currentUserId)")
+    }
+
+    private func markCloudUserSynced(_ userId: UUID) {
+        UserDefaults.standard.set(userId.uuidString, forKey: cloudUserIdDefaultsKey)
     }
 
     private static var isRunningTests: Bool {

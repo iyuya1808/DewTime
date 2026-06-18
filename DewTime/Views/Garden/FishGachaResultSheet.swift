@@ -30,11 +30,11 @@ struct FishGachaResultSheet: View {
                         .foregroundStyle(.yellow)
                         .symbolEffect(.pulse, options: .repeating)
 
-                    Text("新しい仲間が誕生！")
+                    Text(L10n.Gacha.newFriend)
                         .font(.title3.weight(.bold))
 
                     if reveal.isNewSpecies {
-                        Label("図鑑に初登場", systemImage: "book.fill")
+                        Label(L10n.Gacha.dexFirst, systemImage: "book.fill")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.purple)
                             .padding(.horizontal, 10)
@@ -69,7 +69,7 @@ struct FishGachaResultSheet: View {
                 Button {
                     onDismiss()
                 } label: {
-                    Text("水槽で見る")
+                    Text(L10n.Gacha.viewInAquarium)
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
@@ -89,8 +89,8 @@ struct FishGachaResultSheet: View {
     }
 
     private var accessibilitySummary: String {
-        var parts = ["新しい\(species.displayName)が誕生しました"]
-        if reveal.isNewSpecies { parts.append("図鑑に初登場") }
+        var parts = [L10n.Gacha.bornA11y(species.displayName)]
+        if reveal.isNewSpecies { parts.append(L10n.Gacha.dexFirst) }
         return parts.joined(separator: "、")
     }
 }

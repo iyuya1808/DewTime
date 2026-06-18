@@ -9,8 +9,8 @@ struct DewTimeQuickStartWidget: Widget {
         ) { entry in
             QuickStartWidgetView(entry: entry)
         }
-        .configurationDisplayName("DewTime クイックタイマー")
-        .description("ホーム画面から出発タイマーをすばやく開始します。")
+        .configurationDisplayName(L10n.Widget.displayName)
+        .description(L10n.Widget.description)
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
@@ -53,7 +53,7 @@ private struct QuickStartTimelineProvider: TimelineProvider {
             startedAt: .now.addingTimeInterval(-8 * 60),
             targetDepartureTime: .now.addingTimeInterval(22 * 60),
             fishEmoji: "🐟",
-            selectedSpeciesName: "メダカ",
+            selectedSpeciesName: L10n.Widget.previewSpeciesName,
             segments: []
         )
     }
@@ -117,7 +117,7 @@ private struct QuickStartWidgetView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
 
-                Text(state.map { $0.currentTaskName(at: entry.date) } ?? "出発タイマー")
+                Text(state.map { subtitle(for: $0, at: entry.date) } ?? L10n.Widget.departureTimer)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.72))
                     .lineLimit(1)
@@ -128,10 +128,17 @@ private struct QuickStartWidgetView: View {
         }
     }
 
+    private func subtitle(for state: SharedTimerWidgetState, at date: Date) -> String {
+        if state.segments.isEmpty {
+            return state.selectedSpeciesName
+        }
+        return state.currentTaskName(at: date)
+    }
+
     private func runningFooter(state: SharedTimerWidgetState, isOverdue: Bool) -> some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(isOverdue ? "超過" : "残り")
+                Text(isOverdue ? L10n.Live.overdue : L10n.Live.remaining)
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(isOverdue ? .orange : .white.opacity(0.72))
 
@@ -162,7 +169,7 @@ private struct QuickStartWidgetView: View {
                             .font(.caption2.weight(.bold))
                         Text(preset.title)
                             .font(.subheadline.monospacedDigit().weight(.bold))
-                        Text("分")
+                        Text(L10n.Timer.minutesUnit)
                             .font(.caption2.weight(.semibold))
                     }
                     .foregroundStyle(.white)
@@ -291,7 +298,7 @@ private struct WidgetAquariumView: View {
             startedAt: .now.addingTimeInterval(-8 * 60),
             targetDepartureTime: .now.addingTimeInterval(22 * 60),
             fishEmoji: "🐟",
-            selectedSpeciesName: "メダカ",
+            selectedSpeciesName: L10n.Widget.previewSpeciesName,
             segments: []
         )
     )

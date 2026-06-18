@@ -33,11 +33,11 @@ struct SharedTimerWidgetState: Codable, Equatable {
     }
 
     func currentTaskName(at date: Date) -> String {
-        guard !segments.isEmpty else { return "準備中" }
+        guard !segments.isEmpty else { return selectedSpeciesName }
         let elapsed = max(0, date.timeIntervalSince(startedAt))
         return segments.first(where: { elapsed < $0.endOffset })?.name
             ?? segments.last?.name
-            ?? "準備中"
+            ?? L10n.Common.preparing
     }
 
     static func load() -> SharedTimerWidgetState? {

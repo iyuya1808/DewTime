@@ -179,8 +179,6 @@ struct SettingsPrimaryButton: View {
     }
 }
 
-// MARK: - Theme chips
-
 struct SettingsThemeChip: View {
     let theme: AppTheme
     let isSelected: Bool
@@ -218,6 +216,35 @@ struct SettingsThemeChip: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(theme.displayName)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+struct SettingsLanguageChip: View {
+    let language: AppLanguage
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(language.pickerLabel)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(isSelected ? Color.teal : Color.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(
+                    isSelected ? Color.teal.opacity(0.14) : Color.dewSurfaceSoft,
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+                .overlay {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(Color.teal, lineWidth: 1.5)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(language.pickerLabel)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
@@ -322,23 +349,23 @@ struct NotificationAuthorizationBanner: View {
 
     private var bannerTitle: String {
         switch status {
-        case .authorized, .provisional, .ephemeral: return "通知が許可されています"
-        case .denied: return "通知が許可されていません"
-        case .notDetermined: return "通知の許可が必要です"
-        @unknown default: return "通知状態を確認できません"
+        case .authorized, .provisional, .ephemeral: return L10n.NotificationSettings.bannerAuthorized
+        case .denied: return L10n.NotificationSettings.bannerDenied
+        case .notDetermined: return L10n.NotificationSettings.bannerNotDetermined
+        @unknown default: return L10n.NotificationSettings.bannerUnknown
         }
     }
 
     private var bannerSubtitle: String {
         switch status {
         case .authorized, .provisional, .ephemeral:
-            return "出発時刻の通知を予約できます。"
+            return L10n.NotificationSettings.bannerAuthorizedSubtitle
         case .denied:
-            return "iOSの設定アプリから通知を許可してください。"
+            return L10n.NotificationSettings.bannerDeniedSubtitle
         case .notDetermined:
-            return "下のボタンから通知の許可をリクエストできます。"
+            return L10n.NotificationSettings.bannerNotDeterminedSubtitle
         @unknown default:
-            return "もう一度お試しください。"
+            return L10n.NotificationSettings.bannerUnknownSubtitle
         }
     }
 }

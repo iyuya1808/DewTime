@@ -14,369 +14,620 @@ struct DewTimeLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: DewTimerActivityAttributes.self) { context in
             LockScreenLiveActivityView(context: context)
-                .activityBackgroundTint(Color(red: 0.03, green: 0.10, blue: 0.14))
+                .activityBackgroundTint(Color(red: 0.02, green: 0.09, blue: 0.13))
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    ExpandedTankView(context: context)
+                    Color.clear.frame(width: 1, height: 1)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    ExpandedAquariumView(state: context.state)
+                    Color.clear.frame(width: 1, height: 1)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    ExpandedTaskView(context: context)
+                    ExpandedIslandView(context: context)
                 }
             } compactLeading: {
-                HStack(spacing: 3) {
-                    Image(systemName: "drop.fill")
-                    Text("\(context.state.waterPercent)%")
-                        .monospacedDigit()
-                }
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.cyan)
+                CompactLeadingView(context: context)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    .padding(.leading, 3)
             } compactTrailing: {
-                Text(compactStatusText(context.state))
-                    .font(.caption2.weight(.semibold))
+                CompactTrailingView(context: context)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                    .padding(.trailing, 3)
             } minimal: {
-                HStack(spacing: 1) {
-                    Image(systemName: "drop.fill")
-                    Text("\(context.state.waterPercent)%")
-                        .monospacedDigit()
-                        .minimumScaleFactor(0.7)
-                        .lineLimit(1)
-                }
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(context.state.waterLevel <= 0.2 ? .orange : .cyan)
+                IslandMinimalView(context: context)
             }
         }
     }
 }
 
-private struct LockScreenLiveActivityView: View {
-    let context: ActivityViewContext<DewTimerActivityAttributes>
+// MARK: - 出発時刻の切替 + 水位のリアルタイム計算
 
-    private var isDeparted: Bool { context.state.status == .departed }
+/// 出発時刻を必ず含め、1秒ごとに水位用の再描画を行う。
+private struct LiveActivityTimelineSchedule: TimelineSchedule {
+    let startedAt: Date
+    let targetDepartureTime: Date
+    let staleDate: Date
+    let tickInterval: TimeInterval = 1
 
-    var body: some View {
-        HStack(spacing: 14) {
-            TankPreviewView(
-                waterLevel: isDeparted ? 0 : context.state.waterLevel,
-                segments: context.attributes.segments
-            )
-            .frame(width: 82, height: 92)
+    func entries(from startDate: Date, mode: TimelineScheduleMode) -> [Date] {
+        let anchor = max(startDate, startedAt)
+        let end = min(staleDate, anchor.addingTimeInterval(24 * 3600))
+        guard anchor < end else { return [anchor] }
 
-            VStack(alignment: .leading, spacing: 9) {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(context.attributes.scheduleName)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.68))
-                            .lineLimit(1)
-                        Text(context.state.currentTaskName)
-                            .font(.headline.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.78)
-                    }
-
-                    Spacer()
-
-                    VStack(alignment: .trailing, spacing: 3) {
-                        if isDeparted {
-                            Text("水槽へ")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.mint)
-                            Text("注水完了")
-                                .font(.title3.weight(.semibold))
-                                .foregroundStyle(.white)
-                                .minimumScaleFactor(0.72)
-                        } else {
-                            Text(context.state.status == .overdue ? "超過" : "残り")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(context.state.status == .overdue ? .orange : .white.opacity(0.58))
-                            Text(timerInterval: Date.now...context.attributes.targetDepartureTime, countsDown: true)
-                                .font(.title3.monospacedDigit().weight(.semibold))
-                                .foregroundStyle(.white)
-                                .multilineTextAlignment(.trailing)
-                                .minimumScaleFactor(0.72)
-                        }
-                    }
-                }
-
-                WaterMeterView(
-                    waterLevel: isDeparted ? 0 : context.state.waterLevel,
-                    aquariumDepartures: context.state.aquariumDepartures,
-                    aquariumTier: context.state.aquariumTier
-                )
-
-                HStack(spacing: 10) {
-                    AquariumPreviewBadge(state: context.state)
-                        .scaleEffect(isDeparted ? 1.18 : 1.0)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Lv.\(context.state.tierDisplayNumber) \(context.state.aquariumTierName)")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.78)
-                        HStack(spacing: 6) {
-                            Text("\(context.state.aquariumDepartures) 💧")
-                                .font(.caption.monospacedDigit())
-                            if context.state.bonusFeedStock > 0 {
-                                Text("●\(context.state.bonusFeedStock)")
-                                    .font(.caption.monospacedDigit())
-                            }
-                        }
-                        .foregroundStyle(.white.opacity(0.64))
-                    }
-
-                    Spacer()
-                }
-            }
+        var dates: [Date] = []
+        var cursor = anchor
+        while cursor <= end {
+            dates.append(cursor)
+            cursor = cursor.addingTimeInterval(tickInterval)
         }
-        .padding(16)
-        .foregroundStyle(.white)
-        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: context.state.status)
-        .animation(.spring(response: 0.35, dampingFraction: 0.55), value: context.state.phaseIndex)
+
+        if targetDepartureTime > anchor, targetDepartureTime <= end, !dates.contains(targetDepartureTime) {
+            dates.append(targetDepartureTime)
+            dates.sort()
+        }
+
+        return dates.isEmpty ? [anchor] : dates
     }
 }
 
-private struct ExpandedTankView: View {
-    let context: ActivityViewContext<DewTimerActivityAttributes>
-
-    private var isDeparted: Bool { context.state.status == .departed }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            TankPreviewView(
-                waterLevel: isDeparted ? 0 : context.state.waterLevel,
-                segments: context.attributes.segments
-            )
-            .frame(width: 66, height: 72)
-            Text(isDeparted ? "注水完了" : "\(context.state.waterPercent)%")
-                .font(.caption2.monospacedDigit().weight(.semibold))
-                .foregroundStyle(isDeparted ? .mint : .cyan)
-        }
-        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: context.state.status)
+private func liveWaterLevel(
+    attributes: DewTimerActivityAttributes,
+    state: DewTimerActivityAttributes.ContentState,
+    at date: Date
+) -> Double {
+    switch state.status {
+    case .departed, .cancelled:
+        return 0
+    case .running, .overdue:
+        let overdue = date >= attributes.targetDepartureTime || state.status == .overdue
+        return overdue ? 0 : attributes.waterLevel(at: date)
     }
 }
 
-private struct ExpandedAquariumView: View {
+private struct LiveActivityMoment<Content: View>: View {
+    let attributes: DewTimerActivityAttributes
     let state: DewTimerActivityAttributes.ContentState
-
-    private var isDeparted: Bool { state.status == .departed }
+    @ViewBuilder let content: (_ isPastDeparture: Bool, _ date: Date) -> Content
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 5) {
-            Image(systemName: state.aquariumTier >= 6 ? "sparkles" : "drop.fill")
-                .font(.title)
-                .foregroundStyle(state.aquariumTier >= 6 ? .yellow : .cyan)
-                .scaleEffect(isDeparted ? 1.3 : 1.0)
-            Text("Lv.\(state.tierDisplayNumber)")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.82))
-            Text("\(state.aquariumDepartures)💧")
-                .font(.caption2.monospacedDigit())
-                .foregroundStyle(.white.opacity(0.7))
+        if state.status.isFinished {
+            content(false, state.lastUpdatedAt)
+        } else {
+            TimelineView(
+                LiveActivityTimelineSchedule(
+                    startedAt: attributes.startedAt,
+                    targetDepartureTime: attributes.targetDepartureTime,
+                    staleDate: attributes.activityStaleDate
+                )
+            ) { timeline in
+                content(
+                    timeline.date >= attributes.targetDepartureTime,
+                    timeline.date
+                )
+            }
         }
-        .animation(.spring(response: 0.5, dampingFraction: 0.6), value: state.status)
     }
 }
 
-private struct ExpandedTaskView: View {
-    let context: ActivityViewContext<DewTimerActivityAttributes>
+private func isVisuallyOverdue(
+    state: DewTimerActivityAttributes.ContentState,
+    isPastDeparture: Bool
+) -> Bool {
+    isPastDeparture || state.status == .overdue
+}
 
-    private var isDeparted: Bool { context.state.status == .departed }
+// MARK: - Shared
+
+private struct AdaptiveTimerText: View {
+    let attributes: DewTimerActivityAttributes
+    let isPastDeparture: Bool
+    var font: Font = .caption2.monospacedDigit().weight(.semibold)
+    var runningTint: Color = .cyan
+    var alignment: TextAlignment = .trailing
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label(context.state.currentTaskName, systemImage: isDeparted ? "drop.fill" : "figure.walk.motion")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                Spacer()
-                if isDeparted {
-                    Text("水槽へ注水 ✨")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.mint)
-                } else {
-                    Text(timerInterval: Date.now...context.attributes.targetDepartureTime, countsDown: true)
-                        .font(.caption.monospacedDigit().weight(.bold))
-                        .foregroundStyle(.white.opacity(0.88))
-                }
-            }
-
-            WaterMeterView(
-                waterLevel: isDeparted ? 0 : context.state.waterLevel,
-                aquariumDepartures: context.state.aquariumDepartures,
-                aquariumTier: context.state.aquariumTier,
-                isCompact: true
+        if isPastDeparture {
+            OverdueText(attributes: attributes, font: font, alignment: alignment)
+        } else {
+            CountdownText(
+                attributes: attributes,
+                font: font,
+                color: runningTint,
+                alignment: alignment
             )
+        }
+    }
+}
 
-            if !isDeparted, let nextTaskName = context.state.nextTaskName {
-                Text("次: \(nextTaskName)")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.62))
-                    .lineLimit(1)
+private struct CountdownText: View {
+    let attributes: DewTimerActivityAttributes
+    var font: Font = .caption2.monospacedDigit().weight(.semibold)
+    var color: Color = .cyan
+    var alignment: TextAlignment = .trailing
+
+    var body: some View {
+        Text(attributes.timerPlaceholder(isOverdue: false))
+            .font(font)
+            .hidden()
+            .overlay {
+                Text(
+                    timerInterval: attributes.timerInterval,
+                    countsDown: true,
+                    showsHours: attributes.showsHourTimer
+                )
+                .font(font)
+                .monospacedDigit()
+                .multilineTextAlignment(alignment)
+                .foregroundStyle(color)
+            }
+            .fixedSize()
+    }
+}
+
+private struct OverdueText: View {
+    let attributes: DewTimerActivityAttributes
+    var font: Font = .caption2.monospacedDigit().weight(.semibold)
+    var alignment: TextAlignment = .trailing
+
+    var body: some View {
+        Text(attributes.timerPlaceholder(isOverdue: true))
+            .font(font)
+            .hidden()
+            .overlay {
+                HStack(spacing: 0) {
+                    Text("+")
+                    Text(
+                        timerInterval: attributes.targetDepartureTime...attributes.activityStaleDate,
+                        countsDown: false
+                    )
+                    .monospacedDigit()
+                }
+                .font(font)
+                .multilineTextAlignment(alignment)
+                .foregroundStyle(.orange)
+            }
+            .fixedSize()
+    }
+}
+
+private struct WaterBar: View {
+    var level: Double
+    var isOverdue: Bool = false
+    var width: CGFloat? = nil
+    var height: CGFloat = 5
+
+    var body: some View {
+        let clamped = max(0, min(1, level))
+        let fill = isOverdue || clamped <= 0.2 ? Color.orange : Color.cyan
+        let track = isOverdue ? Color.orange.opacity(0.3) : Color(white: 0.38)
+
+        Group {
+            if let width {
+                barTrack(fill: fill, track: track, clamped: clamped, barWidth: width)
+                    .frame(width: width, height: height)
+            } else {
+                GeometryReader { geo in
+                    barTrack(fill: fill, track: track, clamped: clamped, barWidth: geo.size.width)
+                }
+                .frame(height: height)
             }
         }
-        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: context.state.status)
-        .animation(.spring(response: 0.35, dampingFraction: 0.55), value: context.state.phaseIndex)
     }
+
+    private func barTrack(fill: Color, track: Color, clamped: Double, barWidth: CGFloat) -> some View {
+        Capsule()
+            .fill(track)
+            .overlay(alignment: .leading) {
+                Capsule()
+                    .fill(fill)
+                    .frame(width: max(height, barWidth * clamped), height: height)
+                    .animation(.linear(duration: 1), value: clamped)
+            }
+    }
+}
+
+private enum CompactIslandMetrics {
+    static let rowHeight: CGFloat = 11
+    static let iconFont: Font = .system(size: 9, weight: .semibold)
+    static let barWidth: CGFloat = 18
+    static let barHeight: CGFloat = 3
 }
 
 private struct TankPreviewView: View {
     var waterLevel: Double
-    var segments: [DewTimerActivityAttributes.RoutineSegment]
+    var isOverdue: Bool = false
+    var cornerRadius: CGFloat = 12
+
+    private let innerInset: CGFloat = 3
 
     var body: some View {
-        GeometryReader { proxy in
-            let size = proxy.size
-            let clampedLevel = max(0, min(1, waterLevel))
-            let waterHeight = max(8, size.height * clampedLevel)
+        GeometryReader { geo in
+            let clamped = max(0, min(1, waterLevel))
+            let innerHeight = max(0, geo.size.height - innerInset * 2)
+            let waterHeight = innerHeight * clamped
+            let innerRadius = max(3, cornerRadius - innerInset)
+            let waterColors = isOverdue || clamped <= 0.2
+                ? [Color.orange.opacity(0.92), Color.orange.opacity(0.72)]
+                : [Color.cyan.opacity(0.92), Color(red: 0.03, green: 0.47, blue: 0.76).opacity(0.95)]
 
             ZStack(alignment: .bottom) {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.02, green: 0.08, blue: 0.13),
-                                Color(red: 0.08, green: 0.18, blue: 0.23)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(Color(red: 0.05, green: 0.12, blue: 0.16))
+
+                if waterHeight > 0 {
+                    RoundedRectangle(cornerRadius: innerRadius, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: waterColors,
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
                         )
-                    )
+                        .frame(height: waterHeight)
+                        .padding(.horizontal, innerInset)
+                        .padding(.bottom, innerInset)
+                        .animation(.linear(duration: 1), value: waterHeight)
+                }
 
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.16, green: 0.78, blue: 0.92).opacity(0.86),
-                                Color(red: 0.03, green: 0.47, blue: 0.76).opacity(0.94)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(height: waterHeight)
-
-                Capsule()
-                    .fill(.white.opacity(0.26))
-                    .frame(height: 3)
-                    .padding(.horizontal, 8)
-                    .offset(y: -waterHeight + 1.5)
-
-                TaskStripeView(segments: segments)
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 7)
-                    .opacity(segments.isEmpty ? 0 : 1)
-
-                Image(systemName: "drop.fill")
-                    .font(.system(size: min(size.width, size.height) * 0.22))
-                    .foregroundStyle(.cyan.opacity(0.8))
-                    .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
-                    .offset(y: -max(12, waterHeight * 0.46))
-
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(.white.opacity(0.20), lineWidth: 1)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(.white.opacity(0.22), lineWidth: 1)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
     }
 }
 
-private struct WaterMeterView: View {
-    var waterLevel: Double
-    var aquariumDepartures: Int
-    var aquariumTier: Int
-    var isCompact: Bool = false
+private struct StatusLabel: View {
+    let isOverdue: Bool
 
     var body: some View {
-        let clampedLevel = max(0, min(1, waterLevel))
-
-        VStack(alignment: .leading, spacing: isCompact ? 4 : 5) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("💧")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.58))
-                Spacer(minLength: 8)
-                Text("Lv.\(aquariumTier + 1) · \(aquariumDepartures)")
-                    .font(.caption2.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.74))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+        HStack(spacing: 4) {
+            if isOverdue {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 9, weight: .bold))
             }
+            Text(isOverdue ? L10n.Live.overdue : L10n.Live.remaining)
+                .font(.caption2.weight(.bold))
+        }
+        .foregroundStyle(isOverdue ? .orange : .white.opacity(0.58))
+    }
+}
 
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(.white.opacity(0.12))
-                    Capsule()
-                        .fill(clampedLevel <= 0.2 ? .orange : .cyan)
-                        .frame(width: max(8, proxy.size.width * clampedLevel))
+// MARK: - Lock screen
+
+private struct LockScreenLiveActivityView: View {
+    let context: ActivityViewContext<DewTimerActivityAttributes>
+
+    var body: some View {
+        LiveActivityMoment(attributes: context.attributes, state: context.state) { isPast, date in
+            let status = context.state.status
+            let overdue = isVisuallyOverdue(state: context.state, isPastDeparture: isPast)
+            let level = liveWaterLevel(attributes: context.attributes, state: context.state, at: date)
+
+            HStack(alignment: .top, spacing: 12) {
+                TankPreviewView(
+                    waterLevel: level,
+                    isOverdue: overdue,
+                    cornerRadius: 12
+                )
+                .frame(width: 80)
+                .frame(maxHeight: .infinity, alignment: .top)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            if status == .departed {
+                                Text(L10n.Live.toAquarium)
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.mint)
+                                Text(L10n.Live.pourComplete)
+                                    .font(.title2.weight(.semibold))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                            } else {
+                                StatusLabel(isOverdue: overdue)
+                                AdaptiveTimerText(
+                                    attributes: context.attributes,
+                                    isPastDeparture: isPast,
+                                    font: .system(size: 30, weight: .semibold, design: .rounded).monospacedDigit(),
+                                    runningTint: .white,
+                                    alignment: .leading
+                                )
+                            }
+                        }
+
+                        Spacer(minLength: 4)
+
+                        if status != .departed {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text(L10n.Live.departure)
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.white.opacity(overdue ? 0.35 : 0.55))
+                                Text(context.attributes.targetDepartureTime, format: .dateTime.hour().minute())
+                                    .font(.caption.monospacedDigit().weight(.semibold))
+                                    .foregroundStyle(.white.opacity(overdue ? 0.4 : 0.92))
+                            }
+                        }
+                    }
+
+                    if status == .running || status == .overdue || isPast {
+                        WaterBar(
+                            level: level,
+                            isOverdue: overdue,
+                            height: 6
+                        )
+                    }
+
+                    HStack(spacing: 6) {
+                        Image(systemName: footerIcon(status: status, overdue: overdue))
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(footerColor(status: status, overdue: overdue))
+                        Text(footerLabel(status: status))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.82))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(14)
+        }
+    }
+
+    private func footerLabel(status: DewTimerActivityAttributes.TimerStatus) -> String {
+        switch status {
+        case .departed: return L10n.Live.pourToAquarium
+        case .cancelled: return L10n.Timer.statusCancelled
+        case .running, .overdue: return L10n.AquariumSize.name(tier: context.state.aquariumTier)
+        }
+    }
+
+    private func footerIcon(status: DewTimerActivityAttributes.TimerStatus, overdue: Bool) -> String {
+        switch status {
+        case .departed: return "drop.fill"
+        case .cancelled: return "figure.walk.motion"
+        case .running, .overdue: return overdue ? "exclamationmark.triangle.fill" : "figure.walk.motion"
+        }
+    }
+
+    private func footerColor(status: DewTimerActivityAttributes.TimerStatus, overdue: Bool) -> Color {
+        switch status {
+        case .departed: return .mint
+        case .cancelled: return .cyan
+        case .running, .overdue: return overdue ? .orange : .cyan
+        }
+    }
+}
+
+// MARK: - Dynamic Island
+
+private struct CompactLeadingView: View {
+    let context: ActivityViewContext<DewTimerActivityAttributes>
+
+    var body: some View {
+        LiveActivityMoment(attributes: context.attributes, state: context.state) { isPast, date in
+            let status = context.state.status
+            let overdue = isVisuallyOverdue(state: context.state, isPastDeparture: isPast)
+            let level = liveWaterLevel(attributes: context.attributes, state: context.state, at: date)
+
+            Group {
+                switch status {
+                case .departed:
+                    Image(systemName: "drop.fill")
+                        .font(CompactIslandMetrics.iconFont)
+                        .foregroundStyle(.mint)
+                case .cancelled:
+                    Image(systemName: "drop.fill")
+                        .font(CompactIslandMetrics.iconFont)
+                        .foregroundStyle(.white.opacity(0.5))
+                case .running, .overdue:
+                    HStack(alignment: .center, spacing: 3) {
+                        Image(systemName: overdue ? "exclamationmark.triangle.fill" : "drop.fill")
+                            .font(CompactIslandMetrics.iconFont)
+                        WaterBar(
+                            level: level,
+                            isOverdue: overdue,
+                            width: CompactIslandMetrics.barWidth,
+                            height: CompactIslandMetrics.barHeight
+                        )
+                    }
+                    .foregroundStyle(overdue ? .orange : .cyan)
                 }
             }
-            .frame(height: isCompact ? 5 : 7)
+            .frame(height: CompactIslandMetrics.rowHeight)
+            .fixedSize(horizontal: true, vertical: true)
         }
     }
 }
 
-private struct TaskStripeView: View {
-    var segments: [DewTimerActivityAttributes.RoutineSegment]
+private struct CompactTrailingView: View {
+    let context: ActivityViewContext<DewTimerActivityAttributes>
 
     var body: some View {
-        if segments.isEmpty {
-            EmptyView()
+        LiveActivityMoment(attributes: context.attributes, state: context.state) { isPast, _ in
+            let status = context.state.status
+
+            Group {
+                switch status {
+                case .departed: Text("✨")
+                case .cancelled: Text("💧")
+                case .running, .overdue:
+                    AdaptiveTimerText(
+                        attributes: context.attributes,
+                        isPastDeparture: isPast,
+                        runningTint: isPast ? .orange : .cyan
+                    )
+                }
+            }
+            .font(.caption2.monospacedDigit().weight(.semibold))
+            .frame(height: CompactIslandMetrics.rowHeight)
+            .fixedSize(horizontal: true, vertical: true)
+        }
+    }
+}
+
+private struct IslandMinimalView: View {
+    let context: ActivityViewContext<DewTimerActivityAttributes>
+
+    var body: some View {
+        LiveActivityMoment(attributes: context.attributes, state: context.state) { isPast, _ in
+            let overdue = isVisuallyOverdue(state: context.state, isPastDeparture: isPast)
+
+            Image(systemName: overdue ? "exclamationmark.triangle.fill" : "drop.fill")
+                .foregroundStyle(overdue ? .orange : .cyan)
+        }
+    }
+}
+
+private enum IslandExpandedMetrics {
+    static let tankWidth: CGFloat = 68
+    static let leadingInset: CGFloat = 12
+    static let horizontalInset: CGFloat = 14
+    static let topRowHeight: CGFloat = 34
+    static let expandedHeight: CGFloat = 88
+}
+
+/// 展開 DI は bottom 1 枚にまとめる（leading/bottom 分割だと切れ目が出る）
+private struct ExpandedIslandView: View {
+    let context: ActivityViewContext<DewTimerActivityAttributes>
+
+    var body: some View {
+        LiveActivityMoment(attributes: context.attributes, state: context.state) { isPast, date in
+            let status = context.state.status
+            let overdue = isVisuallyOverdue(state: context.state, isPastDeparture: isPast)
+            let level = liveWaterLevel(attributes: context.attributes, state: context.state, at: date)
+            let tankGutter = IslandExpandedMetrics.tankWidth + IslandExpandedMetrics.leadingInset
+
+            GeometryReader { geo in
+                ZStack(alignment: .topLeading) {
+                    TankPreviewView(
+                        waterLevel: level,
+                        isOverdue: overdue,
+                        cornerRadius: 12
+                    )
+                    .frame(width: IslandExpandedMetrics.tankWidth, height: geo.size.height)
+                    .padding(.leading, IslandExpandedMetrics.leadingInset)
+
+                    VStack(spacing: 0) {
+                        HStack {
+                            Spacer(minLength: tankGutter)
+                            expandedDepartureBlock(status: status, overdue: overdue)
+                        }
+                        .frame(height: IslandExpandedMetrics.topRowHeight, alignment: .top)
+
+                        HStack(alignment: .top, spacing: 10) {
+                            Color.clear.frame(width: tankGutter)
+                            VStack(alignment: .leading, spacing: 8) {
+                                expandedTimerRow(status: status, isPast: isPast, overdue: overdue)
+                                if status == .running || status == .overdue || isPast {
+                                    WaterBar(level: level, isOverdue: overdue, height: 5)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .frame(maxHeight: .infinity, alignment: .topLeading)
+                    }
+                    .padding(.trailing, IslandExpandedMetrics.horizontalInset)
+                }
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
+            }
+            .frame(height: IslandExpandedMetrics.expandedHeight)
+        }
+    }
+
+    @ViewBuilder
+    private func expandedDepartureBlock(
+        status: DewTimerActivityAttributes.TimerStatus,
+        overdue: Bool
+    ) -> some View {
+        if status == .departed {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.mint)
         } else {
-            HStack(spacing: 2) {
-                ForEach(segments.prefix(5)) { segment in
-                    Capsule()
-                        .fill(Color(hex: segment.colorHex).opacity(0.9))
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(L10n.Live.departure)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white.opacity(overdue ? 0.35 : 0.55))
+                HStack(spacing: 3) {
+                    Text(context.attributes.targetDepartureTime, format: .dateTime.hour().minute())
+                        .font(.subheadline.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(.white.opacity(overdue ? 0.35 : 0.95))
+                    if overdue {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.orange)
+                    }
                 }
             }
-            .frame(height: 5)
         }
     }
-}
 
-private struct AquariumPreviewBadge: View {
-    let state: DewTimerActivityAttributes.ContentState
+    @ViewBuilder
+    private func expandedTimerRow(
+        status: DewTimerActivityAttributes.TimerStatus,
+        isPast: Bool,
+        overdue: Bool
+    ) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: expandedRowIcon(status: status, overdue: overdue))
+                .font(.caption.weight(.bold))
+                .foregroundStyle(expandedRowColor(status: status, overdue: overdue))
+                .frame(width: 14)
 
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(.white.opacity(0.12))
-            Image(systemName: state.aquariumTier >= 6 ? "sparkles" : "drop.fill")
-                .font(.title3.weight(.bold))
-                .foregroundStyle(state.aquariumTier >= 6 ? .yellow : .cyan)
+            switch status {
+            case .departed:
+                Text(L10n.Live.pourComplete)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.mint)
+                    .lineLimit(1)
+            case .cancelled:
+                Text(L10n.Timer.statusCancelled)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .lineLimit(1)
+            case .running, .overdue:
+                HStack(spacing: 4) {
+                    Text(overdue ? L10n.Live.overdue : L10n.Live.remaining)
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(overdue ? .orange : .white.opacity(0.58))
+                    AdaptiveTimerText(
+                        attributes: context.attributes,
+                        isPastDeparture: isPast,
+                        font: .title3.monospacedDigit().weight(.semibold),
+                        runningTint: overdue ? .orange : .white,
+                        alignment: .leading
+                    )
+                }
+            }
+
+            Spacer(minLength: 0)
         }
-        .frame(width: 46, height: 46)
     }
-}
 
-private func compactStatusText(_ state: DewTimerActivityAttributes.ContentState) -> String {
-    switch state.status {
-    case .overdue:
-        return "⚠️"
-    case .departed:
-        return "✨"
-    case .cancelled:
-        return "💧"
-    case .running:
-        return state.bonusFeedStock > 0 ? "●" : "💧"
+    private func expandedRowIcon(
+        status: DewTimerActivityAttributes.TimerStatus,
+        overdue: Bool
+    ) -> String {
+        switch status {
+        case .departed: return "drop.fill"
+        case .cancelled: return "figure.walk.motion"
+        case .running, .overdue: return overdue ? "exclamationmark.triangle.fill" : "figure.walk.motion"
+        }
     }
-}
 
-private extension Color {
-    init(hex: String) {
-        let normalized = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        let value = UInt64(normalized, radix: 16) ?? 0x38BDF8
-        let red = Double((value >> 16) & 0xFF) / 255.0
-        let green = Double((value >> 8) & 0xFF) / 255.0
-        let blue = Double(value & 0xFF) / 255.0
-        self.init(red: red, green: green, blue: blue)
+    private func expandedRowColor(
+        status: DewTimerActivityAttributes.TimerStatus,
+        overdue: Bool
+    ) -> Color {
+        switch status {
+        case .departed: return .mint
+        case .cancelled: return .cyan
+        case .running, .overdue: return overdue ? .orange : .cyan
+        }
     }
 }

@@ -17,15 +17,17 @@ enum DewTimerLiveActivityController {
     ) async {
         guard activitiesAreEnabled else { return }
 
+        let content = activityContent(attributes: attributes, state: state)
+
         if let currentActivity {
-            await currentActivity.update(ActivityContent(state: state, staleDate: nil))
+            await currentActivity.update(content)
             return
         }
 
         do {
             _ = try Activity.request(
                 attributes: attributes,
-                content: ActivityContent(state: state, staleDate: nil),
+                content: content,
                 pushType: nil
             )
         } catch {
@@ -33,9 +35,12 @@ enum DewTimerLiveActivityController {
         }
     }
 
-    static func update(state: DewTimerActivityAttributes.ContentState) async {
+    static func update(
+        attributes: DewTimerActivityAttributes,
+        state: DewTimerActivityAttributes.ContentState
+    ) async {
         guard activitiesAreEnabled, let currentActivity else { return }
-        await currentActivity.update(ActivityContent(state: state, staleDate: nil))
+        await currentActivity.update(activityContent(attributes: attributes, state: state))
     }
 
     static func end(state: DewTimerActivityAttributes.ContentState, immediately: Bool = true) async {
@@ -54,5 +59,12 @@ enum DewTimerLiveActivityController {
             ActivityContent(state: state, staleDate: nil),
             dismissalPolicy: .after(Date.now.addingTimeInterval(lingerSeconds))
         )
+    }
+
+    private static func activityContent(
+        attributes: DewTimerActivityAttributes,
+        state: DewTimerActivityAttributes.ContentState
+    ) -> ActivityContent<DewTimerActivityAttributes.ContentState> {
+        ActivityContent(state: state, staleDate: attributes.activityStaleDate)
     }
 }

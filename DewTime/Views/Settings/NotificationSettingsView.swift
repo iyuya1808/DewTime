@@ -17,35 +17,35 @@ struct NotificationSettingsView: View {
                 SettingsCard {
                     VStack(alignment: .leading, spacing: 16) {
                         SettingsSectionHeader(
-                            title: "通知",
-                            caption: "タイマー開始時に出発通知を予約します",
+                            title: L10n.NotificationSettings.sectionTitle,
+                            caption: L10n.NotificationSettings.sectionCaption,
                             systemImage: "bell.fill",
                             tint: .orange
                         )
 
                         SettingsToggleRow(
-                            title: "通知を使う",
-                            subtitle: "オフにすると出発通知を送りません",
+                            title: L10n.NotificationSettings.enable,
+                            subtitle: L10n.NotificationSettings.enableSubtitle,
                             isOn: $notificationsEnabled
                         )
 
                         Divider()
 
                         SettingsToggleRow(
-                            title: "出発前にリマインド",
-                            subtitle: "出発時刻の前にもう一度お知らせします",
+                            title: L10n.NotificationSettings.reminder,
+                            subtitle: L10n.NotificationSettings.reminderSubtitle,
                             isOn: $departureReminderEnabled,
                             isDisabled: !notificationsEnabled
                         )
 
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("リマインドのタイミング")
+                            Text(L10n.NotificationSettings.reminderTiming)
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.secondary)
 
-                            Picker("リマインド", selection: $departureReminderMinutes) {
+                            Picker(L10n.NotificationSettings.reminder, selection: $departureReminderMinutes) {
                                 ForEach(AppPreferences.reminderMinuteOptions, id: \.self) { minutes in
-                                    Text("\(minutes)分前").tag(minutes)
+                                    Text(L10n.NotificationSettings.minutesBefore(minutes)).tag(minutes)
                                 }
                             }
                             .pickerStyle(.segmented)
@@ -53,7 +53,7 @@ struct NotificationSettingsView: View {
                         }
 
                         SettingsPrimaryButton(
-                            title: "通知許可を確認",
+                            title: L10n.NotificationSettings.checkPermission,
                             systemImage: "bell.badge.fill",
                             tint: .orange
                         ) {
@@ -65,14 +65,14 @@ struct NotificationSettingsView: View {
                 SettingsCard {
                     VStack(alignment: .leading, spacing: 12) {
                         SettingsSectionHeader(
-                            title: "触覚（ハプティクス）",
-                            caption: "タスク切り替えや操作時の振動フィードバック",
+                            title: L10n.NotificationSettings.hapticsSection,
+                            caption: L10n.NotificationSettings.hapticsCaption,
                             systemImage: "hand.tap.fill",
                             tint: .teal
                         )
 
                         SettingsToggleRow(
-                            title: "ハプティクスを使う",
+                            title: L10n.NotificationSettings.hapticsEnable,
                             isOn: $hapticsEnabled
                         )
                     }
@@ -82,7 +82,7 @@ struct NotificationSettingsView: View {
             .padding(.top, 12)
             .padding(.bottom, 32)
         }
-        .navigationTitle("通知と触覚")
+        .navigationTitle(L10n.NotificationSettings.title)
         .navigationBarTitleDisplayMode(.inline)
         .dewAppBackground()
         .task {

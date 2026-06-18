@@ -20,7 +20,7 @@ final class UserProfile: Identifiable {
 
     init(
         id: UUID = UUID(),
-        nickname: String = "あなた",
+        nickname: String = L10n.Profile.defaultNickname,
         avatarEmoji: String = "🐟",
         createdAt: Date = .now,
         claimedAchievementRewardIds: [String] = []

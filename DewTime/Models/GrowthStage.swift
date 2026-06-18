@@ -15,21 +15,11 @@ enum GrowthStage: String, CaseIterable, Identifiable {
     }
 
     var displayName: String {
-        switch self {
-        case .egg: return "卵"
-        case .fry: return "稚魚"
-        case .juvenile: return "幼魚"
-        case .adult: return "成魚"
-        }
+        L10n.Growth.stageName(self)
     }
 
     var message: String {
-        switch self {
-        case .egg: return "卵を水槽に入れました"
-        case .fry: return "稚魚が生まれました"
-        case .juvenile: return "幼魚に育ちました"
-        case .adult: return "成魚に育ちました"
-        }
+        L10n.Growth.stageMessage(self)
     }
 
     var icon: String {

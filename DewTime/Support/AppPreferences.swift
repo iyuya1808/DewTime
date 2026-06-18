@@ -9,11 +9,7 @@ enum AppTheme: String, CaseIterable, Identifiable {
     var id: String { self.rawValue }
 
     var displayName: String {
-        switch self {
-        case .system: return "システム"
-        case .light: return "ライト"
-        case .dark: return "ダーク"
-        }
+        L10n.Theme.name(self)
     }
 }
 
@@ -238,6 +234,7 @@ enum AppPreferences {
         case appTheme = "dew.preferences.appTheme"
         case aquariumTheme = "dew.preferences.aquariumTheme"
         case hasCompletedTutorial = "dew.preferences.hasCompletedTutorial"
+        case appLanguage = "dew.preferences.appLanguage"
     }
 
     static let reminderMinuteOptions = [3, 5, 10, 15]

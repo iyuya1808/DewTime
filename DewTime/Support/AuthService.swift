@@ -38,7 +38,7 @@ final class AuthService {
             self.isAnonymous = true
             print("Logged in anonymously: \(session.user.id)")
         } catch {
-            self.errorMessage = "匿名ログインに失敗しました: \(error.localizedDescription)"
+            self.errorMessage = L10n.Auth.anonymousSignInFailed(error.localizedDescription)
             print("Anonymous sign-in error: \(error)")
         }
         isProcessing = false
@@ -84,7 +84,7 @@ final class AuthService {
             
             print("Successfully upgraded to permanent account")
         } catch {
-            self.errorMessage = "アカウント登録に失敗しました: \(error.localizedDescription)"
+            self.errorMessage = L10n.Auth.signUpFailed(error.localizedDescription)
             print("Account upgrade error: \(error)")
         }
         isProcessing = false
@@ -102,7 +102,7 @@ final class AuthService {
             self.isAnonymous = false
             print("Successfully signed in with email: \(session.user.id)")
         } catch {
-            self.errorMessage = "ログインに失敗しました: \(error.localizedDescription)"
+            self.errorMessage = L10n.Auth.signInFailed(error.localizedDescription)
             print("Email sign-in error: \(error)")
         }
         isProcessing = false
@@ -126,7 +126,7 @@ final class AuthService {
             self.isAnonymous = false
             print("Successfully signed in with Apple: \(session.user.id)")
         } catch {
-            self.errorMessage = "Appleサインインに失敗しました: \(error.localizedDescription)"
+            self.errorMessage = L10n.Auth.appleSignInFailed(error.localizedDescription)
             print("Apple sign-in error: \(error)")
         }
         isProcessing = false
@@ -145,7 +145,7 @@ final class AuthService {
             self.isAnonymous = true
             print("Successfully signed out and re-authenticated anonymously")
         } catch {
-            self.errorMessage = "サインアウトに失敗しました: \(error.localizedDescription)"
+            self.errorMessage = L10n.Auth.signOutFailed(error.localizedDescription)
             print("Sign out error: \(error)")
         }
         isProcessing = false
@@ -195,7 +195,7 @@ final class AuthService {
             print("Logged in anonymously: \(session.user.id)")
             return session.user
         } catch {
-            self.errorMessage = "匿名ログインに失敗しました: \(error.localizedDescription)"
+            self.errorMessage = L10n.Auth.anonymousSignInFailed(error.localizedDescription)
             print("Anonymous sign-in error: \(error)")
             throw error
         }

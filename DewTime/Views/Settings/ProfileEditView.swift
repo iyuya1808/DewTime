@@ -57,16 +57,16 @@ struct ProfileEditView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 40)
             }
-            .navigationTitle("アカウント")
+            .navigationTitle(L10n.Account.title)
             .navigationBarTitleDisplayMode(.inline)
             .dewAppBackground()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル") { dismiss() }
+                    Button(L10n.Common.cancel) { dismiss() }
                         .foregroundStyle(.secondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") {
+                    Button(L10n.Common.save) {
                         Task { await store.updateProfile(nickname: nickname, avatarEmoji: avatarEmoji) }
                         dismiss()
                     }
@@ -80,13 +80,13 @@ struct ProfileEditView: View {
                 nickname = profile.nickname
                 avatarEmoji = profile.avatarEmoji
             }
-            .alert("サインアウト", isPresented: $showSignOutAlert) {
-                Button("キャンセル", role: .cancel) {}
-                Button("サインアウト", role: .destructive) {
+            .alert(L10n.Account.signOutTitle, isPresented: $showSignOutAlert) {
+                Button(L10n.Common.cancel, role: .cancel) {}
+                Button(L10n.Account.signOut, role: .destructive) {
                     performSignOut()
                 }
             } message: {
-                Text("サインアウトするとクラウドとのデータ同期が停止します。よろしいですか？（サインアウト後は新しい匿名アカウントが作成され、引き続きアプリをご利用いただけます）")
+                Text(L10n.Account.signOutMessage)
             }
         }
     }
@@ -107,11 +107,11 @@ struct ProfileEditView: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("プロフィール編集が制限されています")
+                    Text(L10n.Account.profileLocked)
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.primary)
                     
-                    Text("ニックネームとアバターを変更するには、クラウド保存の有効化（アカウント登録）が必要です。")
+                    Text(L10n.Account.profileLockedDetail)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineSpacing(4)
@@ -122,7 +122,7 @@ struct ProfileEditView: View {
             NavigationLink(destination: AccountRegistrationView()) {
                 HStack {
                     Spacer()
-                    Label("アカウント登録して編集する", systemImage: "icloud.and.arrow.up")
+                    Label(L10n.Account.registerToEdit, systemImage: "icloud.and.arrow.up")
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.white)
                     Spacer()
@@ -151,11 +151,11 @@ struct ProfileEditView: View {
     // ニックネームの美しい入力カード
     private var nicknameInputCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("ニックネーム")
+            Text(L10n.Account.nickname)
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.secondary)
             
-            TextField("例: みずやり名人", text: $nickname)
+            TextField(L10n.Account.nicknamePlaceholder, text: $nickname)
                 .focused($isNicknameFocused)
                 .autocapitalization(.none)
                 .disableAutocorrection(true)
@@ -191,10 +191,10 @@ struct ProfileEditView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("アバター")
+                    Text(L10n.Account.avatar)
                         .font(.caption.weight(.bold))
                         .foregroundStyle(.secondary)
-                    Text("水槽やプロフィールで表示されるアイコン")
+                    Text(L10n.Account.avatarCaption)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -273,7 +273,7 @@ struct ProfileEditView: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("アカウント連携済み")
+                    Text(L10n.Account.accountLinked)
                         .font(.subheadline.weight(.semibold))
                     
                     if let user = authService.currentUser, let email = user.email {
@@ -296,7 +296,7 @@ struct ProfileEditView: View {
                         ProgressView()
                             .tint(.red)
                     } else {
-                        Label("サインアウト", systemImage: "arrow.right.doc.on.clipboard")
+                        Label(L10n.Account.signOut, systemImage: "arrow.right.doc.on.clipboard")
                             .font(.subheadline.weight(.bold))
                             .foregroundStyle(.red)
                     }

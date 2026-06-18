@@ -14,15 +14,15 @@ struct SluiceGateStartButton: View {
                     .foregroundStyle(.white)
                     .frame(width: 88, height: 88)
                     .background(Color.dewBlue, in: Circle())
-                Text("スタート")
+                Text(L10n.Timer.start)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.85))
             }
             .scaleEffect(isPressed ? 0.92 : 1.0)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("スタート")
-        .accessibilityHint("タップしてスタート")
+        .accessibilityLabel(L10n.Timer.start)
+        .accessibilityHint(L10n.Timer.startA11yHint)
         .accessibilityAddTraits(.isButton)
     }
 

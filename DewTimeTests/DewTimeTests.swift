@@ -374,8 +374,44 @@ struct DewTimeTests {
         let attributes = try #require(vm.liveActivityAttributes())
         #expect(attributes.scheduleName == "DewTime")
         #expect(attributes.segments.isEmpty)
+        #expect(attributes.initialWaterLevel == 1.0)
 
         vm.reset()
+    }
+
+    @Test func liveActivityWaterLevelIsDerivedFromTimerDates() {
+        let startedAt = Date(timeIntervalSinceReferenceDate: 0)
+        let target = startedAt.addingTimeInterval(600)
+        let attributes = DewTimerActivityAttributes(
+            scheduleName: "DewTime",
+            startedAt: startedAt,
+            targetDepartureTime: target,
+            segments: [],
+            initialWaterLevel: 1.0
+        )
+
+        #expect(attributes.waterLevel(at: startedAt) == 1.0)
+        #expect(abs(attributes.waterLevel(at: startedAt.addingTimeInterval(300)) - 0.5) < 0.001)
+        #expect(attributes.waterLevel(at: target) == 0.0)
+        #expect(attributes.isOverdue(at: target.addingTimeInterval(1)))
+        #expect(attributes.resolvedStatus(
+            state: .init(
+                currentTaskName: "",
+                nextTaskName: nil,
+                aquariumTier: 0,
+                aquariumTierName: "",
+                aquariumDepartures: 0,
+                bonusFeedStock: 0,
+                waterLevel: 1,
+                status: .running,
+                phaseIndex: -1,
+                lastUpdatedAt: startedAt
+            ),
+            at: target.addingTimeInterval(1)
+        ) == .overdue)
+        #expect(attributes.formattedTimer(at: startedAt.addingTimeInterval(300)) == "05:00")
+        #expect(attributes.formattedTimer(at: target.addingTimeInterval(75)) == "+01:15")
+        #expect(attributes.activityStaleDate > target)
     }
 
     @MainActor
@@ -477,6 +513,43 @@ struct DewTimeTests {
         #expect(syncingStore.aquariums.first?.totalDepartures == 3)
         #expect(cloud.savedSnapshots.last?.aquariums.first?.totalDepartures == 3)
         #expect(cloud.savedUserIds.last == userId)
+        #expect(UserDefaults.standard.string(forKey: "local_cloud_user_id") == userId.uuidString)
+    }
+
+    @MainActor
+    @Test func cloudUserChangeStillUploadsLocalCache() async throws {
+        resetLocalTestState()
+        defer { resetLocalTestState() }
+
+        let previousUserId = UUID()
+        let nextUserId = UUID()
+        let sharedFishId = UUID()
+
+        UserDefaults.standard.set(previousUserId.uuidString, forKey: "local_cloud_user_id")
+
+        let localStore = AppDataStore(enableCloudSync: false)
+        localStore.activeFishes = [
+            ActiveFish(
+                id: sharedFishId,
+                speciesId: FishSpecies.medaka.rawValue,
+                name: FishSpecies.medaka.displayName
+            )
+        ]
+        await localStore.saveAll()
+
+        let cloud = FakeCloudDataService(initialSnapshot: CloudSnapshot())
+        let syncingStore = AppDataStore(
+            cloudDataService: cloud,
+            enableCloudSync: true,
+            cloudUserIdProvider: { nextUserId }
+        )
+
+        await syncingStore.load()
+
+        #expect(syncingStore.activeFishes.first?.id == sharedFishId)
+        #expect(cloud.savedSnapshots.last?.activeFishes.first?.id == sharedFishId)
+        #expect(cloud.savedSnapshots.last?.activeFishes.first?.userId == nextUserId)
+        #expect(UserDefaults.standard.string(forKey: "local_cloud_user_id") == nextUserId.uuidString)
     }
 
     @MainActor
@@ -638,7 +711,8 @@ struct DewTimeTests {
             "local_care_records",
             "local_aquariums",
             "local_profiles",
-            "local_is_developer_supported"
+            "local_is_developer_supported",
+            "local_cloud_user_id"
         ].forEach { UserDefaults.standard.removeObject(forKey: $0) }
     }
 

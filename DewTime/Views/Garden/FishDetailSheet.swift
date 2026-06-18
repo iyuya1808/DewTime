@@ -42,7 +42,7 @@ struct FishDetailSheet: View {
                             .background(Color.dewSurface, in: Circle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("魚の名前を編集")
+                    .accessibilityLabel(L10n.FishDetail.editNameA11y)
                 }
                 
                 Text(fish.recordedAt, format: .dateTime.year().month().day().hour().minute())
@@ -65,7 +65,7 @@ struct FishDetailSheet: View {
                         }
                     }
                     
-                    Text("朝のゆとり")
+                    Text(L10n.FishDetail.morningMargin)
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.secondary)
                 }
@@ -83,7 +83,7 @@ struct FishDetailSheet: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     
-                    Text("出発")
+                    Text(L10n.FishDetail.departure)
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.secondary)
                 }
@@ -106,7 +106,7 @@ struct FishDetailSheet: View {
                     .background(Color(.systemGray5), in: Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("閉じる")
+            .accessibilityLabel(L10n.Common.close)
             .padding(24)
         }
         .background(
@@ -119,15 +119,19 @@ struct FishDetailSheet: View {
                 .ignoresSafeArea()
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(fish.name)の記録。朝のゆとりは\(waterEvaluation)、出発は\(fish.succeeded ? "時間内" : "時間超過")でした。")
-        .alert("魚の名前", isPresented: $showNameEditor) {
-            TextField("名前", text: $nameDraft)
-            Button("保存") {
+        .accessibilityLabel(L10n.FishDetail.recordA11y(
+            name: fish.name,
+            water: waterEvaluation,
+            departure: fish.succeeded ? L10n.FishDetail.onTime : L10n.FishDetail.overTime
+        ))
+        .alert(L10n.FishDetail.nameAlertTitle, isPresented: $showNameEditor) {
+            TextField(L10n.Common.name, text: $nameDraft)
+            Button(L10n.Common.save) {
                 Task { await store.renameCollectedFish(fish, name: nameDraft) }
             }
-            Button("キャンセル", role: .cancel) {}
+            Button(L10n.Common.cancel, role: .cancel) {}
         } message: {
-            Text("空欄で保存すると種類名に戻ります。")
+            Text(L10n.FishDetail.nameAlertMessage)
         }
     }
 
@@ -152,13 +156,7 @@ struct FishDetailSheet: View {
     }
 
     private var waterEvaluation: String {
-        switch fish.waterRatio {
-        case 0.8...: return "余裕たっぷり"
-        case 0.6...: return "いいペース"
-        case 0.4...: return "まずまず"
-        case 0.2...: return "ギリギリ"
-        default: return "タイムオーバー"
-        }
+        L10n.FishDetail.waterEvaluation(for: fish.waterRatio)
     }
 
     private var fishSpecies: FishSpecies {

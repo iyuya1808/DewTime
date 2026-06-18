@@ -17,11 +17,11 @@ struct MonthlyAquariumView: View {
                     Image(systemName: "calendar")
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(.teal)
-                    Text("出発記録")
+                    Text(L10n.Aquarium.departureRecords)
                         .font(.system(.title2, design: .rounded).weight(.bold))
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("出発記録")
+                .accessibilityLabel(L10n.Aquarium.departureRecords)
             }
         }
         .dewAppBackground()

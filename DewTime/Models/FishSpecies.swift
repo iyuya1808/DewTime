@@ -16,23 +16,7 @@ enum FishSpecies: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     var displayName: String {
-        switch self {
-        case .medaka:     return "メダカ"
-        case .guppy:      return "グッピー"
-        case .shrimp:     return "ミナミヌマエビ"
-        case .pufferfish: return "フグ"
-        case .crab:       return "カニ"
-        case .turtle:     return "ミドリガメ"
-        case .squid:      return "イカ"
-        case .octopus:    return "タコ"
-        case .lobster:    return "ロブスター"
-        case .jellyfish:  return "クラゲ"
-        case .seal:       return "アザラシ"
-        case .dolphin:    return "イルカ"
-        case .shark:      return "サメ"
-        case .whale:      return "クジラ"
-        case .whaleShark: return "ジンベエザメ"
-        }
+        L10n.Fish.name(self)
     }
 
     /// 一覧・選択で表示する絵文字。種類の見分けが付くよう絵文字で表現する。
@@ -135,21 +119,19 @@ enum FishSpecies: String, CaseIterable, Identifiable {
     }
 
     var requiredDeparturesText: String {
-        "\(requiredDepartures)しずく"
+        L10n.Fish.requiredDewDrops(requiredDepartures)
     }
 
     var requiredWaterPercentText: String {
         "\(Int((requiredWaterRatio * 100).rounded()))%"
     }
 
+    var difficulty: FishDifficulty {
+        FishDifficulty.from(requiredWaterRatio: requiredWaterRatio)
+    }
+
     var difficultyLabel: String {
-        switch requiredWaterRatio {
-        case ..<0.25: return "かんたん"
-        case ..<0.50: return "易しい"
-        case ..<0.70: return "普通"
-        case ..<0.85: return "難しい"
-        default: return "超難しい"
-        }
+        difficulty.displayName
     }
 
     /// 飼育に必要な水槽サイズ段階。水槽が育つほど大型の魚が選べる。

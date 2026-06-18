@@ -4,19 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## プロジェクト概要
 
-**DewTime** は iOS 17+ 向けの朝タイマーアプリ。出発時刻までの時間を「水タンク」で可視化し、出発時に残った水が水槽へ注がれて魚が成長する。詳細な UX 仕様は `SPEC.md`・`wireframe.html` を参照。ただし `SPEC.md` は SwiftData と記載しているが**実装は Supabase Auth + Database に移行済み**。`wireframe.html` には旧「出発スケジュール」「ルーティン編集」「StartSheet」の画面が残っているが**実装からは削除済み**。仕様書と実装が食い違う場合はコードを正とする。
+**DewTime** は iOS 17+ 向けの朝タイマーアプリ。出発時刻までの時間を「水タンク」で可視化し、オンタイム出発でしずく・餌を獲得して水槽を育てる。詳細な UX 仕様は `SPEC.md`・`wireframe.html` を参照。`wireframe.html` には旧「出発スケジュール」「ルーティン編集」「StartSheet」の画面が残っているが**実装からは削除済み**。仕様書と実装が食い違う場合はコードを正とする。
 
 ## ビルド・実行
 
 ```bash
-# ビルド
-xcodebuild -project DewTime.xcodeproj -scheme DewTime -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
+# ビルド（シミュレーター起動不要）
+xcodebuild -project DewTime.xcodeproj -scheme DewTime -destination 'generic/platform=iOS Simulator' build
 
-# テスト
-xcodebuild test -project DewTime.xcodeproj -scheme DewTime -destination 'platform=iOS Simulator,name=iPhone 16 Pro'
+# テスト（実行時は具体デバイス名が必要。例: iPhone 17 Pro）
+xcodebuild test -project DewTime.xcodeproj -scheme DewTime -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 
 # 単一テスト
-xcodebuild test -project DewTime.xcodeproj -scheme DewTime -destination 'platform=iOS Simulator,name=iPhone 16 Pro' -only-testing:DewTimeTests/DewTimeTests
+xcodebuild test -project DewTime.xcodeproj -scheme DewTime -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:DewTimeTests/DewTimeTests
 ```
 
 LSP は `buildServer.json`（xcode-build-server）が提供。ローカル絶対パスを含むため `.gitignore` 済み。
@@ -64,6 +64,14 @@ ContentView（TabView: timer / collection / aquarium / profile）
 | `StoreManager` | StoreKit チップ購入（snack/coffee/pizza）。`DewTime.storekit` でローカルテスト可 |
 | `ReviewRequestManager` | 30日クールダウン付きレビュー要求。DEBUG はスキップ |
 | `AuthService` | 匿名ログイン優先、メール/Apple でアップグレード可 |
+
+### ローカライズ（ja / en）
+
+- 文字列は `DewTimeLiveActivityShared/L10n.swift`（+ `Support/L10nModels.swift` / `L10nGarden.swift`）経由。**ユーザー向け日本語のハードコード禁止。**
+- 翻訳リソース: `DewTimeLiveActivityShared/Localizable.xcstrings`（ja + en 必須）
+- 言語設定: `LocalizationManager` + 設定画面の言語ピッカー（App Group 共有 → Widget / Live Activity も追従）
+- 手順・用語集: `docs/LOCALIZATION.md` / `docs/LOCALIZATION_GLOSSARY.md`
+- 新規 UI 追加時は `DewTimeTests/LocalizationGuardTests` が通ること
 
 ## graphify
 

@@ -77,7 +77,6 @@ struct WaterTankView: View {
                     drawCaustics(context: context, size: size, time: time, surface: surface)
                     drawBubbles(context: context, size: size, level: visualLevel, time: time, surface: surface)
                     drawFoam(context: context, size: size, level: visualLevel, time: time, surface: surface)
-                    drawGlassShine(context: context, size: size)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -224,20 +223,6 @@ struct WaterTankView: View {
             context.stroke(Path(ellipseIn: rect), with: .color(.white.opacity(0.16)), lineWidth: 1)
             context.fill(Path(ellipseIn: rect.insetBy(dx: radius * 0.62, dy: radius * 0.62)), with: .color(.white.opacity(0.22)))
         }
-    }
-
-    private func drawGlassShine(context: GraphicsContext, size: CGSize) {
-        let shine = Path(roundedRect: CGRect(
-            x: size.width * 0.08,
-            y: size.height * 0.04,
-            width: size.width * 0.11,
-            height: size.height * 0.72
-        ), cornerRadius: size.width * 0.08)
-        context.fill(shine, with: .linearGradient(
-            Gradient(colors: [.white.opacity(0.18), .white.opacity(0.02)]),
-            startPoint: CGPoint(x: size.width * 0.08, y: 0),
-            endPoint: CGPoint(x: size.width * 0.20, y: size.height)
-        ))
     }
 }
 

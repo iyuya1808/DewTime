@@ -170,26 +170,6 @@ private final class AquariumEngine {
         food.removeAll { $0.y > 0.9 }
     }
 
-    /// タップ位置付近の魚 ID。詳細表示用。当たり判定は描画サイズに合わせる。
-    func fishId(at p: CGPoint, canvasSize: CGSize) -> UUID? {
-        guard canvasSize.width > 0, canvasSize.height > 0 else { return nil }
-        let scale = min(canvasSize.width, canvasSize.height)
-
-        var best: Int?
-        var bestDist = CGFloat.greatestFiniteMagnitude
-        for index in fish.indices {
-            let f = fish[index]
-            let hitRadiusPt = f.size * 0.40 + 8
-            let hitRadius = hitRadiusPt / scale
-            let d = hypot(f.x - p.x, f.y - p.y)
-            if d <= hitRadius, d < bestDist {
-                bestDist = d
-                best = index
-            }
-        }
-        return best.map { fish[$0].id }
-    }
-
     /// タップ位置にエサを落とす。
     @discardableResult
     func dropFood(at p: CGPoint) -> Bool {
@@ -222,16 +202,17 @@ private final class AquariumEngine {
 
 // MARK: - 水槽画面
 
+private let aquariumTopBarHeight: CGFloat = 52
+
 struct LiveAquariumView: View {
     @Environment(AppDataStore.self) private var store
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.appTabSelection) private var appTabSelection
     @AppStorage(AppPreferences.Key.aquariumTheme.rawValue) private var aquariumTheme = AquariumTheme.dewBlue.rawValue
 
     @State private var engine = AquariumEngine()
     @State private var showRecords = false
+    @State private var showFishList = false
     @State private var statusGuide: AquariumStatusGuideKind?
-    @State private var selectedFish: CollectedFish?
     @State private var canvasSize: CGSize = .zero
     @State private var gachaReveal: FishGachaReveal?
     @State private var lastFeedTapAt: Date = .distantPast
@@ -321,11 +302,10 @@ struct LiveAquariumView: View {
                 onDismiss: { statusGuide = nil }
             )
         }
-        .sheet(item: $selectedFish) { fish in
-            FishDetailSheet(fish: fish)
-                .presentationDetents([.medium])
-                .presentationBackground(.clear)
-                .presentationDragIndicator(.hidden)
+        .sheet(isPresented: $showFishList) {
+            AquariumFishListSheet()
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(item: $gachaReveal) { reveal in
             FishGachaResultSheet(reveal: reveal) {
@@ -370,12 +350,6 @@ struct LiveAquariumView: View {
             guard canvasSize.width > 0 else { return }
             let point = CGPoint(x: location.x / canvasSize.width, y: location.y / canvasSize.height)
 
-            if let fishId = engine.fishId(at: point, canvasSize: canvasSize),
-               let fish = aquariumFish.first(where: { $0.id == fishId }) {
-                selectedFish = fish
-                return
-            }
-
             guard aquarium.bonusFeedStock > 0 else {
                 showNoFeedFeedback()
                 return
@@ -404,17 +378,17 @@ struct LiveAquariumView: View {
                     showRecords = true
                 } label: {
                     Image(systemName: "calendar")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                    .background(.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(.white.opacity(0.22), lineWidth: 1)
-                    )
+                        .frame(width: aquariumTopBarHeight, height: aquariumTopBarHeight)
+                        .background(.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .strokeBorder(.white.opacity(0.22), lineWidth: 1)
+                        )
                 }
                 .buttonStyle(AquariumStatusButtonStyle())
-                .accessibilityLabel("出発記録")
+                .accessibilityLabel(L10n.Aquarium.departureRecords)
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -426,11 +400,11 @@ struct LiveAquariumView: View {
     private var aquariumStatusBar: some View {
         HStack(spacing: 0) {
             statusSegment(
-                title: "レベル",
+                title: L10n.Aquarium.level,
                 value: "\(aquarium.sizeTier + 1)",
                 accent: .cyan,
                 isHighlighted: aquarium.isMaxTier,
-                accessibilityLabel: "水槽レベル\(aquarium.sizeTier + 1)。タップで説明を表示"
+                accessibilityLabel: L10n.Aquarium.levelA11y(aquarium.sizeTier + 1)
             ) {
                 levelSegmentIcon
             } action: {
@@ -440,32 +414,33 @@ struct LiveAquariumView: View {
             statusDivider
 
             statusSegment(
-                title: "魚",
+                title: L10n.Aquarium.fish,
                 value: "\(swimmingFishCount)/\(fishCapacity)",
                 accent: swimmingFishCount >= fishCapacity ? .orange : .white,
                 isHighlighted: swimmingFishCount >= fishCapacity,
-                accessibilityLabel: "\(swimmingFishCount)匹が泳いでいます。タップで図鑑へ"
+                accessibilityLabel: L10n.Aquarium.fishSwimmingA11y(swimmingFishCount)
             ) {
                 Image(systemName: "fish.fill")
                     .font(.system(size: 15, weight: .bold))
             } action: {
-                appTabSelection?.wrappedValue = .collection
+                showFishList = true
             }
 
             statusDivider
 
             statusSegment(
-                title: "餌",
+                title: L10n.Aquarium.feed,
                 value: "\(aquarium.bonusFeedStock)",
                 accent: .orange,
                 isHighlighted: aquarium.bonusFeedStock > 0,
-                accessibilityLabel: "餌\(aquarium.bonusFeedStock)個。タップで説明を表示"
+                accessibilityLabel: L10n.Aquarium.feedStockA11y(aquarium.bonusFeedStock)
             ) {
                 FeedPelletGlyph(size: 13)
             } action: {
                 statusGuide = .feed
             }
         }
+        .frame(height: aquariumTopBarHeight)
         .padding(4)
         .background(.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
@@ -491,8 +466,8 @@ struct LiveAquariumView: View {
     private var statusDivider: some View {
         Rectangle()
             .fill(.white.opacity(0.16))
-            .frame(width: 1, height: 40)
-            .padding(.vertical, 2)
+            .frame(width: 1)
+            .frame(maxHeight: .infinity)
     }
 
     private func statusSegment<Icon: View>(
@@ -536,10 +511,10 @@ struct LiveAquariumView: View {
         VStack(spacing: 10) {
             if aquarium.bonusFeedStock > 0 {
                 FeedPelletGlyph(size: 28)
-                Text("餌")
+                Text(L10n.Aquarium.feed)
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.85))
-                Text("タップして餌をあげる")
+                Text(L10n.Aquarium.tapToFeed)
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.65))
                     .multilineTextAlignment(.center)
@@ -547,10 +522,10 @@ struct LiveAquariumView: View {
                 Image(systemName: "fish")
                     .font(.system(size: 44, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.7))
-                Text("餌")
+                Text(L10n.Aquarium.feed)
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.85))
-                Text("オンタイム出発か実績解除で獲得できます")
+                Text(L10n.Aquarium.earnFeedHint)
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.55))
                     .multilineTextAlignment(.center)
@@ -565,8 +540,8 @@ struct LiveAquariumView: View {
         }
         .accessibilityLabel(
             aquarium.bonusFeedStock > 0
-                ? "タップして餌をあげると魚が増えます"
-                : "餌がありません。オンタイム出発か実績解除で獲得できます"
+                ? L10n.Aquarium.emptyHasFeedA11y
+                : L10n.Aquarium.emptyNoFeedA11y
         )
     }
 
@@ -596,7 +571,7 @@ struct LiveAquariumView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "fish.fill")
                         .font(.subheadline.weight(.bold))
-                    Text("水槽がいっぱいです")
+                    Text(L10n.Aquarium.capacityFull)
                         .font(.subheadline.weight(.semibold))
                 }
                 Text(capacityFullHint)
@@ -616,19 +591,19 @@ struct LiveAquariumView: View {
             .padding(.horizontal, 24)
             .padding(.bottom, 28)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("水槽がいっぱいです。\(capacityFullHint)")
+            .accessibilityLabel(L10n.Aquarium.capacityFullA11y(capacityFullHint))
         }
         .allowsHitTesting(false)
     }
 
     private var capacityFullHint: String {
         if aquarium.isMaxTier {
-            return "これ以上泳がせることはできません"
+            return L10n.Aquarium.capacityFullMax
         }
         if let remaining = aquarium.departuresUntilNextTier, remaining > 0 {
-            return "あと\(remaining)しずくで収容上限が増えます"
+            return L10n.Aquarium.capacityFullDewRemaining(remaining)
         }
-        return "オンタイム出発で水槽を大きくしよう"
+        return L10n.Aquarium.capacityFullGrow
     }
 
     private func showCapacityFullFeedback() {
@@ -650,7 +625,7 @@ struct LiveAquariumView: View {
             Spacer()
             HStack(spacing: 8) {
                 FeedPelletGlyph(size: 14)
-                Text("餌がありません")
+                Text(L10n.Aquarium.noFeed)
                     .font(.subheadline.weight(.semibold))
             }
             .foregroundStyle(.white)
@@ -664,7 +639,7 @@ struct LiveAquariumView: View {
             .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
             .padding(.horizontal, 24)
             .padding(.bottom, 28)
-            .accessibilityLabel("餌がありません")
+            .accessibilityLabel(L10n.Aquarium.noFeed)
         }
         .allowsHitTesting(false)
     }

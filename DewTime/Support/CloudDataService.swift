@@ -7,7 +7,7 @@ enum CloudDataError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unauthenticated:
-            return "ログイン状態を確認できませんでした"
+            return L10n.Cloud.unauthenticated
         }
     }
 }
@@ -284,7 +284,7 @@ final class SupabaseDataService: CloudDataServicing {
         guard !values.isEmpty else { return }
         try await client
             .from(table)
-            .upsert(values, onConflict: "id")
+            .upsert(values, onConflict: "user_id,id")
             .execute()
     }
 

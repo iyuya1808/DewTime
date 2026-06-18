@@ -9,10 +9,15 @@ struct TimerView: View {
 
     @State private var viewModel: TimerViewModel?
     @State private var showCancelConfirm = false
-    @State private var showResult = false
+    @State private var showDepartureConfirm = false
+    @State private var rewardBurst: DepartureRewardBurst?
     @State private var draftLevel: Double = 1.0
     @State private var didAttemptDepartureRecovery = false
-    @State private var shouldRequestDepartureReview = false
+
+    private struct DepartureRewardBurst: Identifiable {
+        let id = UUID()
+        let bonusFeedAwarded: Bool
+    }
 
     private var draftMinutes: Int { max(5, Int((draftLevel * 30).rounded())) }
 
@@ -22,6 +27,14 @@ struct TimerView: View {
 
             if let vm = viewModel {
                 mainContent(vm: vm)
+            }
+
+            if let burst = rewardBurst {
+                DepartureRewardBurstView(bonusFeedAwarded: burst.bonusFeedAwarded) {
+                    rewardBurst = nil
+                    ReviewRequestManager.shared.tryRequest(for: .departureResult) { requestReview() }
+                }
+                .transition(.opacity)
             }
         }
         .onAppear {
@@ -39,11 +52,14 @@ struct TimerView: View {
                 viewModel?.pause()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: LocalizationManager.languageDidChangeNotification)) { _ in
+            viewModel?.handleLanguageChange()
+        }
         .alert(
-            "保存エラー",
+            L10n.Common.saveError,
             isPresented: Binding(get: { viewModel?.saveError != nil }, set: { _ in viewModel?.clearError() })
         ) {
-            Button("OK", role: .cancel) {}
+            Button(L10n.Common.ok, role: .cancel) {}
         } message: {
             Text(viewModel?.saveError ?? "")
         }
@@ -61,37 +77,25 @@ struct TimerView: View {
                 .presentationDragIndicator(.hidden)
             }
         }
-        .sheet(isPresented: $showResult, onDismiss: {
-            if shouldRequestDepartureReview {
-                ReviewRequestManager.shared.tryRequest(for: .departureResult) { requestReview() }
-            }
-            shouldRequestDepartureReview = false
-        }) {
+        .sheet(isPresented: $showDepartureConfirm) {
             if let vm = viewModel {
-                DepartureResultView(
-                    earnedDrop: vm.finalEarnedDrop,
-                    bonusFeedAwarded: vm.finalBonusFeedAwarded,
-                    delaySeconds: vm.finalDelaySeconds,
-                    onDismiss: {
-                        shouldRequestDepartureReview = true
-                        showResult = false
-                        vm.reset()
+                let aquarium = vm.aquariumSnapshot(from: store)
+                let departuresAfter = vm.projectedAquariumDepartures(from: store)
+                let tierAfter = Aquarium(totalDepartures: departuresAfter).sizeTier
+                DepartureConfirmView(
+                    isOnTime: !vm.isOverdue,
+                    tierWillGrow: tierAfter > aquarium.sizeTier,
+                    bonusFeedWillAward: !vm.isOverdue,
+                    onConfirm: {
+                        showDepartureConfirm = false
+                        depart(vm: vm)
                     },
-                    onResume: {
-                        showResult = false
-                        Task {
-                            await vm.resumeDeparture(store: store)
-                        }
-                    }
+                    onCancel: { showDepartureConfirm = false }
                 )
                 .presentationDetents([
-                    .height(DepartureResultView.preferredDetentHeight(
-                        bonusFeedAwarded: vm.finalBonusFeedAwarded,
-                        hasDelay: vm.finalDelaySeconds > 0
-                    ))
+                    .height(DepartureConfirmView.preferredDetentHeight(tierWillGrow: tierAfter > aquarium.sizeTier))
                 ])
                 .presentationDragIndicator(.hidden)
-                .interactiveDismissDisabled()
             }
         }
     }
@@ -150,7 +154,7 @@ struct TimerView: View {
                     Image(systemName: "hand.draw.fill")
                         .font(.system(size: 22))
                         .foregroundStyle(.white.opacity(0.45))
-                    Text("スワイプで時間を設定")
+                    Text(L10n.Timer.swipeToSet)
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.white.opacity(0.45))
                         .padding(.top, 4)
@@ -162,14 +166,14 @@ struct TimerView: View {
                             .foregroundStyle(.white.opacity(0.85))
                             .contentTransition(.numericText())
                             .animation(.interactiveSpring(), value: draftMinutes)
-                        Text("分")
+                        Text(L10n.Timer.minutesUnit)
                             .font(.system(size: 28, weight: .light, design: .rounded))
                             .foregroundStyle(.white.opacity(0.55))
                             .padding(.bottom, 24)
                     }
                     .padding(.top, 8)
                     .padding(.bottom, 18)
-                    .accessibilityLabel("\(draftMinutes)分")
+                    .accessibilityLabel(L10n.Timer.minutes(draftMinutes))
                 }
                 .transition(.opacity)
             } else {
@@ -197,7 +201,7 @@ struct TimerView: View {
     private func departureBottomButton(vm: TimerViewModel) -> some View {
         HStack(spacing: 20) {
             Button { showCancelConfirm = true } label: {
-                Label("キャンセル", systemImage: "xmark.circle")
+                Label(L10n.Timer.cancel, systemImage: "xmark.circle")
                     .font(.subheadline.weight(.semibold))
                     .labelStyle(.titleAndIcon)
                     .foregroundStyle(.white.opacity(0.55))
@@ -205,10 +209,10 @@ struct TimerView: View {
                     .background(.white.opacity(0.10), in: Capsule())
             }
             .disabled(vm.departed)
-            .accessibilityLabel("キャンセル")
+            .accessibilityLabel(L10n.Timer.cancel)
 
-            Button { depart(vm: vm) } label: {
-                Label("いってきます", systemImage: "figure.walk.departure")
+            Button { showDepartureConfirm = true } label: {
+                Label(L10n.Timer.depart, systemImage: "figure.walk.departure")
                     .font(.headline.weight(.semibold))
                     .labelStyle(.titleAndIcon)
                     .frame(maxWidth: .infinity)
@@ -216,7 +220,7 @@ struct TimerView: View {
                     .background(Color.dewBlue, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
             .disabled(vm.departed)
-            .accessibilityLabel("いってきます")
+            .accessibilityLabel(L10n.Timer.depart)
         }
         .padding(.horizontal, 28)
     }
@@ -224,9 +228,21 @@ struct TimerView: View {
     private func depart(vm: TimerViewModel) {
         guard !vm.departed else { return }
         vm.finalizeDeparture(store: store)
-        showResult = true
+        let earnedDrop = vm.finalEarnedDrop
+        let bonusFeed = vm.finalBonusFeedAwarded
+
+        vm.reset()
+        if earnedDrop {
+            rewardBurst = DepartureRewardBurst(bonusFeedAwarded: bonusFeed)
+        }
+
         Task {
-            await vm.persistDeparture(store: store)
+            await store.recordDeparture(earnedDrop: earnedDrop)
+            await MainActor.run {
+                if store.errorMessage != nil {
+                    viewModel?.reportSaveError(L10n.Timer.saveFailed)
+                }
+            }
         }
     }
 
@@ -265,12 +281,13 @@ struct TimerView: View {
     private func recoverDepartedSessionIfNeeded() {
         guard let vm = viewModel,
               vm.departed,
-              !showResult,
               !didAttemptDepartureRecovery else { return }
         didAttemptDepartureRecovery = true
-        showResult = true
         Task {
             await vm.recoverDepartedSession(store: store)
+            await MainActor.run {
+                vm.reset()
+            }
         }
     }
 }

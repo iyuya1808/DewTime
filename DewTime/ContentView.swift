@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 
 enum AppTab: CaseIterable, Identifiable {
     case timer, collection, aquarium, profile
@@ -7,10 +8,10 @@ enum AppTab: CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .timer:      return "タイマー"
-        case .collection: return "図鑑"
-        case .aquarium:   return "水槽"
-        case .profile:    return "プロフィール"
+        case .timer:      return L10n.Tab.timer
+        case .collection: return L10n.Tab.collection
+        case .aquarium:   return L10n.Tab.aquarium
+        case .profile:    return L10n.Tab.profile
         }
     }
 
@@ -35,7 +36,12 @@ enum AppTab: CaseIterable, Identifiable {
 
 struct ContentView: View {
     @AppStorage(AppPreferences.Key.hasCompletedTutorial.rawValue) private var hasCompletedTutorial = false
+    @AppStorage(AppPreferences.Key.appLanguage.rawValue) private var appLanguageRaw = AppLanguage.system.rawValue
     @State private var selectedTab: AppTab = .timer
+
+    private var activeLocale: Locale {
+        LocalizationManager.shared.locale
+    }
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -48,6 +54,14 @@ struct ContentView: View {
             }
         }
         .environment(\.appTabSelection, $selectedTab)
+        .environment(\.locale, activeLocale)
+        .onAppear {
+            LocalizationManager.shared.language = AppLanguage(rawValue: appLanguageRaw) ?? .system
+        }
+        .onChange(of: appLanguageRaw) { _, newValue in
+            LocalizationManager.shared.language = AppLanguage(rawValue: newValue) ?? .system
+            WidgetCenter.shared.reloadTimelines(ofKind: SharedTimerWidgetState.widgetKind)
+        }
         .overlay {
             if !hasCompletedTutorial {
                 TutorialOverlayView(

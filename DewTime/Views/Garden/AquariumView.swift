@@ -30,7 +30,7 @@ struct FishCareDetailSheet: View {
                             .foregroundStyle(recordColor)
                     }
 
-                    Text(record.earnedDrop ? "オンタイム出発" : "遅延あり")
+                    Text(record.earnedDrop ? L10n.Aquarium.Care.onTime : L10n.Aquarium.Care.late)
                         .font(.headline.weight(.bold))
                         .foregroundStyle(recordColor)
 
@@ -52,17 +52,17 @@ struct FishCareDetailSheet: View {
                         metric(
                             icon: record.earnedDrop ? "drop.fill" : "drop",
                             value: record.earnedDrop ? "+1" : "0",
-                            caption: "しずく",
+                            caption: L10n.Aquarium.dewDrop,
                             tint: .cyan,
-                            accessibilityLabel: record.earnedDrop ? "今回 しずく1" : "今回 しずく0"
+                            accessibilityLabel: record.earnedDrop ? L10n.Aquarium.Care.dewEarnedA11y : L10n.Aquarium.Care.dewNoneA11y
                         )
                         if record.bonusFeedAwarded {
                             metric(
                                 icon: FeedIcon.systemName,
                                 value: "+1",
-                                caption: "餌",
+                                caption: L10n.Aquarium.feed,
                                 tint: .orange,
-                                accessibilityLabel: "餌を1個獲得"
+                                accessibilityLabel: L10n.Aquarium.Care.feedEarnedA11y
                             )
                         }
                     }
@@ -99,9 +99,9 @@ struct FishCareDetailSheet: View {
 
     private var detailAccessibilityLabel: String {
         let dateText = record.recordedAt.formatted(.dateTime.year().month().day().hour().minute())
-        let dropText = record.earnedDrop ? "しずく1獲得" : "しずくなし"
-        let bonusText = record.bonusFeedAwarded ? "餌1個" : ""
-        return "\(dateText)、\(dropText)\(bonusText.isEmpty ? "" : "、\(bonusText)")"
+        let dropText = record.earnedDrop ? L10n.Aquarium.Care.dewSummaryEarned : L10n.Aquarium.Care.dewSummaryNone
+        let bonusText = record.bonusFeedAwarded ? L10n.Aquarium.Care.feedSummary : ""
+        return L10n.Aquarium.Care.detailA11y(date: dateText, dropText: dropText, bonusText: bonusText)
     }
 
     private var recordColor: Color {

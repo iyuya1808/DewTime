@@ -28,7 +28,7 @@ struct TutorialOverlayView: View {
             VStack(spacing: 0) {
                 HStack {
                     Spacer()
-                    Button("スキップ") {
+                    Button(L10n.Tutorial.skip) {
                         completeTutorial()
                     }
                     .font(.subheadline.weight(.semibold))
@@ -36,7 +36,7 @@ struct TutorialOverlayView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                     .background(.white.opacity(0.14), in: Capsule())
-                    .accessibilityHint("チュートリアルを閉じます")
+                    .accessibilityHint(L10n.Tutorial.skipHint)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 18)
@@ -104,14 +104,14 @@ struct TutorialOverlayView: View {
                     .font(.caption.weight(.semibold))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
-                    .accessibilityLabel("\(steps.count)ページ中\(currentIndex + 1)ページ")
+                    .accessibilityLabel(L10n.Tutorial.pageOf(current: currentIndex + 1, total: steps.count))
             }
 
             HStack(spacing: 10) {
                 Button {
                     moveBackward()
                 } label: {
-                    Label("戻る", systemImage: "chevron.left")
+                    Label(L10n.Common.back, systemImage: "chevron.left")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(TutorialSecondaryButtonStyle())
@@ -121,7 +121,7 @@ struct TutorialOverlayView: View {
                 Button {
                     moveForward()
                 } label: {
-                    Label(isLastStep ? "はじめる" : "次へ", systemImage: isLastStep ? "checkmark" : "chevron.right")
+                    Label(isLastStep ? L10n.Tutorial.start : L10n.Tutorial.next, systemImage: isLastStep ? "checkmark" : "chevron.right")
                         .labelStyle(.titleAndIcon)
                         .frame(maxWidth: .infinity)
                 }
@@ -165,6 +165,17 @@ private enum TutorialStep: CaseIterable {
     case collection
     case profileRecords
 
+    var kind: TutorialStepKind {
+        switch self {
+        case .timerWater: return .timerWater
+        case .timerDepart: return .timerDepart
+        case .rewards: return .rewards
+        case .aquariumGacha: return .aquariumGacha
+        case .collection: return .collection
+        case .profileRecords: return .profileRecords
+        }
+    }
+
     var tab: AppTab {
         switch self {
         case .timerWater, .timerDepart, .rewards:
@@ -195,39 +206,9 @@ private enum TutorialStep: CaseIterable {
         }
     }
 
-    var title: String {
-        switch self {
-        case .timerWater:
-            return "水で時間がわかる"
-        case .timerDepart:
-            return "出発で水槽へ届ける"
-        case .rewards:
-            return "しずくと餌"
-        case .aquariumGacha:
-            return "餌で仲間を増やす"
-        case .collection:
-            return "図鑑を埋めよう"
-        case .profileRecords:
-            return "記録と実績"
-        }
-    }
+    var title: String { L10n.Tutorial.stepTitle(kind) }
 
-    var message: String {
-        switch self {
-        case .timerWater:
-            return "タンクをスワイプして出発までの時間を設定します。水が多いほど余裕があり、準備が順調なほど水が残ります。"
-        case .timerDepart:
-            return "「スタート」で準備を始めます。時間内に「いってきます」を押すと、残った水を水槽へ届けられます。"
-        case .rewards:
-            return "オンタイム出発で「しずく +1」と「餌 +1」を獲得できます。しずくは水槽の成長に、餌は水槽タブで魚を呼び寄せるのに使います。遅刻すると報酬はありません。"
-        case .aquariumGacha:
-            return "水槽をタップして餌を落としましょう。魚が食べたタイミングで新しい仲間が誕生し、図鑑に登録されます。"
-        case .collection:
-            return "獲得した魚種は図鑑に記録されます。まだ出会っていない魚はシルエットで表示されます。水槽レベルが上がると、より珍しい魚が出現します。"
-        case .profileRecords:
-            return "出発記録をカレンダーで確認できます。実績を達成すると餌がもらえます。通知の変更は右上の歯車から行えます。"
-        }
-    }
+    var message: String { L10n.Tutorial.stepMessage(kind) }
 
     var tint: Color {
         switch self {

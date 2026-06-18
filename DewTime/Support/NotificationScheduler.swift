@@ -16,8 +16,8 @@ enum NotificationScheduler {
 
         scheduleNotification(
             id: "dew.departure",
-            title: "出発時刻です！",
-            body: "出発時刻になりました",
+            title: L10n.PushNotification.departureTitle,
+            body: L10n.PushNotification.departureBody,
             at: date
         )
 
@@ -25,8 +25,8 @@ enum NotificationScheduler {
         let reminderMinutes = AppPreferences.departureReminderMinutes
         scheduleNotification(
             id: "dew.reminder5",
-            title: "あと\(reminderMinutes)分！",
-            body: "出発まであと\(reminderMinutes)分です",
+            title: L10n.PushNotification.reminderTitle(reminderMinutes),
+            body: L10n.PushNotification.reminderBody(reminderMinutes),
             at: date.addingTimeInterval(TimeInterval(-reminderMinutes * 60))
         )
     }

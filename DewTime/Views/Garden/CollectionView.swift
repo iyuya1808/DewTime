@@ -1,41 +1,15 @@
 import SwiftUI
 import StoreKit
 
-private enum UnlockFilter: String, CaseIterable {
-    case all = "すべて"
-    case unlocked = "解放済み"
-    case locked = "未解放"
-
-    var icon: String {
+private extension FishDifficulty {
+    var lockedAccentColor: Color {
         switch self {
-        case .all: return "square.grid.2x2.fill"
-        case .unlocked: return "checkmark.seal"
-        case .locked: return "lock"
+        case .veryEasy: return Color(hex: "#48C774")
+        case .easy: return Color(hex: "#2EC4B6")
+        case .normal: return Color(hex: "#3FA7FF")
+        case .hard: return Color(hex: "#8B80F9")
+        case .veryHard: return Color(hex: "#F06595")
         }
-    }
-
-    static var selectableCases: [UnlockFilter] {
-        [.unlocked, .locked]
-    }
-}
-
-private enum DifficultyFilter: String, CaseIterable {
-    case all = "すべて"
-    case easy = "易しい"
-    case normal = "普通"
-    case hard = "難しい"
-
-    var starCount: Int {
-        switch self {
-        case .all: return 0
-        case .easy: return 1
-        case .normal: return 2
-        case .hard: return 3
-        }
-    }
-
-    static var selectableCases: [DifficultyFilter] {
-        [.easy, .normal, .hard]
     }
 }
 
@@ -52,25 +26,19 @@ private struct SpeciesGrowthSnapshot {
         if isUnlocked {
             return WaterLevelTheme(waterRatio: bestUnlockedRatio).tintColor
         }
-        switch species.difficultyLabel {
-        case "かんたん": return Color(hex: "#48C774")
-        case "易しい": return Color(hex: "#2EC4B6")
-        case "普通": return Color(hex: "#3FA7FF")
-        case "難しい": return Color(hex: "#8B80F9")
-        default: return Color(hex: "#F06595")
-        }
+        return species.difficulty.lockedAccentColor
     }
 
     var helperText: String {
         if isUnlocked {
-            return "\(unlockedRecordCount)匹獲得"
+            return L10n.Collection.fishAcquired(unlockedRecordCount)
         }
-        return "水槽Lv.\(species.requiredAquariumTier + 1)〜"
+        return L10n.Collection.aquariumLevelMin(species.requiredAquariumTier + 1)
     }
 
     var statusTitle: String {
-        if isUnlocked { return "\(unlockedRecordCount)匹" }
-        return "未発見"
+        if isUnlocked { return L10n.Collection.fishCount(unlockedRecordCount) }
+        return L10n.Collection.undiscovered
     }
 
     var statusIcon: String {
@@ -84,8 +52,8 @@ struct CollectionView: View {
     @Environment(\.requestReview) private var requestReview
 
     @State private var selectedSpecies: FishSpecies?
-    @State private var unlockFilter: UnlockFilter = .all
-    @State private var difficultyFilter: DifficultyFilter = .all
+    @State private var unlockFilter: UnlockFilterBand = .all
+    @State private var difficultyFilter: DifficultyFilterBand = .all
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 2)
 
@@ -98,11 +66,8 @@ struct CollectionView: View {
         case .locked: result = result.filter { records(for: $0).isEmpty }
         }
 
-        switch difficultyFilter {
-        case .all: break
-        case .easy: result = result.filter { $0.difficultyLabel == "易しい" }
-        case .normal: result = result.filter { $0.difficultyLabel == "普通" }
-        case .hard: result = result.filter { $0.difficultyLabel == "難しい" }
+        if difficultyFilter != .all {
+            result = result.filter { $0.difficulty.filterBand == difficultyFilter }
         }
 
         return result
@@ -145,11 +110,11 @@ struct CollectionView: View {
                         Image(systemName: "book.closed.fill")
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(.teal)
-                        Text("図鑑")
+                        Text(L10n.Collection.title)
                             .font(.system(.title2, design: .rounded).weight(.bold))
                     }
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("図鑑")
+                    .accessibilityLabel(L10n.Collection.title)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -177,12 +142,12 @@ struct CollectionView: View {
     private var filterBar: some View {
         HStack(spacing: 10) {
             filterSegmentGroup {
-                ForEach(UnlockFilter.selectableCases, id: \.self) { filter in
+                ForEach(UnlockFilterBand.selectableCases, id: \.self) { filter in
                     filterSegmentButton(
                         icon: filter.icon,
-                        title: filter.rawValue,
+                        title: filter.displayName,
                         isSelected: unlockFilter == filter,
-                        accessibilityLabel: filter.rawValue
+                        accessibilityLabel: filter.displayName
                     ) {
                         withAnimation(.easeInOut(duration: 0.18)) {
                             unlockFilter = unlockFilter == filter ? .all : filter
@@ -192,7 +157,7 @@ struct CollectionView: View {
             }
 
             filterSegmentGroup {
-                ForEach(DifficultyFilter.selectableCases, id: \.self) { filter in
+                ForEach(DifficultyFilterBand.selectableCases, id: \.self) { filter in
                     difficultySegmentButton(
                         filter: filter,
                         isSelected: difficultyFilter == filter
@@ -219,7 +184,7 @@ struct CollectionView: View {
                 }
                 .buttonStyle(.plain)
                 .transition(.opacity)
-                .accessibilityLabel("フィルターをリセット")
+                .accessibilityLabel(L10n.Collection.filterResetA11y)
             }
         }
     }
@@ -263,7 +228,7 @@ struct CollectionView: View {
     }
 
     private func difficultySegmentButton(
-        filter: DifficultyFilter,
+        filter: DifficultyFilterBand,
         isSelected: Bool,
         action: @escaping () -> Void
     ) -> some View {
@@ -275,7 +240,7 @@ struct CollectionView: View {
                     }
                 }
                 .font(.system(size: 9, weight: .semibold))
-                Text(filter.rawValue)
+                Text(filter.displayName)
                     .font(.system(size: 9, weight: .semibold))
             }
             .foregroundStyle(isSelected ? Color.orange : Color.secondary.opacity(0.65))
@@ -286,7 +251,7 @@ struct CollectionView: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(filter.rawValue)
+        .accessibilityLabel(filter.displayName)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
@@ -295,7 +260,7 @@ struct CollectionView: View {
             Image(systemName: "magnifyingglass")
                 .font(.title2)
                 .foregroundStyle(.secondary)
-            Text("該当する魚がいません")
+            Text(L10n.Collection.noResults)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
             Button {
@@ -304,11 +269,11 @@ struct CollectionView: View {
                     difficultyFilter = .all
                 }
             } label: {
-                Label("リセット", systemImage: "xmark.circle")
+                Label(L10n.Common.reset, systemImage: "xmark.circle")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
-            .accessibilityLabel("フィルターをリセット")
+            .accessibilityLabel(L10n.Collection.filterResetA11y)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
@@ -475,7 +440,7 @@ private struct SpeciesDetailSheet: View {
                         .background(Color(.systemGray5), in: Circle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("閉じる")
+                .accessibilityLabel(L10n.Common.close)
             }
             .padding(.horizontal, 20)
             .padding(.top, 16)
@@ -594,7 +559,7 @@ private struct SpeciesDetailSheet: View {
                 Image(systemName: fishes.isEmpty ? FeedIcon.systemName : "fish.fill")
                     .font(.title3.weight(.bold))
                     .foregroundStyle(fishes.isEmpty ? .orange : snapshot.accentColor)
-                Text(fishes.isEmpty ? "餌やりで出現" : "\(fishes.count)匹獲得")
+                Text(fishes.isEmpty ? L10n.Collection.appearsOnFeed : L10n.Collection.fishAcquired(fishes.count))
                     .font(.headline.weight(.bold))
                 Spacer()
             }
@@ -602,7 +567,7 @@ private struct SpeciesDetailSheet: View {
                 HStack(spacing: 8) {
                     Image(systemName: "drop.fill")
                         .foregroundStyle(.cyan)
-                    Text("水槽Lv.\(species.requiredAquariumTier + 1)〜")
+                    Text(L10n.Collection.aquariumLevelMin(species.requiredAquariumTier + 1))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -643,7 +608,7 @@ private struct SpeciesDetailSheet: View {
                         .font(.title3)
                         .foregroundStyle(.teal)
                 }
-                Text("必要水槽")
+                Text(L10n.Collection.requiredAquarium)
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.secondary)
                 Text("Lv.\(species.requiredAquariumTier + 1)")
@@ -663,11 +628,11 @@ private struct SpeciesDetailSheet: View {
                         .font(.title3)
                         .foregroundStyle(.orange)
                 }
-                Text("難しさ")
+                Text(L10n.Collection.difficulty)
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.secondary)
                 difficultyStarsDetail(for: species)
-                Text(species.difficultyLabel)
+                Text(species.difficulty.displayName)
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

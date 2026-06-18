@@ -60,7 +60,7 @@ struct AquariumGrowthStageView: View {
         }
         .frame(height: ladderHeight)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("水槽の成長段階")
+        .accessibilityLabel(L10n.Aquarium.Growth.stagesA11y)
     }
 
     private func tierRow(tiers: [Int], slotWidth: CGFloat) -> some View {
@@ -131,7 +131,7 @@ struct AquariumGrowthStageView: View {
                         HStack(spacing: 2) {
                             Image(systemName: "drop.fill")
                                 .font(.system(size: 7, weight: .bold))
-                            Text("\(Aquarium.tierThresholds[tier])しずく")
+                            Text(L10n.Fish.requiredDewDrops(Aquarium.tierThresholds[tier]))
                                 .font(.system(size: 8, weight: .bold))
                                 .monospacedDigit()
                                 .lineLimit(1)
@@ -193,7 +193,7 @@ struct AquariumGrowthStageView: View {
                 }
             }
             .frame(height: 8)
-            .accessibilityLabel("次の段階まで\(Int((aquarium.progressToNextTier * 100).rounded()))パーセント")
+            .accessibilityLabel(L10n.Aquarium.Growth.progressPercent(Int((aquarium.progressToNextTier * 100).rounded())))
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
@@ -203,7 +203,7 @@ struct AquariumGrowthStageView: View {
                         Text("\(aquarium.totalDepartures)")
                             .font(.subheadline.weight(.bold))
                             .monospacedDigit()
-                        Text("しずく")
+                        Text(L10n.Aquarium.dewDrop)
                             .font(.caption2.weight(.semibold))
                     }
                     .foregroundStyle(.cyan)
@@ -218,7 +218,7 @@ struct AquariumGrowthStageView: View {
                         Text("\(Aquarium.tierThresholds[aquarium.sizeTier + 1])")
                             .font(.subheadline.weight(.bold))
                             .monospacedDigit()
-                        Text("しずく")
+                        Text(L10n.Aquarium.dewDrop)
                             .font(.caption2.weight(.semibold))
                     }
                     .foregroundStyle(.white.opacity(0.85))
@@ -228,16 +228,16 @@ struct AquariumGrowthStageView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "figure.walk.departure")
                             .font(.caption.weight(.bold))
-                        Text("あと\(remaining)しずく")
+                        Text(L10n.Aquarium.Growth.remainingDew(remaining))
                             .font(.caption.weight(.semibold))
                             .monospacedDigit()
                     }
                     .foregroundStyle(.white.opacity(0.85))
-                    .accessibilityLabel("あと\(remaining)回のオンタイム出発で水槽が大きくなります")
+                    .accessibilityLabel(L10n.Aquarium.Growth.remainingA11y(remaining))
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityLabel("オンタイム出発\(aquarium.totalDepartures)回。次の段階は\(Aquarium.tierThresholds[aquarium.sizeTier + 1])回")
+            .accessibilityLabel(L10n.Aquarium.Growth.progressSummaryA11y(current: aquarium.totalDepartures, next: Aquarium.tierThresholds[aquarium.sizeTier + 1]))
         }
         .padding(.top, 4)
     }
@@ -246,13 +246,13 @@ struct AquariumGrowthStageView: View {
         let capacity = Aquarium.fishCapacity(for: tier)
         let name = Aquarium.sizeName(for: tier)
         if isCurrent {
-            return "現在の段階\(tier + 1)、\(name)。魚を\(capacity)匹まで泳がせられます"
+            return L10n.Aquarium.Growth.tierCurrentA11y(tier: tier + 1, name: name, capacity: capacity)
         }
         if isUnlocked {
-            return "達成済みの段階\(tier + 1)、\(name)。魚を\(capacity)匹まで泳がせられます"
+            return L10n.Aquarium.Growth.tierUnlockedA11y(tier: tier + 1, name: name, capacity: capacity)
         }
         let threshold = Aquarium.tierThresholds[tier]
-        return "未解放の段階\(tier + 1)、\(name)。オンタイム出発\(threshold)回で解放。魚を\(capacity)匹まで泳がせられます"
+        return L10n.Aquarium.Growth.tierLockedA11y(tier: tier + 1, name: name, threshold: threshold, capacity: capacity)
     }
 }
 

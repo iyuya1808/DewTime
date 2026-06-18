@@ -12,6 +12,7 @@ struct SettingsView: View {
     @AppStorage(AppPreferences.Key.appTheme.rawValue) private var appTheme = AppTheme.system.rawValue
     @AppStorage(AppPreferences.Key.aquariumTheme.rawValue) private var aquariumTheme = AquariumTheme.dewBlue.rawValue
     @AppStorage(AppPreferences.Key.hasCompletedTutorial.rawValue) private var hasCompletedTutorial = false
+    @AppStorage(AppPreferences.Key.appLanguage.rawValue) private var appLanguageRaw = AppLanguage.system.rawValue
 
     @State private var showProfileEditor = false
     @State private var saveError: String?
@@ -34,7 +35,7 @@ struct SettingsView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 32)
             }
-            .navigationTitle("設定")
+            .navigationTitle(L10n.Settings.title)
             .dewAppBackground()
             .task {
                 await refreshAuthorizationStatus()
@@ -43,10 +44,10 @@ struct SettingsView: View {
                 ProfileEditView()
             }
             .alert(
-                "保存エラー",
+                L10n.Common.saveError,
                 isPresented: Binding(get: { saveError != nil }, set: { _ in saveError = nil })
             ) {
-                Button("OK", role: .cancel) {}
+                Button(L10n.Common.ok, role: .cancel) {}
             } message: {
                 Text(saveError ?? "")
             }
@@ -57,7 +58,7 @@ struct SettingsView: View {
 
     private var accountSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SettingsSectionHeader(title: "アカウント", systemImage: "person.crop.circle", tint: .teal)
+            SettingsSectionHeader(title: L10n.Settings.account, systemImage: "person.crop.circle", tint: .teal)
 
             Button {
                 showProfileEditor = true
@@ -100,9 +101,9 @@ struct SettingsView: View {
     private var accountStatusBadge: some View {
         if let user = authService.currentUser {
             if authService.isAnonymous {
-                SettingsStatusBadge(text: "ローカルのみ", tint: .orange, systemImage: "iphone")
+                SettingsStatusBadge(text: L10n.Settings.accountLocalOnly, tint: .orange, systemImage: "iphone")
             } else {
-                SettingsStatusBadge(text: "クラウド保存: 有効", tint: .teal, systemImage: "icloud.fill")
+                SettingsStatusBadge(text: L10n.Settings.accountCloudEnabled, tint: .teal, systemImage: "icloud.fill")
                 if let email = user.email {
                     Text(email)
                         .font(.caption2)
@@ -110,7 +111,7 @@ struct SettingsView: View {
                 }
             }
         } else {
-            SettingsStatusBadge(text: "準備中", tint: .secondary, systemImage: "hourglass")
+            SettingsStatusBadge(text: L10n.Common.preparing, tint: .secondary, systemImage: "hourglass")
         }
     }
 
@@ -119,7 +120,7 @@ struct SettingsView: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
-                Text("データはこの端末にのみ保存されています。アカウント登録でクラウド保存とプロフィール編集が使えます。")
+                Text(L10n.Settings.accountAnonymousBanner)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -130,7 +131,7 @@ struct SettingsView: View {
             } label: {
                 HStack {
                     Spacer()
-                    Label("アカウント登録する", systemImage: "icloud.and.arrow.up")
+                    Label(L10n.Settings.accountRegister, systemImage: "icloud.and.arrow.up")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(.white)
                     Spacer()
@@ -150,8 +151,8 @@ struct SettingsView: View {
     private var notificationSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             SettingsSectionHeader(
-                title: "通知と触覚",
-                caption: "出発時刻のお知らせと操作時の振動",
+                title: L10n.Settings.notificationsAndHaptics,
+                caption: L10n.Settings.notificationsCaption,
                 systemImage: "bell.badge.fill",
                 tint: .orange
             )
@@ -162,7 +163,7 @@ struct SettingsView: View {
                 SettingsCard {
                     VStack(alignment: .leading, spacing: 12) {
                         SettingsNavigationRow(
-                            title: "通知と触覚の設定",
+                            title: L10n.Settings.notificationsSettings,
                             subtitle: notificationInlineSummary,
                             systemImage: "bell.badge",
                             iconTint: .orange,
@@ -171,7 +172,7 @@ struct SettingsView: View {
 
                         if authorizationStatus == .denied {
                             SettingsStatusBadge(
-                                text: "iOSで通知が拒否されています",
+                                text: L10n.Settings.notificationsDeniedIOS,
                                 tint: .red,
                                 systemImage: "exclamationmark.triangle.fill"
                             )
@@ -193,8 +194,8 @@ struct SettingsView: View {
     private var displaySection: some View {
         VStack(alignment: .leading, spacing: 10) {
             SettingsSectionHeader(
-                title: "表示",
-                caption: "アプリ全体と水槽の見た目",
+                title: L10n.Settings.display,
+                caption: L10n.Settings.displayCaption,
                 systemImage: "paintpalette.fill",
                 tint: .purple
             )
@@ -202,7 +203,29 @@ struct SettingsView: View {
             SettingsCard {
                 VStack(alignment: .leading, spacing: 20) {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("外観モード")
+                        Text(L10n.Settings.language)
+                            .font(.subheadline.weight(.semibold))
+
+                        HStack(spacing: 8) {
+                            ForEach(AppLanguage.allCases) { language in
+                                SettingsLanguageChip(
+                                    language: language,
+                                    isSelected: appLanguageRaw == language.rawValue
+                                ) {
+                                    appLanguageRaw = language.rawValue
+                                }
+                            }
+                        }
+
+                        Text(L10n.Settings.languageFooter)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(L10n.Settings.appearanceMode)
                             .font(.subheadline.weight(.semibold))
 
                         HStack(spacing: 8) {
@@ -224,7 +247,7 @@ struct SettingsView: View {
                     Divider()
 
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("水槽テーマ")
+                        Text(L10n.Settings.aquariumTheme)
                             .font(.subheadline.weight(.semibold))
 
                         HStack(spacing: 8) {
@@ -238,7 +261,7 @@ struct SettingsView: View {
                             }
                         }
 
-                        Text("タイマーの水タンクと水槽画面の色合いが変わります。")
+                        Text(L10n.Settings.aquariumThemeFooter)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -250,7 +273,7 @@ struct SettingsView: View {
     private var helpSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             SettingsSectionHeader(
-                title: "ヘルプ",
+                title: L10n.Settings.help,
                 systemImage: "questionmark.circle.fill",
                 tint: .blue
             )
@@ -260,8 +283,8 @@ struct SettingsView: View {
                     hasCompletedTutorial = false
                 } label: {
                     SettingsNavigationRow(
-                        title: "チュートリアルをもう一度見る",
-                        subtitle: "タイマー・しずくと餌・水槽・図鑑・実績の使い方を確認できます",
+                        title: L10n.Settings.tutorialReplay,
+                        subtitle: L10n.Settings.tutorialReplaySubtitle,
                         systemImage: "book.pages.fill",
                         iconTint: .blue
                     )
@@ -273,7 +296,7 @@ struct SettingsView: View {
 
     private var linksSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SettingsSectionHeader(title: "その他", systemImage: "ellipsis.circle", tint: .secondary)
+            SettingsSectionHeader(title: L10n.Settings.other, systemImage: "ellipsis.circle", tint: .secondary)
 
             SettingsCard {
                 VStack(spacing: 16) {
@@ -281,8 +304,8 @@ struct SettingsView: View {
                         DataManagementView()
                     } label: {
                         SettingsNavigationRow(
-                            title: "データ管理",
-                            subtitle: "保存状態の確認やデータの初期化",
+                            title: L10n.Settings.dataManagement,
+                            subtitle: L10n.Settings.dataManagementSubtitle,
                             systemImage: "externaldrive.fill",
                             iconTint: .teal
                         )
@@ -295,8 +318,8 @@ struct SettingsView: View {
                         SupportDeveloperView()
                     } label: {
                         SettingsNavigationRow(
-                            title: "開発者を応援",
-                            subtitle: "アプリの開発をサポートする",
+                            title: L10n.Settings.supportDeveloper,
+                            subtitle: L10n.Settings.supportDeveloperSubtitle,
                             systemImage: "heart.fill",
                             iconTint: .pink
                         )
@@ -308,7 +331,7 @@ struct SettingsView: View {
     }
 
     private var versionFooter: some View {
-        Text("バージョン \(appVersionString)")
+        Text(L10n.Settings.version(appVersionString))
             .font(.caption2)
             .foregroundStyle(.tertiary)
             .frame(maxWidth: .infinity)
@@ -325,26 +348,26 @@ struct SettingsView: View {
 
     private var notificationInlineSummary: String {
         var parts: [String] = []
-        parts.append(notificationsEnabled ? "通知 ON" : "通知 OFF")
+        parts.append(notificationsEnabled ? L10n.Settings.notificationOn : L10n.Settings.notificationOff)
         if notificationsEnabled {
             if departureReminderEnabled {
-                parts.append("\(departureReminderMinutes)分前にリマインド")
+                parts.append(L10n.Settings.reminderBefore(departureReminderMinutes))
             } else {
-                parts.append("出発時刻のみ")
+                parts.append(L10n.Settings.departureOnly)
             }
         }
-        parts.append(hapticsEnabled ? "触覚 ON" : "触覚 OFF")
+        parts.append(hapticsEnabled ? L10n.Settings.hapticsOn : L10n.Settings.hapticsOff)
         return parts.joined(separator: " · ")
     }
 
     private var themeFooterText: String {
         switch AppTheme(rawValue: appTheme) {
         case .system:
-            return "ライトモードとダークモードは端末の外観設定に合わせて切り替わります。"
+            return L10n.Settings.themeFooterSystem
         case .light:
-            return "常にライトモードで表示します。"
+            return L10n.Settings.themeFooterLight
         case .dark:
-            return "常にダークモードで表示します。"
+            return L10n.Settings.themeFooterDark
         default:
             return ""
         }

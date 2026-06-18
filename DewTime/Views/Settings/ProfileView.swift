@@ -25,14 +25,14 @@ struct ProfileView: View {
                 .padding(.bottom, 32)
             }
             .navigationBarTitleDisplayMode(.inline)
-            .navigationTitle("プロフィール")
+            .navigationTitle(L10n.Tab.profile)
             .dewAppBackground()
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink(destination: SettingsView()) {
                         Image(systemName: "gear")
                     }
-                    .accessibilityLabel("設定")
+                    .accessibilityLabel(L10n.Settings.title)
                 }
             }
             .sheet(item: $selectedRecord) { record in
@@ -67,18 +67,18 @@ struct ProfileView: View {
             .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(profile?.nickname ?? "あなた")
+                Text(profile?.nickname ?? L10n.Profile.defaultNickname)
                     .font(.title3.weight(.bold))
                 HStack(spacing: 4) {
                     Image(systemName: "calendar")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    Text("\(daysSinceStart)日目")
+                    Text(L10n.Profile.dayCount(daysSinceStart))
                         .font(.caption.weight(.bold))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
-                .accessibilityLabel("出発\(daysSinceStart)日目")
+                .accessibilityLabel(L10n.Profile.departureDayAccessibility(daysSinceStart))
             }
 
             Spacer()
@@ -90,7 +90,7 @@ struct ProfileView: View {
                     Image(systemName: "pencil")
                         .font(.headline)
                         .foregroundStyle(.teal)
-                    Text("編集")
+                    Text(L10n.Profile.edit)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.teal)
                 }
@@ -98,7 +98,7 @@ struct ProfileView: View {
                 .background(Color.dewSurfaceSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("プロフィールを編集")
+            .accessibilityLabel(L10n.Profile.editAccessibility)
         }
         .padding(16)
         .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -116,7 +116,7 @@ struct ProfileView: View {
                 Image(systemName: "trophy.fill")
                     .font(.headline)
                     .foregroundStyle(.orange)
-                Text("実績")
+                Text(L10n.Profile.achievements)
                     .font(.headline.weight(.bold))
                 Spacer()
                 Text("\(unlockedCount)/\(totalCount)")
@@ -125,7 +125,7 @@ struct ProfileView: View {
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("実績 \(unlockedCount)個獲得、全\(totalCount)個")
+            .accessibilityLabel(L10n.Profile.achievementsAccessibility(unlocked: unlockedCount, total: totalCount))
 
             ForEach(AchievementCategory.allCases) { category in
                 achievementCategoryBlock(category)
@@ -191,12 +191,8 @@ struct ProfileView: View {
                 }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(
-            unlocked
-                ? "\(achievement.title)、獲得済み"
-                : "\(achievement.title)、未獲得"
-        )
-        .accessibilityHint("タップして詳細を表示")
+        .accessibilityLabel(L10n.Profile.achievementAccessibility(title: achievement.title, unlocked: unlocked))
+        .accessibilityHint(L10n.Profile.achievementTapHint)
     }
 }
 
@@ -226,11 +222,11 @@ private struct AchievementDetailSheet: View {
             }
 
             if unlocked {
-                Label("獲得済み", systemImage: "checkmark.seal.fill")
+                Label(L10n.Profile.achievementUnlocked, systemImage: "checkmark.seal.fill")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(achievement.tint)
                 if achievement.feedReward > 0 {
-                    Label("報酬: 餌\(achievement.feedReward)個", systemImage: FeedIcon.systemName)
+                    Label(L10n.Profile.rewardFeed(achievement.feedReward), systemImage: FeedIcon.systemName)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.orange)
                 }
@@ -243,7 +239,7 @@ private struct AchievementDetailSheet: View {
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                     if achievement.feedReward > 0 {
-                        Label("解除で餌\(achievement.feedReward)個", systemImage: FeedIcon.systemName)
+                        Label(L10n.Profile.unlockRewardFeed(achievement.feedReward), systemImage: FeedIcon.systemName)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.orange)
                     }

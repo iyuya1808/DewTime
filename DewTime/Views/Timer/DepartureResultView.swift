@@ -47,11 +47,11 @@ struct DepartureResultView: View {
                 .foregroundStyle(earnedDrop ? Color.teal : Color.orange)
                 .shadow(color: (earnedDrop ? Color.teal : Color.orange).opacity(0.4), radius: 12, y: 4)
 
-            Text(earnedDrop ? "いってきます！" : "遅刻してしまいました")
+            Text(earnedDrop ? L10n.Timer.resultOnTime : L10n.Timer.resultLate)
                 .font(.title3.weight(.bold))
 
             if delaySeconds > 0 {
-                Text("\(delayMinutesText)遅れ")
+                Text(L10n.Timer.minutesLate(delayMinutesText))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.orange)
             }
@@ -64,16 +64,16 @@ struct DepartureResultView: View {
         VStack(spacing: 10) {
             rewardRow(
                 icon: earnedDrop ? "drop.fill" : "drop",
-                title: earnedDrop ? "しずく +1" : "しずくなし",
-                subtitle: earnedDrop ? "オンタイム出発" : "次回は時間内に出発しましょう",
+                title: earnedDrop ? L10n.Timer.dewDropPlus : L10n.Timer.noDewDrop,
+                subtitle: earnedDrop ? L10n.Timer.onTimeDeparture : L10n.Timer.tryOnTimeNext,
                 tint: earnedDrop ? .cyan : .orange
             )
 
             if bonusFeedAwarded {
                 rewardRow(
                     icon: FeedIcon.systemName,
-                    title: "餌 +1",
-                    subtitle: "水槽タブで使えます",
+                    title: L10n.Timer.feedPlus,
+                    subtitle: L10n.Timer.feedForAquarium,
                     tint: .yellow
                 )
             }
@@ -104,7 +104,7 @@ struct DepartureResultView: View {
     private var actionButtons: some View {
         HStack(spacing: 16) {
             Button(action: onResume) {
-                Label("再開", systemImage: "arrow.uturn.backward.circle")
+                Label(L10n.Timer.resume, systemImage: "arrow.uturn.backward.circle")
                     .font(.subheadline.weight(.semibold))
                     .labelStyle(.titleAndIcon)
                     .foregroundStyle(.white.opacity(0.55))
@@ -112,17 +112,17 @@ struct DepartureResultView: View {
                     .background(.white.opacity(0.10), in: Capsule())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("タイマーを再開")
+            .accessibilityLabel(L10n.Timer.resumeA11y)
 
             Button(action: onDismiss) {
-                Text("完了")
+                Text(L10n.Common.done)
                     .font(.headline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
                     .background(Color.dewBlue, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("完了")
+            .accessibilityLabel(L10n.Common.done)
         }
     }
 
@@ -130,7 +130,7 @@ struct DepartureResultView: View {
 
     private var delayMinutesText: String {
         let minutes = max(1, Int(ceil(Double(delaySeconds) / 60.0)))
-        return "\(minutes)分"
+        return L10n.Timer.minutes(minutes)
     }
 
     private func playFeedback() {

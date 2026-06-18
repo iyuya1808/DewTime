@@ -13,8 +13,8 @@ struct DataManagementView: View {
                 SettingsCard {
                     VStack(alignment: .leading, spacing: 12) {
                         SettingsSectionHeader(
-                            title: "保存状態",
-                            caption: "水槽・図鑑・出発記録は端末内に保存されます",
+                            title: L10n.DataManagement.saveStatus,
+                            caption: L10n.DataManagement.saveStatusCaption,
                             systemImage: "externaldrive.fill",
                             tint: .teal
                         )
@@ -22,7 +22,7 @@ struct DataManagementView: View {
                         if store.isSaving || store.isLoading {
                             HStack(spacing: 12) {
                                 ProgressView()
-                                Text(store.isLoading ? "データを読み込み中..." : "データを保存中...")
+                                Text(store.isLoading ? L10n.DataManagement.loading : L10n.DataManagement.saving)
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
@@ -30,7 +30,7 @@ struct DataManagementView: View {
                             HStack(spacing: 10) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundStyle(.green)
-                                Text("ローカルに保存されています")
+                                Text(L10n.DataManagement.savedLocally)
                                     .font(.subheadline.weight(.medium))
                             }
                         }
@@ -49,15 +49,15 @@ struct DataManagementView: View {
                 SettingsCard {
                     VStack(alignment: .leading, spacing: 16) {
                         SettingsSectionHeader(
-                            title: "部分的に初期化",
-                            caption: "必要なデータだけを選んで削除できます",
+                            title: L10n.DataManagement.partialReset,
+                            caption: L10n.DataManagement.partialResetCaption,
                             systemImage: "arrow.counterclockwise",
                             tint: .orange
                         )
 
                         resetButton(
-                            title: "水槽データを初期化",
-                            subtitle: "魚・図鑑・出発記録・水槽を削除します",
+                            title: L10n.DataManagement.resetAquarium,
+                            subtitle: L10n.DataManagement.resetAquariumSubtitle,
                             systemImage: "fish.fill"
                         ) {
                             showResetAquariumConfirm = true
@@ -68,8 +68,8 @@ struct DataManagementView: View {
                 SettingsCard(borderColor: .red) {
                     VStack(alignment: .leading, spacing: 16) {
                         SettingsSectionHeader(
-                            title: "危険な操作",
-                            caption: "削除したデータは元に戻せません",
+                            title: L10n.DataManagement.dangerousOps,
+                            caption: L10n.DataManagement.dangerousOpsCaption,
                             systemImage: "exclamationmark.triangle.fill",
                             tint: .red
                         )
@@ -85,10 +85,10 @@ struct DataManagementView: View {
                                     .background(Color.red.opacity(0.12), in: Circle())
 
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("すべてのデータを初期化")
+                                    Text(L10n.DataManagement.resetAll)
                                         .font(.subheadline.weight(.semibold))
                                         .foregroundStyle(.primary)
-                                    Text("アプリのすべてのデータが削除されます")
+                                    Text(L10n.DataManagement.resetAllSubtitle)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
@@ -105,36 +105,36 @@ struct DataManagementView: View {
             .padding(.top, 12)
             .padding(.bottom, 32)
         }
-        .navigationTitle("データ管理")
+        .navigationTitle(L10n.DataManagement.title)
         .navigationBarTitleDisplayMode(.inline)
         .dewAppBackground()
         .alert(
-            "保存エラー",
+            L10n.Common.saveError,
             isPresented: Binding(get: { saveError != nil }, set: { _ in saveError = nil })
         ) {
-            Button("OK", role: .cancel) {}
+            Button(L10n.Common.ok, role: .cancel) {}
         } message: {
             Text(saveError ?? "")
         }
         .confirmationDialog(
-            "水槽データを初期化",
+            L10n.DataManagement.resetAquariumConfirm,
             isPresented: $showResetAquariumConfirm,
             titleVisibility: .visible
         ) {
-            Button("初期化する", role: .destructive) { resetAquarium() }
-            Button("キャンセル", role: .cancel) {}
+            Button(L10n.DataManagement.resetButton, role: .destructive) { resetAquarium() }
+            Button(L10n.Common.cancel, role: .cancel) {}
         } message: {
-            Text("図鑑・出発記録・水槽がすべて削除されます。旧データが残っている場合はここで初期化してください。")
+            Text(L10n.DataManagement.resetAquariumMessage)
         }
         .confirmationDialog(
-            "すべてのデータを初期化",
+            L10n.DataManagement.resetAllConfirm,
             isPresented: $showResetAllConfirm,
             titleVisibility: .visible
         ) {
-            Button("すべて初期化する", role: .destructive) { resetAll() }
-            Button("キャンセル", role: .cancel) {}
+            Button(L10n.DataManagement.resetAllButton, role: .destructive) { resetAll() }
+            Button(L10n.Common.cancel, role: .cancel) {}
         } message: {
-            Text("魚・記録など、アプリのすべてのデータが削除されます。")
+            Text(L10n.DataManagement.resetAllMessage)
         }
     }
 

@@ -4,9 +4,15 @@ import SwiftUI
 struct DewTimeApp: App {
     @State private var dataStore = AppDataStore()
     @State private var deepLinkRouter = QuickTimerDeepLinkRouter()
-    @State private var isBootstrapComplete = false
+    @State private var isDataReady = false
+    @State private var isShellReady = false
     @State private var showLaunchOverlay = true
     @AppStorage(AppPreferences.Key.appTheme.rawValue) private var appTheme = AppTheme.system.rawValue
+    @AppStorage(AppPreferences.Key.appLanguage.rawValue) private var appLanguageRaw = AppLanguage.system.rawValue
+
+    private var isLaunchReady: Bool {
+        isDataReady && isShellReady
+    }
 
     private var colorScheme: ColorScheme? {
         switch AppTheme(rawValue: appTheme) {
@@ -16,21 +22,39 @@ struct DewTimeApp: App {
         }
     }
 
+    private var activeLocale: Locale {
+        LocalizationManager.shared.locale
+    }
+
     var body: some Scene {
         WindowGroup {
             ZStack {
-                ContentView()
-                    .environment(dataStore)
-                    .environment(deepLinkRouter)
-                    .preferredColorScheme(colorScheme)
-                    .onOpenURL { url in
-                        deepLinkRouter.handle(url)
-                    }
+                if isDataReady {
+                    ContentView()
+                        .environment(dataStore)
+                        .environment(deepLinkRouter)
+                        .preferredColorScheme(colorScheme)
+                        .environment(\.locale, activeLocale)
+                        .id(appLanguageRaw)
+                        .onOpenURL { url in
+                            deepLinkRouter.handle(url)
+                        }
+                        .onAppear {
+                            LocalizationManager.shared.language = AppLanguage(rawValue: appLanguageRaw) ?? .system
+                        }
+                        .task {
+                            await Task.yield()
+                            isShellReady = true
+                        }
+                }
 
                 if showLaunchOverlay {
                     AppLaunchLoadingView(
-                        bootstrapComplete: isBootstrapComplete,
-                        onDismissed: { showLaunchOverlay = false }
+                        bootstrapComplete: isLaunchReady,
+                        onDismissed: {
+                            showLaunchOverlay = false
+                            NotificationScheduler.requestPermission()
+                        }
                     )
                     .zIndex(1)
                 }
@@ -43,9 +67,8 @@ struct DewTimeApp: App {
 
     @MainActor
     private func runBootstrap() async {
-        NotificationScheduler.requestPermission()
         await dataStore.loadLocalCache()
-        isBootstrapComplete = true
+        isDataReady = true
         Task {
             await dataStore.syncFromCloud()
         }

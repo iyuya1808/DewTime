@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DewTime — 水と魚の朝タイマー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Noto+Sans+JP:wght@400;700;900&family=Cormorant+Garamond:ital,wght@0,300;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+  --black:#090C15;
+  --white:#F2F5FB;
+  --cyan:#22D3EE;
+  --cyan2:#06B6D4;
+  --cyan3:#0891B2;
+  --yellow:#FDE047;
+  --orange:#FB923C;
+  --red:#F87171;
+  --green:#34D399;
+  --purple:#A78BFA;
+  --dim:rgba(242,245,251,.78);
+  --dim2:rgba(242,245,251,.62);
+  --fh:'Syne','Noto Sans JP',sans-serif;
+  --fb:'Noto Sans JP',sans-serif;
+  --fi:'Cormorant Garamond',serif;
+}
+
+html,body{width:100%;height:100%;background:#111;overflow:hidden;cursor:pointer;font-family:var(--fb)}
+
+/* ── layout ── */
+#deck{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+.stage{
+  position:relative;
+  width:100vw;
+  max-width:calc(100vh * 16/9);
+  aspect-ratio:16/9;
+  overflow:hidden;
+  box-shadow:0 0 0 1px rgba(255,255,255,.08);
+}
+
+/* ── slides ── */
+.slide{
+  position:absolute;inset:0;
+  display:none;
+  flex-direction:column;align-items:center;justify-content:center;
+  background:var(--black);overflow:hidden;
+}
+.slide.active{display:flex}
+
+/* ── chrome ── */
+#chrome{
+  position:fixed;bottom:0;left:0;right:0;
+  height:40px;
+  background:rgba(0,0,0,.85);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;z-index:300;
+  gap:12px;
+}
+#chrome button{
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);
+  color:var(--white);border-radius:6px;
+  padding:5px 16px;font:700 13px/1 var(--fb);
+  cursor:pointer;transition:background .2s;flex-shrink:0;
+}
+#chrome button:hover{background:rgba(255,255,255,.2)}
+#chrome button:disabled{opacity:.3;cursor:default}
+#counter{
+  font:700 13px/1 var(--fb);color:rgba(255,255,255,.5);
+  flex-shrink:0;letter-spacing:.1em;
+}
+#progress-wrap{flex:1;height:4px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden}
+#progress{height:100%;background:var(--cyan);border-radius:2px}
+#hint{font:12px/1 var(--fb);color:rgba(255,255,255,.25);letter-spacing:.12em;flex-shrink:0}
+
+/* ── water shape ── */
+.water-section{
+  position:absolute;bottom:0;left:0;right:0;
+  height:40%;
+  background:linear-gradient(180deg,rgba(34,211,238,.18),rgba(8,145,178,.52));
+}
+.water-edge{
+  position:absolute;left:0;right:0;
+  height:52px;
+}
+.water-edge svg{width:100%;height:100%;display:block}
+
+/* ── phone mockup ── */
+.iph{
+  flex-shrink:0;width:clamp(128px,13vw,170px);
+  aspect-ratio:9/19.5;border-radius:32px;
+  border:3px solid rgba(255,255,255,.13);overflow:hidden;
+  background:linear-gradient(180deg,#1a3d60,#2a6da0);
+  box-shadow:0 20px 60px rgba(0,0,0,.65),inset 0 1px 0 rgba(255,255,255,.1);
+}
+.iph .media-slot{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.iph .media-slot video,.iph .media-slot img{width:100%;height:100%;object-fit:cover;display:block}
+.ph{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:14px}
+.phi{font-size:22px}.pht{font-size:9px;color:rgba(255,255,255,.62);text-align:center;line-height:1.5}
+
+/* ── feature slide base (2-col) ── */
+.feat{flex-direction:row;align-items:center;gap:clamp(36px,5vw,72px)}
+.feat .exp{max-width:460px}
+.sec-lbl{font-size:clamp(10px,1.2vw,13px);font-weight:700;letter-spacing:.3em;margin-bottom:10px;opacity:.7}
+.feat-h{font-family:var(--fh);font-weight:800;font-size:clamp(28px,3.8vw,48px);color:var(--white);line-height:1.28;margin-bottom:18px}
+.feat-h .hl{color:var(--cyan)}
+.feat-h .hly{color:var(--yellow)}
+.feat-h .hlg{color:var(--green)}
+.feat-h .hlp{color:var(--purple)}
+.feat-h .hlo{color:var(--orange)}
+.feat-ul{list-style:none;display:flex;flex-direction:column;gap:9px}
+.feat-ul li{display:flex;align-items:flex-start;gap:10px;font-size:clamp(12px,1.5vw,17px);color:var(--dim);font-weight:400;line-height:1.5}
+.feat-ul li::before{content:'✓';color:var(--cyan);font-weight:700;flex-shrink:0;font-size:14px;margin-top:2px}
+.feat-ul.yellow li::before{color:var(--yellow)}
+.feat-ul.green li::before{color:var(--green)}
+.feat-ul.purple li::before{color:var(--purple)}
+.feat-ul.orange li::before{color:var(--orange)}
+.feat-tag{
+  display:inline-block;margin-top:16px;
+  border-radius:100px;padding:6px 16px;
+  font-size:clamp(11px,1.3vw,14px);font-weight:700;letter-spacing:.04em;
+}
+.feat-tag.c{background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.3);color:var(--cyan)}
+.feat-tag.y{background:rgba(253,224,71,.08);border:1px solid rgba(253,224,71,.25);color:var(--yellow)}
+.feat-tag.g{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);color:var(--green)}
+.feat-tag.p{background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.28);color:var(--purple)}
+
+/* ─────────────────────────
+   S1  TITLE
+───────────────────────── */
+#s1{background:radial-gradient(ellipse at 45% 38%,#0d1f3c 0%,#05090f 75%)}
+#s1 .water-edge{bottom:39%}
+#s1 .fish-row{position:absolute;bottom:11%;left:0;right:0;display:flex;justify-content:center;gap:clamp(10px,2vw,28px)}
+#s1 .fish-row span{font-size:clamp(20px,2.8vw,36px);opacity:.8}
+#s1 .c{position:relative;z-index:10;text-align:center;margin-bottom:80px}
+#s1 .drop{display:block;font-size:clamp(40px,5.5vw,62px);margin-bottom:12px}
+#s1 .title{font-family:var(--fh);font-weight:800;font-size:clamp(72px,10vw,124px);color:var(--white);letter-spacing:.06em;line-height:1;text-shadow:0 0 60px rgba(34,211,238,.25)}
+#s1 .tag{font-size:clamp(13px,1.7vw,20px);font-weight:700;color:var(--cyan);letter-spacing:.3em;margin-top:14px}
+
+/* ─────────────────────────
+   S2  HOOK A
+───────────────────────── */
+#s2{background:radial-gradient(ellipse at 50% 55%,#0c1828 0%,#04080f 100%)}
+#s2 .alarm{font-size:clamp(44px,6vw,72px);display:block;text-align:center;margin-bottom:22px}
+#s2 .txt{font-family:var(--fh);font-weight:800;font-size:clamp(36px,5.2vw,66px);color:var(--white);text-align:center;line-height:1.4}
+#s2 .txt .hl{color:var(--cyan)}
+#s2 .txt .sm{font-size:65%;color:var(--dim);font-weight:700}
+
+/* ─────────────────────────
+   S3  HOOK B
+───────────────────────── */
+#s3{background:radial-gradient(ellipse at 50% 42%,#2a0808 0%,#0e0303 100%)}
+#s3 .big{font-family:var(--fh);font-weight:800;font-size:clamp(120px,17vw,210px);color:var(--red);line-height:.88;text-shadow:0 0 60px rgba(248,113,113,.4)}
+#s3 .unit{font-weight:700;font-size:38%;color:rgba(248,113,113,.95);vertical-align:middle}
+#s3 .sub{font-size:clamp(22px,3.2vw,42px);font-weight:700;color:rgba(255,255,255,.82);margin-top:10px;letter-spacing:.06em}
+
+/* ─────────────────────────
+   S4  PROBLEM
+───────────────────────── */
+#s4{background:#080B14}
+#s4 .clock{
+  width:clamp(100px,11vw,136px);height:clamp(100px,11vw,136px);
+  border-radius:50%;border:2px solid rgba(255,255,255,.08);
+  display:flex;align-items:center;justify-content:center;margin-bottom:36px;
+}
+#s4 .clock .f{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;filter:blur(3px);opacity:.15}
+#s4 .clock .f span{color:#fff;font-family:var(--fb);font-size:13px;text-align:center}
+#s4 .q{font-family:var(--fh);font-weight:800;font-size:clamp(26px,3.8vw,50px);color:var(--white);text-align:center;line-height:1.48;max-width:750px}
+#s4 .q .hl{color:var(--yellow)}
+#s4 .note{margin-top:20px;font-size:clamp(14px,1.7vw,20px);font-weight:700;color:var(--dim);text-align:center}
+
+/* ─────────────────────────
+   S5  REVEAL
+───────────────────────── */
+#s5{background:linear-gradient(185deg,#021318 0%,#042535 55%,#063850 100%)}
+#s5 .water-edge{bottom:41%}
+#s5 .ripple-deco{
+  position:absolute;
+  width:clamp(200px,28vw,360px);height:clamp(200px,28vw,360px);
+  border-radius:50%;border:1px solid rgba(34,211,238,.15);
+  top:42%;left:50%;transform:translate(-50%,-50%);
+}
+#s5 .ripple-deco2{
+  position:absolute;
+  width:clamp(130px,18vw,230px);height:clamp(130px,18vw,230px);
+  border-radius:50%;border:1px solid rgba(34,211,238,.25);
+  top:42%;left:50%;transform:translate(-50%,-50%);
+}
+#s5 .c{position:relative;z-index:10;text-align:center;margin-bottom:80px}
+#s5 .pre{font-size:clamp(14px,1.8vw,22px);font-weight:700;color:var(--dim);letter-spacing:.2em;margin-bottom:12px}
+#s5 .reveal{font-family:var(--fi);font-weight:300;font-style:italic;font-size:clamp(64px,9vw,114px);color:var(--white);text-shadow:0 0 80px rgba(34,211,238,.3);letter-spacing:.03em}
+#s5 .hint{font-size:clamp(14px,1.7vw,20px);font-weight:700;color:var(--cyan);letter-spacing:.28em;margin-top:16px}
+
+/* S6〜S8: タイマー系 */
+#s6{background:linear-gradient(135deg,#060E1E,#0C1E3A)}
+#s7{background:linear-gradient(135deg,#060E1E,#0A1C34)}
+#s8{background:linear-gradient(135deg,#05101C,#0A1A2C)}
+
+/* S9: オンタイム報酬 */
+#s9{background:linear-gradient(155deg,#060D1C,#0A1830)}
+#s9 .flow{display:flex;align-items:center;gap:clamp(10px,2vw,24px);margin-bottom:32px}
+.fl{display:flex;flex-direction:column;align-items:center;gap:8px}
+.fl .ico{font-size:clamp(34px,4.5vw,52px)}
+.fl .lbl{font-size:clamp(10px,1.2vw,14px);color:var(--dim2);font-weight:700;letter-spacing:.04em;text-align:center}
+.fa{font-size:clamp(18px,2.2vw,28px);flex-shrink:0;color:var(--green);opacity:.8}
+.fa.g{color:var(--yellow)}
+#s9 .hed{font-family:var(--fh);font-weight:800;font-size:clamp(30px,4.5vw,56px);color:var(--white);text-align:center;line-height:1.3}
+#s9 .hed .hl{color:var(--yellow)}
+#s9 .note{margin-top:10px;font-size:clamp(13px,1.5vw,17px);font-weight:700;color:var(--dim);text-align:center}
+#s9 .badge{
+  display:inline-block;margin-top:16px;
+  background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);
+  border-radius:100px;padding:7px 20px;
+  font-size:clamp(12px,1.4vw,15px);color:var(--green);font-weight:700;letter-spacing:.05em;
+}
+
+/* S10: 遅刻 */
+#s10{background:linear-gradient(135deg,#0E0505,#1A0808)}
+
+/* S11〜S15: 報酬系 */
+#s11{background:linear-gradient(135deg,#060D1C,#0A1830)}
+#s12{background:linear-gradient(155deg,#060D1C,#0C1428)}
+#s14{background:linear-gradient(155deg,#060C1A,#0A1424)}
+
+/* S13: 水槽成長 */
+#s13{background:linear-gradient(155deg,#07051A,#100823)}
+#s13 .lh{font-family:var(--fh);font-weight:800;font-size:clamp(26px,3.6vw,46px);color:var(--white);text-align:center;margin-bottom:28px}
+#s13 .stages{display:flex;align-items:flex-end;gap:clamp(8px,1.2vw,16px);margin-bottom:24px}
+.stg{display:flex;flex-direction:column;align-items:center;gap:6px}
+.stg .si{
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.25);
+}
+.stg .sn{font-size:clamp(8px,1vw,11px);color:var(--dim2);font-weight:700;text-align:center;line-height:1.3}
+.stg .sl{font-size:clamp(7px,.9vw,10px);color:rgba(167,139,250,.6);font-weight:700}
+.arr{font-size:clamp(12px,1.5vw,18px);color:var(--purple);opacity:.7;flex-shrink:0;align-self:center}
+#s13 .tags{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+.stag{background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.22);border-radius:100px;padding:6px 16px;font-size:clamp(11px,1.3vw,14px);color:var(--purple);font-weight:700}
+
+/* S15: 報酬ループ全体 */
+#s15{background:linear-gradient(155deg,#07051A,#100823)}
+#s15 .lh{font-family:var(--fh);font-weight:800;font-size:clamp(28px,4vw,50px);color:var(--white);text-align:center;margin-bottom:36px}
+#s15 .loop{display:flex;align-items:center;gap:clamp(8px,1.4vw,18px)}
+.ls{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:clamp(70px,8vw,96px)}
+.ls .li{
+  width:clamp(52px,6vw,68px);height:clamp(52px,6vw,68px);border-radius:50%;
+  background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.25);
+  display:flex;align-items:center;justify-content:center;font-size:clamp(20px,2.8vw,28px);
+}
+.ls .ll{font-size:clamp(9px,1.1vw,12px);color:var(--dim2);font-weight:700;text-align:center;line-height:1.4}
+.la{font-size:clamp(14px,1.8vw,20px);color:var(--purple);opacity:.88;flex-shrink:0}
+
+/* S16〜S19: iOS統合 */
+#s16{background:linear-gradient(155deg,#060F1E,#0A1A2E)}
+#s17{background:linear-gradient(155deg,#060E1C,#091828)}
+#s18{background:linear-gradient(155deg,#060D1C,#091626)}
+#s19{background:linear-gradient(135deg,#080616,#130A28)}
+
+/* S20〜S22: 記録 */
+#s20{background:linear-gradient(155deg,#060810,#0A1018)}
+#s21{background:linear-gradient(155deg,#050D14,#081420)}
+#s22{background:linear-gradient(155deg,#060A14,#0A1020)}
+
+/* S23: インクルーシブ白背景 */
+#s23{background:#EEF3FA}
+#s23 .ih{font-family:var(--fh);font-weight:800;font-size:clamp(34px,5vw,62px);color:#09111E;text-align:center;margin-bottom:32px}
+.chs{display:flex;gap:clamp(16px,2.8vw,36px);margin-bottom:28px;flex-wrap:wrap;justify-content:center}
+.ch{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:80px}
+.ch .ci{font-size:clamp(28px,3.8vw,44px)}
+.ch .cl{font-size:clamp(11px,1.4vw,15px);color:var(--cyan3);font-weight:700;text-align:center}
+#s23 .us{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.ut{background:rgba(8,145,178,.09);border:1px solid rgba(8,145,178,.22);border-radius:100px;padding:7px 18px;font-size:clamp(12px,1.4vw,15px);color:var(--cyan3);font-weight:700}
+
+/* S24: 哲学 */
+#s24{background:radial-gradient(ellipse at 50% 52%,#06111C 0%,#030810 100%)}
+#s24 .bar{width:44px;height:3px;background:var(--cyan);margin:0 auto 28px;border-radius:2px}
+#s24 .qt{font-family:var(--fi);font-size:clamp(32px,5vw,60px);font-style:italic;font-weight:300;color:var(--white);text-align:center;line-height:1.42;max-width:820px}
+#s24 .qt em{font-style:normal;color:var(--cyan)}
+#s24 .va{margin-top:32px;font-size:clamp(12px,1.5vw,16px);font-weight:700;color:var(--dim2);text-align:center;letter-spacing:.1em}
+#s24 .va span{color:rgba(34,211,238,.85)}
+
+/* S25: 技術スタック */
+#s25{background:linear-gradient(155deg,#060E1C,#0A1828)}
+#s25 .th{font-family:var(--fh);font-weight:800;font-size:clamp(30px,4.2vw,52px);color:var(--white);text-align:center;margin-bottom:36px}
+.pills{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;max-width:820px}
+.pill{border-radius:100px;padding:9px 22px;font-family:var(--fb);font-size:clamp(13px,1.5vw,16px);font-weight:700;border:1px solid;letter-spacing:.04em}
+.pill.a{background:rgba(34,211,238,.07);border-color:rgba(34,211,238,.2);color:var(--cyan)}
+.pill.b{background:rgba(253,224,71,.06);border-color:rgba(253,224,71,.18);color:var(--yellow)}
+.pill.c{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.18);color:rgba(242,245,251,.78)}
+#s25 .cap{margin-top:28px;font-size:clamp(13px,1.5vw,16px);font-weight:700;color:var(--dim2);letter-spacing:.1em;text-align:center}
+
+/* S26: クロージング */
+#s26{background:linear-gradient(185deg,#020810 0%,#071828 55%,#0C2840 100%)}
+#s26 .water-edge{bottom:37%}
+#s26 .fish-row{position:absolute;bottom:9%;left:0;right:0;display:flex;justify-content:center;gap:clamp(6px,1.2vw,18px)}
+#s26 .fish-row span{font-size:clamp(20px,2.6vw,32px);opacity:.85}
+#s26 .c{position:relative;z-index:10;text-align:center;margin-bottom:88px}
+#s26 .pre{font-size:clamp(13px,1.6vw,20px);font-weight:700;color:var(--dim2);letter-spacing:.15em;margin-bottom:14px}
+#s26 .main{font-family:var(--fi);font-size:clamp(34px,5vw,60px);font-weight:300;color:var(--white);line-height:1.35}
+#s26 .brand{margin-top:28px;font-family:var(--fh);font-size:clamp(18px,2.5vw,30px);font-weight:700;color:var(--cyan);letter-spacing:.18em}
+</style>
+</head>
+<body>
+
+<div id="deck"><div class="stage">
+
+<!-- ── S1 タイトル ── -->
+<div class="slide active" id="s1">
+  <div class="water-section"></div>
+  <div class="water-edge">
+    <svg viewBox="0 0 1440 52" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <path fill="#22D3EE" fill-opacity=".55" d="M0,26 C240,52 480,0 720,26 C960,52 1200,0 1440,26 L1440,52 L0,52Z"/>
+      <path fill="#06B6D4" fill-opacity=".3" d="M0,34 C360,10 720,50 1080,22 C1260,8 1380,40 1440,34 L1440,52 L0,52Z"/>
+    </svg>
+  </div>
+  <div class="fish-row">
+    <span>🐟</span><span>🐠</span><span>🐡</span><span>🦑</span><span>🐬</span>
+  </div>
+  <div class="c">
+    <span class="drop">💧</span>
+    <div class="title">DewTime</div>
+    <div class="tag">水と魚の朝タイマー</div>
+  </div>
+</div>
+
+<!-- ── S2 フック：スマホあるある ── -->
+<div class="slide" id="s2">
+  <span class="alarm">⏰</span>
+  <div class="txt">
+    <div>朝。スマホを開いた。</div>
+    <div><span class="hl">5分だけ</span><span class="sm">……のはずが、</span></div>
+  </div>
+</div>
+
+<!-- ── S3 フック：30分経ってた ── -->
+<div class="slide" id="s3">
+  <div class="big">30<span class="unit">分</span></div>
+  <div class="sub">経ってました。</div>
+</div>
+
+<!-- ── S4 問題の本質 ── -->
+<div class="slide" id="s4">
+  <div class="clock">
+    <div class="f">
+      <span>12</span><span>&nbsp;</span><span>3</span>
+      <span>&nbsp;</span><span>&nbsp;</span><span>&nbsp;</span>
+      <span>9</span><span>&nbsp;</span><span>6</span>
+    </div>
+  </div>
+  <div class="q">
+    時間って、数字を見ても<br>
+    <span class="hl">実感わかない</span>じゃないですか。
+  </div>
+  <div class="note">残り20分。……急ぐべき？ゆっくりしていい？</div>
+</div>
+
+<!-- ── S5 REVEAL ── -->
+<div class="slide" id="s5">
+  <div class="water-section"></div>
+  <div class="water-edge">
+    <svg viewBox="0 0 1440 52" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <path fill="#22D3EE" fill-opacity=".55" d="M0,26 C240,52 480,0 720,26 C960,52 1200,0 1440,26 L1440,52 L0,52Z"/>
+      <path fill="#06B6D4" fill-opacity=".3" d="M0,34 C360,10 720,50 1080,22 C1260,8 1380,40 1440,34 L1440,52 L0,52Z"/>
+    </svg>
+  </div>
+  <div class="ripple-deco"></div>
+  <div class="ripple-deco2"></div>
+  <div class="c">
+    <div class="pre">だから——</div>
+    <div class="reveal">水にした。</div>
+    <div class="hint">水の量 ＝ 残り時間</div>
+  </div>
+</div>
+
+<!-- ── S6 時間設定：スワイプで直感的に ── -->
+<div class="slide feat" id="s6">
+  <div class="iph">
+    <div class="media-slot" data-v="video-timer-setup.mp4" data-i="screenshot-timer-setup.png" data-h="video-timer-setup.mp4"></div>
+  </div>
+  <div class="exp">
+    <div class="sec-lbl" style="color:var(--cyan)">TIMER — 設定</div>
+    <div class="feat-h"><span class="hl">スワイプ</span>で<br>時間を流し込む</div>
+    <ul class="feat-ul">
+      <li>上下スワイプで 5〜30分をセット</li>
+      <li>タンクの水位がリアルタイムで変化</li>
+      <li>数字ではなく「量感」で時間を選ぶ</li>
+      <li>片手・一動作で完結</li>
+    </ul>
+    <span class="feat-tag c">直感的な水量UI</span>
+  </div>
+</div>
+
+<!-- ── S7 カウントダウン中：水が減る ── -->
+<div class="slide feat" id="s7">
+  <div class="iph">
+    <div class="media-slot" data-v="video-timer-running.mp4" data-i="screenshot-timer-running.png" data-h="video-timer-running.mp4"></div>
+  </div>
+  <div class="exp">
+    <div class="sec-lbl" style="color:var(--cyan)">TIMER — カウントダウン</div>
+    <div class="feat-h">水が<span class="hl">減っていく</span><br>それだけで伝わる</div>
+    <ul class="feat-ul">
+      <li>水面が波打ちながらリアルタイムで低下</li>
+      <li>残り少なくなると色が赤みを帯びる</li>
+      <li>60fps Canvas描画でなめらか</li>
+      <li>文字を読まなくても「急ぎ度」がわかる</li>
+    </ul>
+    <span class="feat-tag c">TimelineView + Canvas 60fps</span>
+  </div>
+</div>
+
+<!-- ── S8 出発ボタン ── -->
+<div class="slide feat" id="s8">
+  <div class="iph">
+    <div class="media-slot" data-v="video-departure.mp4" data-i="screenshot-departure.png" data-h="video-departure.mp4"></div>
+  </div>
+  <div class="exp">
+    <div class="sec-lbl" style="color:var(--cyan)">TIMER — 出発</div>
+    <div class="feat-h">水門を開いて<br><span class="hl">出発する</span></div>
+    <ul class="feat-ul">
+      <li>「水門を開く」ボタンで出発を記録</li>
+      <li>オンタイム / 遅刻を自動判定</li>
+      <li>出発時刻・遅延時間をその場で表示</li>
+      <li>タイマーキャンセルも罰なし</li>
+    </ul>
+    <span class="feat-tag c">出発を儀式にする</span>
+  </div>
+</div>
+
+<!-- ── S9 オンタイム報酬 ── -->
+<div class="slide" id="s9">
+  <div class="flow">
+    <div class="fl"><span class="ico">🚪</span><span class="lbl">時間通りに出発</span></div>
+    <span class="fa">→</span>
+    <div class="fl"><span class="ico">💧</span><span class="lbl">しずく +1</span></div>
+    <span class="fa g">＋</span>
+    <div class="fl"><span class="ico">🍖</span><span class="lbl">餌 +1</span></div>
+    <span class="fa g">＋</span>
+    <div class="fl"><span class="ico">📊</span><span class="lbl">連続記録</span></div>
+  </div>
+  <div class="hed">それだけで、<span class="hl">ご褒美がもらえる。</span></div>
+  <div class="note">遅刻しても責めない。水が溢れる、それだけ。</div>
+  <span class="badge">罰ゲームじゃなく、報酬ゲーム</span>
+</div>
+
+<!-- ── S10 遅刻しても罰なし ── -->
+<div class="slide feat" id="s10">
+  <div class="iph">
+    <div class="media-slot" data-v="video-overflow.mp4" data-i="screenshot-overflow.png" data-h="video-overflow.mp4"></div>
+  </div>
+  <div class="exp">
+    <div class="sec-lbl" style="color:var(--red)">TIMER — 遅刻</div>
+    <div class="feat-h" style="color:var(--white)">水が<span style="color:var(--red)">溢れる</span>だけ。<br>それだけ。</div>
+    <ul class="feat-ul">
+      <li>タイマーゼロで水が溢れるアニメーション</li>
+      <li>ペナルティ・スコア減点・バッジ剥奪なし</li>
+      <li>次の朝、また始めればいい</li>
+      <li>自己嫌悪より継続を優先する設計</li>
+    </ul>
+    <span class="feat-tag" style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);color:var(--red)">失敗に優しいUX</span>
+  </div>
+</div>
+
+<!-- ── S11 魚ガチャ ── -->
+<div class="slide feat" id="s11">
+  <div class="iph">
+    <div class="media-slot" data-v="video-gacha.mp4" data-i="screenshot-gacha.png" data-h="video-gacha.mp4"></div>
+  </div>
+  <div class="exp">
+    <div class="sec-lbl" style="color:var(--yellow)">REWARD — ガチャ</div>
+    <div class="feat-h"><span class="hly">餌</span>を使って<br>魚を引く</div>
+    <ul class="feat-ul yellow">
+      <li>オンタイム出発で獲得した餌を消費</li>
+      <li>15種類の魚がランダムに登場</li>
+      <li>レア魚は出現確率が低い</li>
+      <li>演出アニメーションで毎朝小さなときめき</li>
+    </ul>
+    <span class="feat-tag y">毎朝の小さな楽しみ</span>
+  </div>
+</div>
+
+<!-- ── S12 コレクション図鑑 ── -->
+<div class="slide feat" id="s12">
+  <div class="iph">
+    <div class="media-slot" data-v="video-collection.mp4" data-i="screenshot-collection.png" data-h="screenshot-collection.png"></div>
+  </div>
+  <div class="exp">
+    <div class="sec-lbl" style="color:var(--yellow)">REWARD — コレクション</div>
+    <div class="feat-h"><span class="hly">15種</span>の魚を<br>集める図鑑</div>
+    <ul class="feat-ul yellow">
+      <li>メダカ・金魚・熱帯魚・深海魚…全15種</li>
+      <li>未入手はシルエット表示</li>
+      <li>各魚の詳細・取得日時・レア度を確認</li>
+      <li>コンプリートを目指す収集欲</li>
+    </ul>
+    <span class="feat-tag y">メダカ → ジンベエザメ</span>
+  </div>
+</div>
+
+<!-- ── S13 水槽成長7段階 ── -->
+<div class="slide" id="s13">
+  <div class="lh">水槽が、朝ごとに<span style="color:var(--purple)">育っていく</span>。</div>
+  <div class="stages">
+    <div class="stg">
+      <div class="si" style="width:clamp(38px,4.5vw,54px);height:clamp(38px,4.5vw,54px);font-size:clamp(16px,2.2vw,26px)">🪣</div>
+      <div class="sn">Lv.1<br>バケツ</div>
+    </div>
+    <span class="arr">→</span>
+    <div class="stg">
+      <div class="si" style="width:clamp(42px,5vw,58px);height:clamp(42px,5vw,58px);font-size:clamp(18px,2.4vw,28px)">🏺</div>
+      <div class="sn">Lv.2<br>水瓶</div>
+    </div>
+    <span class="arr">→</span>
+    <div class="stg">
+      <div class="si" style="width:clamp(46px,5.5vw,64px);height:clamp(46px,5.5vw,64px);font-size:clamp(20px,2.6vw,30px)">🐠</div>
+      <div class="sn">Lv.3<br>小水槽</div>
+    </div>
+    <span class="arr">→</span>
+    <div class="stg">
+      <div class="si" style="width:clamp(50px,6vw,70px);height:clamp(50px,6vw,70px);font-size:clamp(22px,2.8vw,34px)">🐙</div>
+      <div class="sn">Lv.4<br>中水槽</div>
+    </div>
+    <span class="arr">→</span>
+    <div class="stg">
+      <div class="si" style="width:clamp(54px,6.5vw,76px);height:clamp(54px,6.5vw,76px);font-size:clamp(24px,3vw,36px)">🐬</div>
+      <div class="sn">Lv.5<br>大水槽</div>
+    </div>
+    <span class="arr">→</span>
+    <div class="stg">
+      <div class="si" style="width:clamp(58px,7vw,82px);height:clamp(58px,7vw,82px);font-size:clamp(26px,3.2vw,38px)">🦈</div>
+      <div class="sn">Lv.6<br>水族館</div>
+    </div>
+    <span class="arr">→</span>
+    <div class="stg">
+      <div class="si" style="width:clamp(64px,7.5vw,90px);height:clamp(64px,7.5vw,90px);font-size:clamp(28px,3.5vw,42px)">🐋</div>
+      <div class="sn">Lv.7<br>大海原</div>
+      <div class="sl">MAX</div>
+    </div>
+  </div>
+  <div class="tags">
+    <span class="stag">しずくを貯めて成長</span>
+    <span class="stag">見た目が大きく変わる</span>
+    <span class="stag">達成感が継続を生む</span>
+  </div>
+</div>
+
+<!-- ── S14 実績解除 ── -->
+<div class="slide feat" id="s14">
+  <div class="iph">
+    <div class="media-slot" data-v="video-achievement.mp4" data-i="screenshot-achievement.png" data-h="screenshot-achievement.png"></div>
+  </div>
+  <div class="exp">
+    <div class="sec-lbl" style="color:var(--green)">REWARD — 実績</div>
+    <div class="feat-h">達成が<span class="hlg">餌</span>に<br>変わる仕組み</div>
+    <ul class="feat-ul green">
+      <li>「連続7日オンタイム」「魚5種コンプ」など</li>
+      <li>実績解除で追加の餌を獲得</li>
+      <li>中長期の目標がモチベーションを維持</li>
+      <li>報酬ループを太くする隠し要素</li>
+    </ul>
+    <span class="feat-tag g">達成 → 餌 → ガチャ</span>
+  </div>
+</div>
+
+<!-- ── S15 報酬ループ全体像 ── -->
+<div class="slide" id="s15">
+  <div class="lh">餌で魚を引いて、水槽を育てる。</div>
+  <div class="loop">
+    <div class="ls"><div class="li">🌅</div><div class="ll">オンタイム<br>出発</div></div>
+    <span class="la">→</span>
+    <div class="ls"><div class="li">🍖</div><div class="ll">餌<br>獲得</div></div>
+    <span class="la">→</span>
+    <div class="ls"><div class="li">✨</div><div class="ll">魚<br>ガチャ</div></div>
+    <span class="la">→</span>
+    <div class="ls"><div class="li">🐠</div><div class="ll">新しい<br>魚</div></div>
+    <span class="la">→</span>
+    <div class="ls"><div class="li">🏆</div><div class="ll">実績<br>解除</div></div>
+    <span class="la">→</span>
+    <div class="ls"><div class="li">💧</div><div class="ll">水槽<br>成長</div></div>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:28px">
+    <span class="stag">15種の魚</span>
+    <span class="stag">7段階の水槽成長</span>
+    <span class="stag">メダカ → ジンベエザメ</span>
+    <span class="stag">実績バッジ</span>
+  </div>
+</div>
+
+<!-- ── S16 Dynamic Island ── -->
+<div class="slide feat" id="s16">
+  <div class="iph">
+    <div class="media-slot" data-v="video-dynamic-island.mp4" data-i="screenshot-dynamic-island.png" data-h="screenshot-dynamic-island.png"></div>
+  </div>
+  <div class="exp">
+    <div class="sec-lbl" style="color:var(--purple)">iOS — Dynamic Island</div>
+    <div class="feat-h"><span class="hlp">水位</span>と魚が<br>島に浮かぶ</div>
+    <ul class="feat-ul purple">
+      <li>Dynamic IslandにミニチュアのWaterTank表示</li>
+      <li>魚のアイコンがリアルタイムで動く</li>
+      <li>スマホを見るたびに残り時間がわかる</li>
+      <li>アプリを開かなくても状態確認</li>
+    </ul>
+    <span class="feat-tag p">ActivityKit + Live Activity</span>
+  </div>
+</div>
+
+<!-- ── S17 Live Activity ── -->
+<div class="slide feat" id="s17">
+  <div class="iph">
+    <div class="media-slot" data-v="video-live-activity.mp4" data-i="screenshot-live-activity.png" data-h="screenshot-live-activity.png"></div>
+  </div>
+  <div class="exp">
+    <div class="sec-lbl" style="color:var(--purple)">iOS — Live Activity</div>
+    <div class="feat-h">画面<span class="hlp">閉じたまま</span><br>残り時間がわかる</div>
+    <ul class="feat-ul purple">
+      <li>ロック画面・通知センターに常駐</li>
+      <li>水位アニメーションをロック画面に表示</li>
+      <li>スマホを開く必要がない</li>
+      <li>出発通知もLive Activityから</li>
+    </ul>
+    <span class="feat-tag p">ロック画面でタイマー管理</span>
+  </div>
+</div>
+
+<!-- ── S18 WidgetKit ── -->
+<div class="slide feat" id="s18">
+  <div class="iph">
+    <div class="media-slot" data-v="video-widget.mp4" data-i="screenshot-widget.png" data-h="screenshot-widget.png"></div>
+  </div>
+  <div class="exp">
+    <div class="sec-lbl" style="color:var(--purple)">iOS — Widget</div>
+    <div class="feat-h">ホーム画面から<br><span class="hlp">ワンタップ</span>スタート</div>
+    <ul class="feat-ul purple">
+      <li>15 / 30 / 45 / 60分のボタンを配置</li>
+      <li>タップ一発でタイマー自動スタート</li>
+      <li>スマホロック → タイマー開始まで3秒</li>
+      <li>WidgetKit + Deep Link連携</li>
+    </ul>
+    <span class="feat-tag p">dewtime://start-timer?minutes=N</span>
+  </div>
+</div>
+
+<!-- ── S19 Core Haptics ── -->
+<div class="slide feat" id="s19">
+  <div class="iph">
+    <div class="media-slot" data-i="screenshot-haptics.png" data-h="screenshot-haptics.png"></div>
+  </div>
+  <div class="exp">
+    <div class="sec-lbl" style="color:var(--purple)">iOS — Core Haptics</div>
+    <div class="feat-h">遅刻を<br><span class="hlp">体</span>で感じる</div>
+    <ul class="feat-ul purple">
+      <li>残り5分：軽い振動で予告</li>
+      <li>タイマーゼロ：連続振動で「溢れた」感覚</li>
+      <li>出発ボタン：達成感のあるハプティクス</li>
+      <li>視覚・聴覚に頼らない第三の通知</li>
+    </ul>
+    <span class="feat-tag p">CHHapticEngine</span>
+  </div>
+</div>
+
+<!-- ── S20 出発記録カレンダー ── -->
+<div class="slide feat" id="s20">
+  <div class="iph">
+    <div class="media-slot" data-v="video-calendar.mp4" data-i="screenshot-calendar.png" data-h="screenshot-calendar.png"></div>
+  </div>
+  <div class="exp">
+    <div class="sec-lbl" style="color:var(--orange)">RECORD — カレンダー</div>
+    <div class="feat-h">毎朝の出発が<br><span class="hlo">記録</span>になる</div>
+    <ul class="feat-ul orange">
+      <li>カレンダー形式で出発履歴を一覧</li>
+      <li>オンタイム・遅刻を色で区別</li>
+      <li>連続日数・月の達成率を表示</li>
+      <li>「続けてきた」実感が次の行動を生む</li>
+    </ul>
+    <span class="feat-tag" style="background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.25);color:var(--orange)">積み重ねの可視化</span>
+  </div>
+</div>
+
+<!-- ── S21 月次水槽ビュー ── -->
+<div class="slide feat" id="s21">
+  <div class="iph">
+    <div class="media-slot" data-v="video-monthly.mp4" data-i="screenshot-monthly.png" data-h="screenshot-monthly.png"></div>
+  </div>
+  <div class="exp">
+    <div class="sec-lbl" style="color:var(--orange)">RECORD — 月次</div>
+    <div class="feat-h"><span class="hlo">先月の自分</span>の<br>水槽が残る</div>
+    <ul class="feat-ul orange">
+      <li>月ごとに成長した水槽をアーカイブ</li>
+      <li>月の達成率に応じて水槽の様子が変わる</li>
+      <li>過去の月の水槽を見返せる</li>
+      <li>時間をかけて育てた記録</li>
+    </ul>
+    <span class="feat-tag" style="background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.25);color:var(--orange)">過去の努力が形に残る</span>
+  </div>
+</div>
+
+<!-- ── S22 プロフィール統計 ── -->
+<div class="slide feat" id="s22">
+  <div class="iph">
+    <div class="media-slot" data-v="video-profile.mp4" data-i="screenshot-profile.png" data-h="screenshot-profile.png"></div>
+  </div>
+  <div class="exp">
+    <div class="sec-lbl" style="color:var(--orange)">RECORD — 統計</div>
+    <div class="feat-h">積み上げた数字が<br><span class="hlo">自信</span>になる</div>
+    <ul class="feat-ul orange">
+      <li>総出発回数・オンタイム率</li>
+      <li>最長連続記録・今月の連続記録</li>
+      <li>獲得しずく数・コレクション達成率</li>
+      <li>Supabase同期でデバイス変更しても引継ぎ</li>
+    </ul>
+    <span class="feat-tag" style="background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.25);color:var(--orange)">iCloudサインインで同期</span>
+  </div>
+</div>
+
+<!-- ── S23 インクルーシブ（具体）白背景 ── -->
+<div class="slide" id="s23">
+  <div class="ih">文字、読まなくていいんです。</div>
+  <div class="chs">
+    <div class="ch"><span class="ci">🌊</span><span class="cl">水位</span></div>
+    <div class="ch"><span class="ci">🎨</span><span class="cl">色の変化</span></div>
+    <div class="ch"><span class="ci">🌀</span><span class="cl">アニメ</span></div>
+    <div class="ch"><span class="ci">📳</span><span class="cl">振動</span></div>
+    <div class="ch"><span class="ci">🕐</span><span class="cl">MM:SS</span></div>
+  </div>
+  <div class="us">
+    <span class="ut">未就学児</span>
+    <span class="ut">読字困難</span>
+    <span class="ut">発達障害</span>
+    <span class="ut">外国語話者</span>
+    <span class="ut">忙しい親</span>
+  </div>
+</div>
+
+<!-- ── S24 インクルーシブ（哲学） ── -->
+<div class="slide" id="s24">
+  <div class="bar"></div>
+  <div class="qt">「読めない子のためのUIは、<br><em>全員に</em>優しい。」</div>
+  <div class="va"><span>VoiceOver</span> 対応 &nbsp;·&nbsp; 日本語 <span>/</span> English 対応</div>
+</div>
+
+<!-- ── S25 技術スタック ── -->
+<div class="slide" id="s25">
+  <div class="th">中身は、全部最新のiOS。</div>
+  <div class="pills">
+    <span class="pill a">SwiftUI</span>
+    <span class="pill a">iOS 17+</span>
+    <span class="pill a">ActivityKit</span>
+    <span class="pill a">WidgetKit</span>
+    <span class="pill a">Core Haptics</span>
+    <span class="pill b">Canvas 60fps</span>
+    <span class="pill b">TimelineView</span>
+    <span class="pill b">StoreKit 2</span>
+    <span class="pill c">Supabase</span>
+    <span class="pill c">AuthenticationServices</span>
+    <span class="pill c">UserNotifications</span>
+    <span class="pill c">App Groups</span>
+  </div>
+  <div class="cap">iOS のシステム機能を、朝の UX に全部使った。</div>
+</div>
+
+<!-- ── S26 クロージング ── -->
+<div class="slide" id="s26">
+  <div class="water-section"></div>
+  <div class="water-edge">
+    <svg viewBox="0 0 1440 52" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <path fill="#22D3EE" fill-opacity=".55" d="M0,26 C240,52 480,0 720,26 C960,52 1200,0 1440,26 L1440,52 L0,52Z"/>
+      <path fill="#06B6D4" fill-opacity=".3" d="M0,34 C360,10 720,50 1080,22 C1260,8 1380,40 1440,34 L1440,52 L0,52Z"/>
+    </svg>
+  </div>
+  <div class="fish-row">
+    <span>🐟</span><span>🐠</span><span>🐬</span><span>🦈</span><span>🐋</span>
+  </div>
+  <div class="c">
+    <div class="pre">朝タイマーは「遅刻を防ぐ道具」でした。</div>
+    <div class="main">DewTimeは、毎朝の小さな達成と<br>喜びを貯める道具です。</div>
+    <div class="brand">明日の朝、魚が待っています。</div>
+  </div>
+</div>
+
+</div></div><!-- .stage / #deck -->
+
+<!-- ── コントロールバー ── -->
+<div id="chrome">
+  <button id="btn-prev" onclick="go(-1)" disabled>◀ 前へ</button>
+  <div id="progress-wrap"><div id="progress"></div></div>
+  <span id="counter">1 / 26</span>
+  <button id="btn-next" onclick="go(1)">次へ ▶</button>
+  <span id="hint">← → キーでも移動</span>
+</div>
+
+<script>
+(function(){
+  /* ── メディアスロット初期化 ── */
+  document.querySelectorAll('.media-slot').forEach(slot => {
+    const v = slot.dataset.v, i = slot.dataset.i, h = slot.dataset.h || '(ファイルなし)';
+
+    function showPlaceholder() {
+      slot.innerHTML = '<div class="ph"><span class="phi">📱</span><span class="pht">' + h + '</span></div>';
+    }
+
+    function tryImg() {
+      if (!i) { showPlaceholder(); return; }
+      const img = new Image();
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block';
+      img.alt = h;
+      img.onerror = showPlaceholder;
+      img.onload = function(){ slot.innerHTML = ''; slot.appendChild(img); };
+      img.src = i;
+    }
+
+    if (v) {
+      const vid = document.createElement('video');
+      vid.autoplay = true; vid.loop = true; vid.muted = true; vid.playsInline = true;
+      vid.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block';
+      const src = document.createElement('source');
+      src.src = v; src.type = 'video/mp4';
+      src.addEventListener('error', tryImg);
+      vid.addEventListener('error', tryImg);
+      vid.appendChild(src);
+      slot.appendChild(vid);
+    } else {
+      tryImg();
+    }
+  });
+
+  /* ── スライドナビ ── */
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const N = slides.length;
+  let cur = 0;
+
+  function update(){
+    document.getElementById('counter').textContent = (cur+1)+' / '+N;
+    document.getElementById('progress').style.width = ((cur+1)/N*100)+'%';
+    document.getElementById('btn-prev').disabled = cur === 0;
+    document.getElementById('btn-next').disabled = cur === N-1;
+  }
+
+  window.go = function(dir){
+    const next = cur + dir;
+    if(next < 0 || next >= N) return;
+    slides[cur].classList.remove('active');
+    cur = next;
+    slides[cur].classList.add('active');
+    update();
+  };
+
+  document.addEventListener('keydown', e => {
+    if(['ArrowRight','Space','Enter'].includes(e.key)){e.preventDefault();go(1);}
+    if(e.key==='ArrowLeft'){e.preventDefault();go(-1);}
+    if(e.key==='Home'){e.preventDefault();slides[cur].classList.remove('active');cur=0;slides[cur].classList.add('active');update();}
+    if(e.key==='End'){e.preventDefault();slides[cur].classList.remove('active');cur=N-1;slides[cur].classList.add('active');update();}
+  });
+
+  update();
+})();
+</script>
+</body>
+</html>
