@@ -22,6 +22,7 @@ final class TimerViewModel {
     private var timer: Timer?
     private var lastLiveActivityUpdate: Date?
     private var didPlayOverdueWarning = false
+    private var departureSessionID = UUID()
     private weak var activityStore: AppDataStore?
 
     init(targetDepartureTime: Date = .now.addingTimeInterval(15 * 60)) {
@@ -106,7 +107,7 @@ final class TimerViewModel {
         syncLiveActivity(store: activityStore, force: true)
     }
 
-    func depart(store: AppDataStore) async {
+    func finalizeDeparture(store: AppDataStore) {
         guard !departed else { return }
         finalWaterLevel = waterLevel
         finalDelaySeconds = overdueSeconds
@@ -117,6 +118,7 @@ final class TimerViewModel {
         finalAquariumDepartures = aquariumBefore.totalDepartures + (finalEarnedDrop ? 1 : 0)
         finalAquariumTier = Aquarium(totalDepartures: finalAquariumDepartures).sizeTier
 
+        departureSessionID = UUID()
         departed = true
         departurePersisted = false
         timer?.invalidate()
@@ -124,14 +126,65 @@ final class TimerViewModel {
         NotificationScheduler.cancelAll()
         saveState()
         endLiveActivity(store: activityStore, status: .departed)
+    }
 
-        await store.recordDeparture(earnedDrop: finalEarnedDrop)
+    func persistDeparture(store: AppDataStore) async {
+        guard departed, !departurePersisted else { return }
+
+        let sessionID = departureSessionID
+        let earnedDrop = finalEarnedDrop
+
+        await store.recordDeparture(earnedDrop: earnedDrop)
+
+        if sessionID != departureSessionID {
+            if store.errorMessage == nil {
+                await store.undoLastDeparture(earnedDrop: earnedDrop)
+            }
+            return
+        }
+
+        guard departed else { return }
+
         departurePersisted = store.errorMessage == nil
         saveState()
 
         if let error = store.errorMessage {
             saveError = "記録の保存に失敗しました"
             print("[DewTime] 出発記録の保存に失敗しました: \(error)")
+        }
+    }
+
+    func depart(store: AppDataStore) async {
+        finalizeDeparture(store: store)
+        await persistDeparture(store: store)
+    }
+
+    /// 誤タップで出発した場合、タイマーを再開する。
+    func resumeDeparture(store: AppDataStore) async {
+        guard departed, startedAt != nil else { return }
+
+        let earnedDrop = finalEarnedDrop
+        let wasPersisted = departurePersisted
+        departureSessionID = UUID()
+
+        departed = false
+        departurePersisted = false
+        finalWaterLevel = 1.0
+        finalDelaySeconds = 0
+        finalEarnedDrop = false
+        finalBonusFeedAwarded = false
+        finalAquariumTier = 0
+        finalAquariumDepartures = 0
+
+        now = .now
+        didPlayOverdueWarning = isOverdue
+        startTicker()
+        saveState()
+        NotificationScheduler.schedule(departureAt: targetDepartureTime)
+        syncLiveActivity(store: store, force: true)
+
+        if wasPersisted {
+            await store.undoLastDeparture(earnedDrop: earnedDrop)
         }
     }
 

@@ -317,6 +317,20 @@ final class AppDataStore {
         await saveAll()
     }
 
+    func undoLastDeparture(earnedDrop: Bool) async {
+        guard let index = careRecords.lastIndex(where: { $0.isDepartureLog }) else { return }
+        careRecords.remove(at: index)
+
+        if earnedDrop {
+            let aquarium = aquarium()
+            aquarium.totalDepartures = max(0, aquarium.totalDepartures - 1)
+            aquarium.bonusFeedStock = max(0, aquarium.bonusFeedStock - 1)
+            aquarium.updatedAt = .now
+        }
+
+        await saveAll()
+    }
+
     // MARK: - Cloud Snapshot Mapping
 
     func makeCloudSnapshot(userId: UUID, now: Date = .now) -> CloudSnapshot {

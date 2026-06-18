@@ -12,6 +12,7 @@ struct TimerView: View {
     @State private var showResult = false
     @State private var draftLevel: Double = 1.0
     @State private var didAttemptDepartureRecovery = false
+    @State private var shouldRequestDepartureReview = false
 
     private var draftMinutes: Int { max(5, Int((draftLevel * 30).rounded())) }
 
@@ -61,7 +62,10 @@ struct TimerView: View {
             }
         }
         .sheet(isPresented: $showResult, onDismiss: {
-            ReviewRequestManager.shared.tryRequest(for: .departureResult) { requestReview() }
+            if shouldRequestDepartureReview {
+                ReviewRequestManager.shared.tryRequest(for: .departureResult) { requestReview() }
+            }
+            shouldRequestDepartureReview = false
         }) {
             if let vm = viewModel {
                 DepartureResultView(
@@ -69,8 +73,15 @@ struct TimerView: View {
                     bonusFeedAwarded: vm.finalBonusFeedAwarded,
                     delaySeconds: vm.finalDelaySeconds,
                     onDismiss: {
+                        shouldRequestDepartureReview = true
                         showResult = false
                         vm.reset()
+                    },
+                    onResume: {
+                        showResult = false
+                        Task {
+                            await vm.resumeDeparture(store: store)
+                        }
                     }
                 )
                 .presentationDetents([
@@ -134,12 +145,7 @@ struct TimerView: View {
     @ViewBuilder
     private func centerInfoDisplay(vm: TimerViewModel, isIdle: Bool = false) -> some View {
         ZStack {
-            if vm.departed {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 64))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .transition(.opacity)
-            } else if isIdle {
+            if isIdle {
                 VStack(spacing: 0) {
                     Image(systemName: "hand.draw.fill")
                         .font(.system(size: 22))
@@ -207,14 +213,7 @@ struct TimerView: View {
                     .labelStyle(.titleAndIcon)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(
-                        LinearGradient(
-                            colors: departureBtnColors(vm.waterLevel),
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .background(Color.dewBlue, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
             .disabled(vm.departed)
             .accessibilityLabel("いってきます")
@@ -222,15 +221,12 @@ struct TimerView: View {
         .padding(.horizontal, 28)
     }
 
-    private func departureBtnColors(_ level: Double) -> [Color] {
-        WaterLevelTheme(waterRatio: level).gradientColors
-    }
-
     private func depart(vm: TimerViewModel) {
         guard !vm.departed else { return }
+        vm.finalizeDeparture(store: store)
+        showResult = true
         Task {
-            await vm.depart(store: store)
-            showResult = true
+            await vm.persistDeparture(store: store)
         }
     }
 
@@ -272,11 +268,9 @@ struct TimerView: View {
               !showResult,
               !didAttemptDepartureRecovery else { return }
         didAttemptDepartureRecovery = true
+        showResult = true
         Task {
             await vm.recoverDepartedSession(store: store)
-            if vm.departed {
-                showResult = true
-            }
         }
     }
 }

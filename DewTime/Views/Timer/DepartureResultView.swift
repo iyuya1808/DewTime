@@ -5,10 +5,11 @@ struct DepartureResultView: View {
     let bonusFeedAwarded: Bool
     let delaySeconds: Int
     let onDismiss: () -> Void
+    let onResume: () -> Void
 
     /// sheet の高さ目安（報酬行数に応じて調整）
     static func preferredDetentHeight(bonusFeedAwarded: Bool, hasDelay: Bool) -> CGFloat {
-        var height: CGFloat = 318
+        var height: CGFloat = 330
         if bonusFeedAwarded { height += 58 }
         if hasDelay { height += 22 }
         return height
@@ -25,7 +26,7 @@ struct DepartureResultView: View {
                 VStack(spacing: 20) {
                     statusSection
                     rewardsSection
-                    doneButton
+                    actionButtons
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 4)
@@ -100,22 +101,29 @@ struct DepartureResultView: View {
         }
     }
 
-    private var doneButton: some View {
-        Button(action: onDismiss) {
-            Text("完了")
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    LinearGradient(
-                        colors: earnedDrop ? [.teal, .cyan] : [.orange, .yellow.opacity(0.85)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    private var actionButtons: some View {
+        HStack(spacing: 16) {
+            Button(action: onResume) {
+                Label("再開", systemImage: "arrow.uturn.backward.circle")
+                    .font(.subheadline.weight(.semibold))
+                    .labelStyle(.titleAndIcon)
+                    .foregroundStyle(.white.opacity(0.55))
+                    .frame(width: 100, height: 52)
+                    .background(.white.opacity(0.10), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("タイマーを再開")
+
+            Button(action: onDismiss) {
+                Text("完了")
+                    .font(.headline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Color.dewBlue, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("完了")
         }
-        .accessibilityLabel("完了")
     }
 
     // MARK: - Helpers
@@ -142,7 +150,8 @@ struct DepartureResultView: View {
                 earnedDrop: true,
                 bonusFeedAwarded: true,
                 delaySeconds: 0,
-                onDismiss: {}
+                onDismiss: {},
+                onResume: {}
             )
             .presentationDetents([
                 .height(DepartureResultView.preferredDetentHeight(bonusFeedAwarded: true, hasDelay: false))
@@ -157,7 +166,8 @@ struct DepartureResultView: View {
                 earnedDrop: false,
                 bonusFeedAwarded: false,
                 delaySeconds: 185,
-                onDismiss: {}
+                onDismiss: {},
+                onResume: {}
             )
             .presentationDetents([
                 .height(DepartureResultView.preferredDetentHeight(bonusFeedAwarded: false, hasDelay: true))
