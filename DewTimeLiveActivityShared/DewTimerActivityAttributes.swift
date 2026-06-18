@@ -13,13 +13,10 @@ struct DewTimerActivityAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {
         var currentTaskName: String
         var nextTaskName: String?
-        var selectedSpeciesName: String
-        var fishEmoji: String
-        var growthStageName: String
-        var growthStageIconName: String
-        var currentDepartures: Int
-        var requiredDepartures: Int
-        var projectedDepartures: Int
+        var aquariumTier: Int
+        var aquariumTierName: String
+        var aquariumDepartures: Int
+        var bonusFeedStock: Int
         var waterLevel: Double
         var status: TimerStatus
         var phaseIndex: Int
@@ -29,9 +26,8 @@ struct DewTimerActivityAttributes: ActivityAttributes {
             Int((max(0, min(1, waterLevel)) * 100).rounded())
         }
 
-        var growthProgress: Double {
-            guard requiredDepartures > 0 else { return 0 }
-            return max(0, min(1, Double(projectedDepartures) / Double(requiredDepartures)))
+        var tierDisplayNumber: Int {
+            aquariumTier + 1
         }
     }
 

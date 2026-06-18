@@ -6,13 +6,7 @@ struct ProfileView: View {
     @State private var selectedAchievement: Achievement?
     @State private var showProfileEditor = false
 
-    private let calendar = Calendar.current
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 7)
     private let badgeColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
-
-    private var records: [FishCareRecord] {
-        store.careRecords.sorted { $0.recordedAt > $1.recordedAt }
-    }
 
     var body: some View {
         NavigationStack {
@@ -22,7 +16,7 @@ struct ProfileView: View {
                         .padding(.horizontal)
                         .padding(.top, 12)
 
-                    weekGrid
+                    DepartureRecordCalendarView(selectedRecord: $selectedRecord)
                         .padding(.horizontal)
 
                     achievementsSection
@@ -31,6 +25,7 @@ struct ProfileView: View {
                 .padding(.bottom, 32)
             }
             .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("プロフィール")
             .dewAppBackground()
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -51,7 +46,7 @@ struct ProfileView: View {
             }
             .sheet(item: $selectedAchievement) { achievement in
                 AchievementDetailSheet(achievement: achievement, store: store)
-                    .presentationDetents([.height(260)])
+                    .presentationDetents([.height(300)])
             }
         }
     }
@@ -78,12 +73,12 @@ struct ProfileView: View {
                     Image(systemName: "calendar")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    Text("\(daysSinceStart)")
+                    Text("\(daysSinceStart)日目")
                         .font(.caption.weight(.bold))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
-                .accessibilityLabel("水やり\(daysSinceStart)日目")
+                .accessibilityLabel("出発\(daysSinceStart)日目")
             }
 
             Spacer()
@@ -91,11 +86,16 @@ struct ProfileView: View {
             Button {
                 showProfileEditor = true
             } label: {
-                Image(systemName: "pencil")
-                    .font(.headline)
-                    .foregroundStyle(.teal)
-                    .frame(width: 38, height: 38)
-                    .background(Color.dewSurfaceSoft, in: Circle())
+                VStack(spacing: 4) {
+                    Image(systemName: "pencil")
+                        .font(.headline)
+                        .foregroundStyle(.teal)
+                    Text("編集")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.teal)
+                }
+                .frame(width: 44, height: 44)
+                .background(Color.dewSurfaceSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("プロフィールを編集")
@@ -105,97 +105,19 @@ struct ProfileView: View {
         .accessibilityElement(children: .contain)
     }
 
-    // MARK: - Week grid
-
-    private var weekGrid: some View {
-        LazyVGrid(columns: columns, spacing: 8) {
-            ForEach(recentWeekDays) { day in
-                weekDayCell(day)
-            }
-        }
-    }
-
-    private func weekDayCell(_ day: ProfileWeekDay) -> some View {
-        Button {
-            selectedRecord = day.record
-        } label: {
-            VStack(spacing: 5) {
-                Text(day.weekday)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-
-                Text("\(calendar.component(.day, from: day.date))")
-                    .font(.subheadline.weight(day.isToday ? .bold : .semibold))
-                    .monospacedDigit()
-
-                Spacer(minLength: 0)
-
-                if let record = day.record {
-                    recordSymbol(for: record, size: 24).frame(height: 28)
-
-                    HStack(spacing: 2) {
-                        Text("+\(record.departuresAfter)💧")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                        if day.recordCount > 1 {
-                            Text("+\(day.recordCount - 1)")
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(recordColor(for: record), in: Capsule())
-                        }
-                    }
-                    .foregroundStyle(.secondary)
-                } else {
-                    Circle()
-                        .fill(.secondary.opacity(0.12))
-                        .frame(width: 8, height: 8)
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(7)
-            .frame(maxWidth: .infinity)
-            .aspectRatio(0.68, contentMode: .fit)
-            .background(
-                day.record == nil ? Color.dewSurfaceSoft : Color.dewSurface,
-                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-            )
-            .overlay {
-                if day.isToday {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.teal.opacity(0.7), lineWidth: 1.5)
-                }
-            }
-            .overlay(alignment: .bottom) {
-                if let record = day.record {
-                    Capsule()
-                        .fill(recordColor(for: record).opacity(0.9))
-                        .frame(height: 3)
-                        .padding(.horizontal, 8)
-                        .padding(.bottom, 5)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .disabled(day.record == nil)
-        .accessibilityLabel(weekDayAccessibilityLabel(for: day))
-    }
-
     // MARK: - Achievements
 
     private var achievementsSection: some View {
         let unlockedCount = Achievement.allCases.filter { $0.isUnlocked(in: store) }.count
         let totalCount = Achievement.allCases.count
 
-        return VStack(alignment: .leading, spacing: 12) {
+        return VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Image(systemName: "trophy.fill")
                     .font(.headline)
                     .foregroundStyle(.orange)
+                Text("実績")
+                    .font(.headline.weight(.bold))
                 Spacer()
                 Text("\(unlockedCount)/\(totalCount)")
                     .font(.subheadline.weight(.bold))
@@ -205,14 +127,35 @@ struct ProfileView: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel("実績 \(unlockedCount)個獲得、全\(totalCount)個")
 
-            LazyVGrid(columns: badgeColumns, spacing: 8) {
-                ForEach(Achievement.allCases) { achievement in
-                    badgeCell(achievement)
-                }
+            ForEach(AchievementCategory.allCases) { category in
+                achievementCategoryBlock(category)
             }
         }
         .padding(14)
         .background(Color.dewSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func achievementCategoryBlock(_ category: AchievementCategory) -> some View {
+        let achievements = category.achievements
+        let unlockedInCategory = achievements.filter { $0.isUnlocked(in: store) }.count
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Text(category.title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(category.tint)
+                Text("\(unlockedInCategory)/\(achievements.count)")
+                    .font(.caption.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+
+            LazyVGrid(columns: badgeColumns, spacing: 8) {
+                ForEach(achievements) { achievement in
+                    badgeCell(achievement)
+                }
+            }
+        }
     }
 
     private func badgeCell(_ achievement: Achievement) -> some View {
@@ -220,12 +163,22 @@ struct ProfileView: View {
         return Button {
             selectedAchievement = achievement
         } label: {
-            Text(achievement.emoji)
-                .font(.system(size: 28))
-                .saturation(unlocked ? 1 : 0)
-                .opacity(unlocked ? 1 : 0.35)
-                .frame(maxWidth: .infinity)
-                .frame(height: 52)
+            VStack(spacing: 4) {
+                Text(achievement.emoji)
+                    .font(.system(size: 24))
+                    .saturation(unlocked ? 1 : 0)
+                    .opacity(unlocked ? 1 : 0.35)
+                if unlocked {
+                    Text(achievement.title)
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .padding(.horizontal, 2)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: unlocked ? 64 : 52)
                 .background(
                     unlocked ? achievement.tint.opacity(0.16) : Color.dewSurfaceSoft,
                     in: RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -245,61 +198,6 @@ struct ProfileView: View {
         )
         .accessibilityHint("タップして詳細を表示")
     }
-
-    // MARK: - Shared subviews
-
-    @ViewBuilder
-    private func recordSymbol(for record: FishCareRecord, size: CGFloat) -> some View {
-        if record.completedGrowth {
-            FishArtworkView(species: record.species)
-                .frame(width: size * 1.2, height: size)
-        } else {
-            Image(systemName: record.growthStage.icon)
-                .font(.system(size: size, weight: .semibold))
-                .foregroundStyle(recordColor(for: record))
-                .symbolRenderingMode(.hierarchical)
-        }
-    }
-
-    // MARK: - Helpers
-
-    private var recentWeekDays: [ProfileWeekDay] {
-        let recordsByDay = Dictionary(grouping: records) { calendar.startOfDay(for: $0.recordedAt) }
-        return (0..<7).compactMap { offset in
-            guard let date = calendar.date(byAdding: .day, value: offset - 6, to: calendar.startOfDay(for: .now)) else { return nil }
-            let startOfDay = calendar.startOfDay(for: date)
-            let dayRecords = recordsByDay[startOfDay] ?? []
-            return ProfileWeekDay(
-                date: date,
-                weekday: date.formatted(.dateTime.weekday(.abbreviated)),
-                isToday: calendar.isDateInToday(date),
-                record: dayRecords.first,
-                recordCount: dayRecords.count
-            )
-        }
-    }
-
-    private func weekDayAccessibilityLabel(for day: ProfileWeekDay) -> String {
-        let dateLabel = day.date.formatted(.dateTime.month().day())
-        if let record = day.record {
-            let growth = record.completedGrowth ? "成魚" : record.growthStage.displayName
-            return "\(dateLabel)、しずく\(record.departuresAfter)、\(growth)"
-        }
-        return "\(dateLabel)、記録なし"
-    }
-
-    private func recordColor(for record: FishCareRecord) -> Color {
-        record.completedGrowth ? WaterLevelTheme(waterRatio: 1).tintColor : .orange
-    }
-}
-
-private struct ProfileWeekDay: Identifiable {
-    var date: Date
-    var weekday: String
-    var isToday: Bool
-    var record: FishCareRecord?
-    var recordCount: Int
-    var id: Date { date }
 }
 
 // MARK: - Achievement detail
@@ -331,6 +229,11 @@ private struct AchievementDetailSheet: View {
                 Label("獲得済み", systemImage: "checkmark.seal.fill")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(achievement.tint)
+                if achievement.feedReward > 0 {
+                    Label("報酬: 餌\(achievement.feedReward)個", systemImage: FeedIcon.systemName)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.orange)
+                }
             } else {
                 VStack(spacing: 6) {
                     ProgressView(value: Double(progress.current), total: Double(progress.target))
@@ -339,6 +242,11 @@ private struct AchievementDetailSheet: View {
                         .font(.caption.weight(.semibold))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
+                    if achievement.feedReward > 0 {
+                        Label("解除で餌\(achievement.feedReward)個", systemImage: FeedIcon.systemName)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.orange)
+                    }
                 }
                 .padding(.horizontal, 24)
             }

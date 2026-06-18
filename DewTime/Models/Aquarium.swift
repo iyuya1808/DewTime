@@ -4,29 +4,33 @@ import Observation
 /// 水槽成長の土台モデル。
 ///
 /// オンタイム出発のたびに `totalDepartures` が増え、
-/// 累積数が増えるほど水槽サイズ（`sizeTier`）が大きくなり、より大きな魚を飼える。
+/// 累積数が増えるほど水槽サイズ（`sizeTier`）が大きくなり、ガチャで出る魚種が増える。
 @Observable
 final class Aquarium: Identifiable {
     var id: UUID
     var totalDepartures: Int
+    /// オンタイム出発・実績解除で獲得した餌（水槽タブで消費）。
+    var bonusFeedStock: Int
     var createdAt: Date
     var updatedAt: Date
 
     init(
         id: UUID = UUID(),
         totalDepartures: Int = 0,
+        bonusFeedStock: Int = 0,
         createdAt: Date = .now,
         updatedAt: Date = .now
     ) {
         self.id = id
         self.totalDepartures = totalDepartures
+        self.bonusFeedStock = bonusFeedStock
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
 
     static let tierThresholds: [Int] = [0, 10, 30, 60, 100, 150, 200]
 
-    /// 各サイズ段階で泳がせられる成魚の上限（種類による表示制限は設けない）。
+    /// 各サイズ段階で泳がせられる魚の上限。
     static let fishCapacityByTier: [Int] = [5, 10, 20, 35, 50, 70, 100]
 
     static let maxTier = tierThresholds.count - 1

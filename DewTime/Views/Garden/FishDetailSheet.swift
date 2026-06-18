@@ -11,18 +11,6 @@ struct FishDetailSheet: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            HStack {
-                Spacer()
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color(.secondaryLabel))
-                        .frame(width: 30, height: 30)
-                        .background(Color(.systemGray5), in: Circle())
-                }
-                .buttonStyle(.plain)
-            }
-
             ZStack {
                 Circle()
                     .fill(fishColor.opacity(0.16))
@@ -95,7 +83,7 @@ struct FishDetailSheet: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     
-                    Text("しゅっぱつ")
+                    Text("出発")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.secondary)
                 }
@@ -107,8 +95,20 @@ struct FishDetailSheet: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 24)
-        .padding(.top, 8)
+        .padding(.top, 38)
         .padding(.bottom, 24)
+        .overlay(alignment: .topTrailing) {
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Color(.secondaryLabel))
+                    .frame(width: 30, height: 30)
+                    .background(Color(.systemGray5), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("閉じる")
+            .padding(24)
+        }
         .background(
             RoundedRectangle(cornerRadius: 32, style: .continuous)
                 .fill(

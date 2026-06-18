@@ -1,5 +1,6 @@
 import SwiftUI
 import Supabase
+import UserNotifications
 
 struct SettingsView: View {
     @Environment(AppDataStore.self) private var store
@@ -12,188 +13,31 @@ struct SettingsView: View {
     @AppStorage(AppPreferences.Key.aquariumTheme.rawValue) private var aquariumTheme = AquariumTheme.dewBlue.rawValue
     @AppStorage(AppPreferences.Key.hasCompletedTutorial.rawValue) private var hasCompletedTutorial = false
 
-    @State private var showAddSheet = false
     @State private var showProfileEditor = false
-    @State private var newName = ""
-    @State private var newTime = Date()
     @State private var saveError: String?
+    @State private var authorizationStatus: UNAuthorizationStatus = .notDetermined
 
     @State private var authService = AuthService.shared
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    Button {
-                        showProfileEditor = true
-                    } label: {
-                        HStack(spacing: 12) {
-                            let profile = store.profile()
-                            Text(profile.avatarEmoji)
-                                .font(.system(size: 28))
-                                .frame(width: 44, height: 44)
-                                .background(Color.dewSurfaceSoft, in: Circle())
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(profile.nickname)
-                                    .font(.headline)
-                                    .foregroundStyle(.primary)
-                                
-                                if let user = authService.currentUser {
-                                    if authService.isAnonymous {
-                                        Text("クラウド保存: 未有効")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                    } else {
-                                        Text(user.email ?? "クラウド保存: 有効")
-                                            .font(.caption2)
-                                            .foregroundStyle(.teal)
-                                    }
-                                } else {
-                                    Text("アカウント準備中...")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            
-                            Spacer()
-                            
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 4)
-                        .contentShape(Rectangle())
-                        .background(Color.black.opacity(0.0001))
-                    }
-                    .buttonStyle(.plain)
-                } header: {
-                    Text("アカウント")
-                } footer: {
-                    if let user = authService.currentUser, authService.isAnonymous {
-                        Text("現在はアカウント登録なしでご利用中です（データはローカルに保存されます）。プロフィールを編集するにはアカウント登録が必要です。")
-                    } else if authService.currentUser != nil {
-                        Text("クラウド保存が有効になっています。タップしてプロフィール変更やアカウント管理を行えます。")
-                    }
+            ScrollView {
+                VStack(spacing: 20) {
+                    accountSection
+                    notificationSection
+                    displaySection
+                    helpSection
+                    linksSection
+                    versionFooter
                 }
-                .listRowBackground(Color.dewListRowBackground)
-
-                Section {
-                    ForEach(store.schedules) { schedule in
-                        NavigationLink(destination: RoutineEditorView(schedule: schedule)) {
-                            ScheduleRow(schedule: schedule)
-                        }
-                        .swipeActions(edge: .leading) {
-                            Button("有効化") { activate(schedule) }
-                                .tint(.green)
-                        }
-                    }
-                    .onDelete(perform: delete)
-                } header: {
-                    Text("出発スケジュール")
-                } footer: {
-                    Text("有効化したスケジュールがタイマーに使われます")
-                }
-                .listRowBackground(Color.dewListRowBackground)
-
-                Section {
-                    Button {
-                        newTime = defaultTime()
-                        newName = ""
-                        showAddSheet = true
-                    } label: {
-                        Label("スケジュールを追加", systemImage: "plus.circle.fill")
-                    }
-                }
-                .listRowBackground(Color.dewListRowBackground)
-
-                Section {
-                    NavigationLink(destination: NotificationSettingsView()) {
-                        Label("通知と触覚", systemImage: "bell.badge")
-                    }
-                } header: {
-                    Text("通知と触覚")
-                } footer: {
-                    Text(notificationSummary)
-                }
-                .listRowBackground(Color.dewListRowBackground)
-
-                Section {
-                    Button {
-                        hasCompletedTutorial = false
-                    } label: {
-                        Label("チュートリアルを見る", systemImage: "questionmark.circle")
-                    }
-                } footer: {
-                    Text("タイマー・図鑑・水槽・プロフィールの使い方をもう一度確認できます。")
-                }
-                .listRowBackground(Color.dewListRowBackground)
-
-                Section {
-                    HStack {
-                        Label("外観モード", systemImage: "circle.lefthalf.filled")
-                        Spacer()
-                        Picker("", selection: $appTheme) {
-                            ForEach(AppTheme.allCases) { theme in
-                                Text(theme.displayName).tag(theme.rawValue)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .tint(.secondary)
-                    }
-                    HStack {
-                        Label("水槽テーマ", systemImage: "paintpalette")
-                        Spacer()
-                        Picker("", selection: $aquariumTheme) {
-                            ForEach(AquariumTheme.allCases) { theme in
-                                Text(theme.displayName).tag(theme.rawValue)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .tint(.secondary)
-                    }
-                } header: {
-                    Text("表示")
-                } footer: {
-                    Text(themeFooterText)
-                }
-                .listRowBackground(Color.dewListRowBackground)
-
-                Section {
-                    NavigationLink(destination: DataManagementView()) {
-                        Label("データ管理", systemImage: "externaldrive")
-                    }
-                }
-                .listRowBackground(Color.dewListRowBackground)
-
-                Section {
-                    NavigationLink(destination: SupportDeveloperView()) {
-                        Label("開発者を応援", systemImage: "heart.fill")
-                    }
-                    HStack {
-                        Label("バージョン", systemImage: "info.circle")
-                        Spacer()
-                        Text(verbatim: appVersionString)
-                            .foregroundStyle(.secondary)
-                    }
-                } header: {
-                    Text("サポート")
-                }
-                .listRowBackground(Color.dewListRowBackground)
+                .padding(.horizontal)
+                .padding(.top, 12)
+                .padding(.bottom, 32)
             }
             .navigationTitle("設定")
-            .scrollContentBackground(.hidden)
             .dewAppBackground()
-            .onAppear {
-                let activeCount = store.schedules.filter(\.isActive).count
-                if !store.schedules.isEmpty, activeCount != 1 {
-                    UserSchedule.ensureSingleActive(in: store.schedules)
-                    Task { await store.saveAll() }
-                }
-            }
-            .sheet(isPresented: $showAddSheet) {
-                addSheet
-                    .presentationDetents([.medium])
+            .task {
+                await refreshAuthorizationStatus()
             }
             .sheet(isPresented: $showProfileEditor) {
                 ProfileEditView()
@@ -209,7 +53,269 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Sections
 
+    private var accountSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SettingsSectionHeader(title: "アカウント", systemImage: "person.crop.circle", tint: .teal)
+
+            Button {
+                showProfileEditor = true
+            } label: {
+                SettingsCard {
+                    VStack(spacing: 16) {
+                        HStack(spacing: 14) {
+                            let profile = store.profile()
+                            Text(profile.avatarEmoji)
+                                .font(.system(size: 36))
+                                .frame(width: 64, height: 64)
+                                .background(Color.dewSurfaceSoft, in: Circle())
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(profile.nickname)
+                                    .font(.title3.weight(.bold))
+                                    .foregroundStyle(.primary)
+
+                                accountStatusBadge
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.tertiary)
+                        }
+
+                        if authService.isAnonymous {
+                            anonymousAccountBanner
+                        }
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder
+    private var accountStatusBadge: some View {
+        if let user = authService.currentUser {
+            if authService.isAnonymous {
+                SettingsStatusBadge(text: "ローカルのみ", tint: .orange, systemImage: "iphone")
+            } else {
+                SettingsStatusBadge(text: "クラウド保存: 有効", tint: .teal, systemImage: "icloud.fill")
+                if let email = user.email {
+                    Text(email)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } else {
+            SettingsStatusBadge(text: "準備中", tint: .secondary, systemImage: "hourglass")
+        }
+    }
+
+    private var anonymousAccountBanner: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                Text("データはこの端末にのみ保存されています。アカウント登録でクラウド保存とプロフィール編集が使えます。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            NavigationLink {
+                AccountRegistrationView()
+            } label: {
+                HStack {
+                    Spacer()
+                    Label("アカウント登録する", systemImage: "icloud.and.arrow.up")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                }
+                .frame(height: 40)
+                .background(
+                    LinearGradient(colors: [.dewBlue, .dewNavy], startPoint: .leading, endPoint: .trailing),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12)
+        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private var notificationSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SettingsSectionHeader(
+                title: "通知と触覚",
+                caption: "出発時刻のお知らせと操作時の振動",
+                systemImage: "bell.badge.fill",
+                tint: .orange
+            )
+
+            NavigationLink {
+                NotificationSettingsView()
+            } label: {
+                SettingsCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        SettingsNavigationRow(
+                            title: "通知と触覚の設定",
+                            subtitle: notificationInlineSummary,
+                            systemImage: "bell.badge",
+                            iconTint: .orange,
+                            showsChevron: false
+                        )
+
+                        if authorizationStatus == .denied {
+                            SettingsStatusBadge(
+                                text: "iOSで通知が拒否されています",
+                                tint: .red,
+                                systemImage: "exclamationmark.triangle.fill"
+                            )
+                        }
+
+                        HStack {
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var displaySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SettingsSectionHeader(
+                title: "表示",
+                caption: "アプリ全体と水槽の見た目",
+                systemImage: "paintpalette.fill",
+                tint: .purple
+            )
+
+            SettingsCard {
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("外観モード")
+                            .font(.subheadline.weight(.semibold))
+
+                        HStack(spacing: 8) {
+                            ForEach(AppTheme.allCases) { theme in
+                                SettingsThemeChip(
+                                    theme: theme,
+                                    isSelected: appTheme == theme.rawValue
+                                ) {
+                                    appTheme = theme.rawValue
+                                }
+                            }
+                        }
+
+                        Text(themeFooterText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("水槽テーマ")
+                            .font(.subheadline.weight(.semibold))
+
+                        HStack(spacing: 8) {
+                            ForEach(AquariumTheme.allCases) { theme in
+                                AquariumThemeSwatch(
+                                    theme: theme,
+                                    isSelected: aquariumTheme == theme.rawValue
+                                ) {
+                                    aquariumTheme = theme.rawValue
+                                }
+                            }
+                        }
+
+                        Text("タイマーの水タンクと水槽画面の色合いが変わります。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private var helpSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SettingsSectionHeader(
+                title: "ヘルプ",
+                systemImage: "questionmark.circle.fill",
+                tint: .blue
+            )
+
+            SettingsCard {
+                Button {
+                    hasCompletedTutorial = false
+                } label: {
+                    SettingsNavigationRow(
+                        title: "チュートリアルをもう一度見る",
+                        subtitle: "タイマー・しずくと餌・水槽・図鑑・実績の使い方を確認できます",
+                        systemImage: "book.pages.fill",
+                        iconTint: .blue
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var linksSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SettingsSectionHeader(title: "その他", systemImage: "ellipsis.circle", tint: .secondary)
+
+            SettingsCard {
+                VStack(spacing: 16) {
+                    NavigationLink {
+                        DataManagementView()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "データ管理",
+                            subtitle: "保存状態の確認やデータの初期化",
+                            systemImage: "externaldrive.fill",
+                            iconTint: .teal
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Divider()
+
+                    NavigationLink {
+                        SupportDeveloperView()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "開発者を応援",
+                            subtitle: "アプリの開発をサポートする",
+                            systemImage: "heart.fill",
+                            iconTint: .pink
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var versionFooter: some View {
+        Text("バージョン \(appVersionString)")
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 4)
+    }
+
+    // MARK: - Computed
 
     private var appVersionString: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
@@ -217,12 +323,18 @@ struct SettingsView: View {
         return "\(version) (\(build))"
     }
 
-    private var notificationSummary: String {
-        guard notificationsEnabled else { return "通知はオフです。" }
-        if departureReminderEnabled {
-            return "出発時刻と\(departureReminderMinutes)分前に通知します。"
+    private var notificationInlineSummary: String {
+        var parts: [String] = []
+        parts.append(notificationsEnabled ? "通知 ON" : "通知 OFF")
+        if notificationsEnabled {
+            if departureReminderEnabled {
+                parts.append("\(departureReminderMinutes)分前にリマインド")
+            } else {
+                parts.append("出発時刻のみ")
+            }
         }
-        return "出発時刻のみ通知します。"
+        parts.append(hapticsEnabled ? "触覚 ON" : "触覚 OFF")
+        return parts.joined(separator: " · ")
     }
 
     private var themeFooterText: String {
@@ -238,90 +350,11 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Add sheet
-
-    private var addSheet: some View {
-        NavigationStack {
-            Form {
-                Section("名前") {
-                    TextField("例: 平日・休日", text: $newName)
-                }
-                Section("出発時刻") {
-                    DatePicker("出発時刻", selection: $newTime, displayedComponents: .hourAndMinute)
-                        .datePickerStyle(.wheel)
-                        .labelsHidden()
-                }
-            }
-            .navigationTitle("新しいスケジュール")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル") { showAddSheet = false }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("追加") {
-                        addSchedule()
-                        showAddSheet = false
-                    }
-                    .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
-            }
-        }
-    }
-
     // MARK: - Actions
 
-    private func activate(_ schedule: UserSchedule) {
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.prepare()
-        generator.impactOccurred()
-        UserSchedule.setActive(schedule, in: store.schedules)
-        Task { await store.saveAll() }
-    }
-
-    private func delete(at offsets: IndexSet) {
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.prepare()
-        generator.impactOccurred()
-        let deleting = offsets.map { store.schedules[$0] }
-        Task { await store.deleteSchedules(deleting) }
-    }
-
-    private func addSchedule() {
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.prepare()
-        generator.impactOccurred()
-        Task { await store.addSchedule(name: newName, targetDepartureTime: newTime) }
-    }
-
-    private func defaultTime() -> Date {
-        DepartureTimeDefaults.fifteenMinutesFromNow()
-    }
-}
-
-// MARK: - Row
-
-private struct ScheduleRow: View {
-    let schedule: UserSchedule
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(schedule.name)
-                    .font(.headline)
-                Spacer()
-                if schedule.isActive {
-                    Label("使用中", systemImage: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.green)
-                        .labelStyle(.titleAndIcon)
-                }
-            }
-            Text(schedule.targetDepartureTime, format: .dateTime.hour().minute())
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 4)
+    private func refreshAuthorizationStatus() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        authorizationStatus = settings.authorizationStatus
     }
 }
 

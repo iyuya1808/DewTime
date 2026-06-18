@@ -3,9 +3,14 @@ import SwiftUI
 
 /// プロフィール・実績向けの集計ヘルパー。
 enum ProfileStats {
-    /// 連続して記録のある最長日数。
-    static func longestStreak(in records: [FishCareRecord], calendar: Calendar = .current) -> Int {
-        let days = Set(records.map { calendar.startOfDay(for: $0.recordedAt) }).sorted()
+    /// オンタイム出発の記録（新ログ + 旧データの earnedDrop）。
+    static func onTimeDepartureRecords(in records: [FishCareRecord]) -> [FishCareRecord] {
+        records.filter(\.earnedDrop)
+    }
+
+    /// 連続してオンタイム出発があった最長日数。
+    static func longestOnTimeStreak(in records: [FishCareRecord], calendar: Calendar = .current) -> Int {
+        let days = Set(onTimeDepartureRecords(in: records).map { calendar.startOfDay(for: $0.recordedAt) }).sorted()
         guard !days.isEmpty else { return 0 }
         var best = 1, current = 1
         for index in days.indices.dropFirst() {
@@ -16,113 +21,368 @@ enum ProfileStats {
         }
         return best
     }
+
+    /// 図鑑に登録された魚種数。
+    static func discoveredSpeciesCount(in store: AppDataStore) -> Int {
+        Set(store.collectedFishes.map(\.speciesId)).count
+    }
+
+    /// オンタイム出発の記録件数（ログ未整備の旧データは累計しずくで補完）。
+    static func onTimeDepartureCount(in store: AppDataStore) -> Int {
+        let fromLogs = onTimeDepartureRecords(in: store.careRecords).count
+        let totalShizuku = store.aquariums.first?.totalDepartures ?? 0
+        return max(fromLogs, totalShizuku)
+    }
+
+    /// 獲得した魚の総数（同種含む）。
+    static func totalFishCollected(in store: AppDataStore) -> Int {
+        store.collectedFishes.count
+    }
+
+    /// 利用開始からの経過日数。
+    static func daysSinceStart(in store: AppDataStore) -> Int {
+        store.profile().daysSinceStart
+    }
 }
 
-/// 通算の達成バッジ。獲得判定は `AppDataStore` 全体（全期間）から導出する。
-enum Achievement: String, CaseIterable, Identifiable {
-    case firstWatering, firstAdult
-    case streak3, streak7, streak30
-    case dex5, dex10, dexAll
-    case water1000, water5000
-    case aquariumMid, aquariumLarge
+/// 実績の大分類。同カテゴリ内で段階的に解除される。
+enum AchievementCategory: String, CaseIterable, Identifiable {
+    case departure
+    case streak
+    case encyclopedia
+    case fishHerd
+    case aquarium
+    case journey
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .firstWatering:  return "はじめの一滴"
-        case .firstAdult:     return "初めての成魚"
-        case .streak3:        return "3日連続"
-        case .streak7:        return "1週間皆勤"
-        case .streak30:       return "30日マスター"
-        case .dex5:           return "コレクター"
-        case .dex10:          return "図鑑の達人"
-        case .dexAll:         return "コンプリート"
-        case .water1000:      return "1000pt達成"
-        case .water5000:      return "水の番人"
-        case .aquariumMid:    return "中型水槽"
-        case .aquariumLarge:  return "大型水槽"
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .firstWatering:  return "はじめて水やりを記録した"
-        case .firstAdult:     return "魚を成魚まで育てた"
-        case .streak3:        return "3日続けて水やりした"
-        case .streak7:        return "7日続けて水やりした"
-        case .streak30:       return "30日続けて水やりした"
-        case .dex5:           return "図鑑に5種類登録した"
-        case .dex10:          return "図鑑に10種類登録した"
-        case .dexAll:         return "図鑑を全15種コンプリートした"
-        case .water1000:      return "累計1000ptの水を注いだ"
-        case .water5000:      return "累計5000ptの水を注いだ"
-        case .aquariumMid:    return "水槽が中型まで育った"
-        case .aquariumLarge:  return "水槽が大型まで育った"
-        }
-    }
-
-    var emoji: String {
-        switch self {
-        case .firstWatering:  return "🌱"
-        case .firstAdult:     return "🎉"
-        case .streak3:        return "🔥"
-        case .streak7:        return "⭐️"
-        case .streak30:       return "👑"
-        case .dex5:           return "📖"
-        case .dex10:          return "📚"
-        case .dexAll:         return "🏆"
-        case .water1000:      return "💧"
-        case .water5000:      return "🌊"
-        case .aquariumMid:    return "🐠"
-        case .aquariumLarge:  return "🐋"
+        case .departure:    return "しずく"
+        case .streak:       return "連続出発"
+        case .encyclopedia: return "図鑑"
+        case .fishHerd:     return "仲間"
+        case .aquarium:     return "水槽"
+        case .journey:      return "記念日"
         }
     }
 
     var tint: Color {
         switch self {
-        case .firstWatering, .firstAdult:        return .green
-        case .streak3, .streak7, .streak30:      return .orange
-        case .dex5, .dex10, .dexAll:             return .purple
-        case .water1000, .water5000:             return .cyan
-        case .aquariumMid, .aquariumLarge:       return .teal
+        case .departure:    return .cyan
+        case .streak:       return .orange
+        case .encyclopedia: return .purple
+        case .fishHerd:     return .green
+        case .aquarium:     return .teal
+        case .journey:      return .pink
+        }
+    }
+
+    var achievements: [Achievement] {
+        Achievement.allCases
+            .filter { $0.category == self }
+            .sorted { $0.sortOrder < $1.sortOrder }
+    }
+}
+
+/// 通算の達成バッジ。獲得判定は `AppDataStore` 全体（全期間）から導出する。
+enum Achievement: String, CaseIterable, Identifiable {
+    // しずく
+    case firstWatering, departures10, departures25, departures50, departures100
+    case departures200, departures500, departures1000
+    // 連続出発
+    case streak3, streak7, streak14, streak30, streak60, streak100
+    // 図鑑
+    case firstAdult, dex3, dex5, dex8, dex10, dex12, dexAll
+    // 仲間（総獲得数）
+    case fish5, fish10, fish25, fish50, fish100
+    // 水槽
+    case aquariumLv2, aquariumMid, aquariumLarge, aquariumLv5, aquariumLv6, aquariumMax
+    // 記念日
+    case days7, days30, days100, days200, days365
+
+    var id: String { rawValue }
+
+    var category: AchievementCategory {
+        switch self {
+        case .firstWatering, .departures10, .departures25, .departures50, .departures100,
+             .departures200, .departures500, .departures1000:
+            return .departure
+        case .streak3, .streak7, .streak14, .streak30, .streak60, .streak100:
+            return .streak
+        case .firstAdult, .dex3, .dex5, .dex8, .dex10, .dex12, .dexAll:
+            return .encyclopedia
+        case .fish5, .fish10, .fish25, .fish50, .fish100:
+            return .fishHerd
+        case .aquariumLv2, .aquariumMid, .aquariumLarge, .aquariumLv5, .aquariumLv6, .aquariumMax:
+            return .aquarium
+        case .days7, .days30, .days100, .days200, .days365:
+            return .journey
+        }
+    }
+
+    var sortOrder: Int {
+        switch self {
+        case .firstWatering:   return 0
+        case .departures10:    return 1
+        case .departures25:    return 2
+        case .departures50:    return 3
+        case .departures100:   return 4
+        case .departures200:   return 5
+        case .departures500:   return 6
+        case .departures1000:  return 7
+        case .streak3:         return 0
+        case .streak7:         return 1
+        case .streak14:        return 2
+        case .streak30:        return 3
+        case .streak60:        return 4
+        case .streak100:       return 5
+        case .firstAdult:      return 0
+        case .dex3:            return 1
+        case .dex5:            return 2
+        case .dex8:            return 3
+        case .dex10:           return 4
+        case .dex12:           return 5
+        case .dexAll:          return 6
+        case .fish5:           return 0
+        case .fish10:          return 1
+        case .fish25:          return 2
+        case .fish50:          return 3
+        case .fish100:         return 4
+        case .aquariumLv2:     return 0
+        case .aquariumMid:     return 1
+        case .aquariumLarge:   return 2
+        case .aquariumLv5:     return 3
+        case .aquariumLv6:     return 4
+        case .aquariumMax:     return 5
+        case .days7:           return 0
+        case .days30:          return 1
+        case .days100:         return 2
+        case .days200:         return 3
+        case .days365:         return 4
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .firstWatering:  return "初めてのしずく"
+        case .departures10:   return "しずく 10回"
+        case .departures25:   return "しずく 25回"
+        case .departures50:   return "しずく 50回"
+        case .departures100:  return "しずく 100回"
+        case .departures200:  return "しずく 200回"
+        case .departures500:  return "しずく 500回"
+        case .departures1000: return "しずく 1000回"
+        case .streak3:        return "3日連続"
+        case .streak7:        return "1週間連続"
+        case .streak14:       return "2週間連続"
+        case .streak30:       return "1か月連続"
+        case .streak60:       return "2か月連続"
+        case .streak100:      return "100日連続"
+        case .firstAdult:     return "はじめの仲間"
+        case .dex3:           return "図鑑3種"
+        case .dex5:           return "コレクター"
+        case .dex8:           return "図鑑8種"
+        case .dex10:          return "図鑑の達人"
+        case .dex12:          return "図鑑12種"
+        case .dexAll:         return "コンプリート"
+        case .fish5:          return "5匹の仲間"
+        case .fish10:         return "10匹の仲間"
+        case .fish25:         return "25匹の仲間"
+        case .fish50:         return "50匹の仲間"
+        case .fish100:        return "100匹の仲間"
+        case .aquariumLv2:    return "小型水槽"
+        case .aquariumMid:    return "中型水槽"
+        case .aquariumLarge:  return "大型水槽"
+        case .aquariumLv5:    return "特大水槽"
+        case .aquariumLv6:    return "アクアリウム"
+        case .aquariumMax:    return "大水族館"
+        case .days7:          return "1週間の旅"
+        case .days30:         return "1か月の旅"
+        case .days100:        return "100日の旅"
+        case .days200:        return "200日の旅"
+        case .days365:        return "1年の旅"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .firstWatering:  return "はじめてオンタイム出発した"
+        case .departures10:   return "累計10しずく獲得した"
+        case .departures25:   return "累計25しずく獲得した"
+        case .departures50:   return "累計50しずく獲得した"
+        case .departures100:  return "累計100しずく獲得した"
+        case .departures200:  return "累計200しずく獲得した"
+        case .departures500:  return "累計500しずく獲得した"
+        case .departures1000: return "累計1000しずく獲得した"
+        case .streak3:        return "3日続けてオンタイム出発した"
+        case .streak7:        return "7日続けてオンタイム出発した"
+        case .streak14:       return "14日続けてオンタイム出発した"
+        case .streak30:       return "30日続けてオンタイム出発した"
+        case .streak60:       return "60日続けてオンタイム出発した"
+        case .streak100:      return "100日続けてオンタイム出発した"
+        case .firstAdult:     return "餌やりで魚を1匹獲得した"
+        case .dex3:           return "図鑑に3種類登録した"
+        case .dex5:           return "図鑑に5種類登録した"
+        case .dex8:           return "図鑑に8種類登録した"
+        case .dex10:          return "図鑑に10種類登録した"
+        case .dex12:          return "図鑑に12種類登録した"
+        case .dexAll:         return "図鑑を全15種コンプリートした"
+        case .fish5:          return "魚を累計5匹獲得した"
+        case .fish10:         return "魚を累計10匹獲得した"
+        case .fish25:         return "魚を累計25匹獲得した"
+        case .fish50:         return "魚を累計50匹獲得した"
+        case .fish100:        return "魚を累計100匹獲得した"
+        case .aquariumLv2:    return "水槽が小型（Lv.2）まで育った"
+        case .aquariumMid:    return "水槽が中型（Lv.3）まで育った"
+        case .aquariumLarge:  return "水槽が大型（Lv.4）まで育った"
+        case .aquariumLv5:    return "水槽が特大（Lv.5）まで育った"
+        case .aquariumLv6:    return "水槽がアクアリウム（Lv.6）まで育った"
+        case .aquariumMax:    return "水槽が大水族館（Lv.7）まで育った"
+        case .days7:          return "アプリを7日間使った"
+        case .days30:         return "アプリを30日間使った"
+        case .days100:        return "アプリを100日間使った"
+        case .days200:        return "アプリを200日間使った"
+        case .days365:        return "アプリを365日間使った"
+        }
+    }
+
+    var emoji: String {
+        switch self {
+        case .firstWatering, .departures10, .departures25: return "💧"
+        case .departures50, .departures100:                 return "💦"
+        case .departures200, .departures500, .departures1000: return "🌊"
+        case .streak3:        return "🔥"
+        case .streak7:        return "⭐️"
+        case .streak14:       return "✨"
+        case .streak30:       return "👑"
+        case .streak60:       return "🏅"
+        case .streak100:      return "🎖️"
+        case .firstAdult:     return "🐟"
+        case .dex3, .dex5:    return "📖"
+        case .dex8, .dex10:   return "📚"
+        case .dex12:          return "🔖"
+        case .dexAll:         return "🏆"
+        case .fish5, .fish10: return "🐠"
+        case .fish25, .fish50: return "🐡"
+        case .fish100:        return "🦈"
+        case .aquariumLv2:    return "🫧"
+        case .aquariumMid:    return "🐠"
+        case .aquariumLarge:  return "🐋"
+        case .aquariumLv5:    return "🪸"
+        case .aquariumLv6:    return "🐬"
+        case .aquariumMax:    return "🐳"
+        case .days7:          return "🌱"
+        case .days30:         return "📅"
+        case .days100:        return "🌸"
+        case .days200:        return "🌺"
+        case .days365:        return "🎂"
+        }
+    }
+
+    var tint: Color { category.tint }
+
+    /// 初回解除時に水槽へ付与される餌の数。
+    var feedReward: Int {
+        switch self {
+        case .firstWatering, .firstAdult: return 1
+        case .departures10, .streak3, .dex3, .fish5, .aquariumLv2, .days7:
+            return 2
+        case .departures25, .streak7, .dex5, .fish10, .aquariumMid, .days30:
+            return 3
+        case .departures50, .streak14, .dex8, .fish25, .aquariumLarge, .days100:
+            return 4
+        case .departures100, .streak30, .dex10, .fish50, .aquariumLv5, .days200:
+            return 5
+        case .departures200, .streak60, .dex12, .aquariumLv6:
+            return 6
+        case .departures500, .streak100, .fish100, .aquariumMax, .days365:
+            return 8
+        case .departures1000, .dexAll:
+            return 10
+        }
+    }
+
+    private var target: Int {
+        switch self {
+        case .firstWatering:  return 1
+        case .departures10:   return 10
+        case .departures25:   return 25
+        case .departures50:   return 50
+        case .departures100:  return 100
+        case .departures200:  return 200
+        case .departures500:  return 500
+        case .departures1000: return 1000
+        case .streak3:        return 3
+        case .streak7:        return 7
+        case .streak14:       return 14
+        case .streak30:       return 30
+        case .streak60:       return 60
+        case .streak100:      return 100
+        case .firstAdult:     return 1
+        case .dex3:           return 3
+        case .dex5:           return 5
+        case .dex8:           return 8
+        case .dex10:          return 10
+        case .dex12:          return 12
+        case .dexAll:         return FishSpecies.allCases.count
+        case .fish5:          return 5
+        case .fish10:         return 10
+        case .fish25:         return 25
+        case .fish50:         return 50
+        case .fish100:        return 100
+        case .aquariumLv2:    return 1
+        case .aquariumMid:    return 2
+        case .aquariumLarge:  return 3
+        case .aquariumLv5:    return 4
+        case .aquariumLv6:    return 5
+        case .aquariumMax:    return 6
+        case .days7:          return 7
+        case .days30:         return 30
+        case .days100:        return 100
+        case .days200:        return 200
+        case .days365:        return 365
+        }
+    }
+
+    private func currentValue(in store: AppDataStore) -> Int {
+        switch category {
+        case .departure:
+            return ProfileStats.onTimeDepartureCount(in: store)
+        case .streak:
+            return ProfileStats.longestOnTimeStreak(in: store.careRecords)
+        case .encyclopedia:
+            if self == .firstAdult {
+                return ProfileStats.totalFishCollected(in: store)
+            }
+            return ProfileStats.discoveredSpeciesCount(in: store)
+        case .fishHerd:
+            return ProfileStats.totalFishCollected(in: store)
+        case .aquarium:
+            return store.aquariums.first?.sizeTier ?? 0
+        case .journey:
+            return ProfileStats.daysSinceStart(in: store)
         }
     }
 
     /// 目標値に対する現在値（達成度表示用）。`(current, target)`。
     func progress(in store: AppDataStore) -> (current: Int, target: Int) {
-        let dexCount = Set(store.collectedFishes.map(\.speciesId)).count
-        let streak = ProfileStats.longestStreak(in: store.careRecords)
-        let cumulativeWater = store.aquariums.first?.totalDepartures ?? 0
-        let tier = store.aquariums.first?.sizeTier ?? 0
-        let adults = store.collectedFishes.count
-
-        switch self {
-        case .firstWatering: return (min(store.careRecords.count, 1), 1)
-        case .firstAdult:    return (min(adults, 1), 1)
-        case .streak3:       return (min(streak, 3), 3)
-        case .streak7:       return (min(streak, 7), 7)
-        case .streak30:      return (min(streak, 30), 30)
-        case .dex5:          return (min(dexCount, 5), 5)
-        case .dex10:         return (min(dexCount, 10), 10)
-        case .dexAll:        return (min(dexCount, FishSpecies.allCases.count), FishSpecies.allCases.count)
-        case .water1000:     return (min(cumulativeWater, 1000), 1000)
-        case .water5000:     return (min(cumulativeWater, 5000), 5000)
-        case .aquariumMid:   return (min(tier, 2), 2)
-        case .aquariumLarge: return (min(tier, 3), 3)
-        }
+        let current = currentValue(in: store)
+        return (min(current, target), target)
     }
 
     func isUnlocked(in store: AppDataStore) -> Bool {
-        let p = progress(in: store)
-        return p.current >= p.target
+        currentValue(in: store) >= target
     }
 
     var progressText: String {
-        // 達成度のラベル。aquarium 系は段階なので個別表記。
         switch self {
-        case .aquariumMid:   return "中型到達"
-        case .aquariumLarge: return "大型到達"
+        case .aquariumLv2:   return "Lv.2到達"
+        case .aquariumMid:   return "Lv.3到達"
+        case .aquariumLarge: return "Lv.4到達"
+        case .aquariumLv5:   return "Lv.5到達"
+        case .aquariumLv6:   return "Lv.6到達"
+        case .aquariumMax:   return "Lv.7到達"
         default:             return ""
         }
     }

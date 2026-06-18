@@ -35,15 +35,6 @@ enum AquariumTheme: String, CaseIterable, Identifiable {
     }
 
     func tankColors(isDark: Bool, isOverdue: Bool) -> (top: Color, middle: Color, bottom: Color, glow: Color) {
-        if isOverdue {
-            return (
-                Color(red: 0.95, green: 0.35, blue: 0.25),
-                Color(red: 0.98, green: 0.24, blue: 0.20),
-                Color(red: 0.70, green: 0.15, blue: 0.10),
-                Color.orange
-            )
-        }
-
         switch self {
         case .dewBlue:
             if isDark {

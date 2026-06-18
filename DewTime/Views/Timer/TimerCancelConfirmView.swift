@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// タイマーキャンセルの確認シート。テキストなし・アイコンとビジュアルのみ。
+/// タイマーキャンセルの確認シート。
 struct TimerCancelConfirmView: View {
     let waterLevel: Double
     let onReset: () -> Void
@@ -15,9 +15,10 @@ struct TimerCancelConfirmView: View {
                 DragHandle()
                     .padding(.bottom, 12)
 
-                Image(systemName: "xmark.circle")
-                    .font(.system(size: 40, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.75))
+                Text("タイマーをキャンセルしますか？")
+                    .font(.title3.weight(.bold))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
 
                 HStack(alignment: .center, spacing: 20) {
                     WaterTankView(waterLevel: waterLevel, cornerRadius: 22)
@@ -37,6 +38,13 @@ struct TimerCancelConfirmView: View {
                 }
                 .padding(.top, 16)
 
+                Text("続けると水が残ります")
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.65))
+                    .padding(.top, 12)
+                    .padding(.horizontal, 24)
+                    .multilineTextAlignment(.center)
+
                 Spacer(minLength: 0)
             }
         }
@@ -47,10 +55,14 @@ struct TimerCancelConfirmView: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     onContinue()
                 } label: {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 56))
-                        .foregroundStyle(Color.dewBlue)
-                        .shadow(color: Color.dewBlue.opacity(0.45), radius: 10, y: 4)
+                    VStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 56))
+                            .foregroundStyle(Color.dewBlue)
+                            .shadow(color: Color.dewBlue.opacity(0.45), radius: 10, y: 4)
+                        Text("続ける")
+                            .font(.caption.weight(.semibold))
+                    }
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("続ける")
@@ -59,10 +71,14 @@ struct TimerCancelConfirmView: View {
                     UINotificationFeedbackGenerator().notificationOccurred(.warning)
                     onReset()
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 56))
-                        .foregroundStyle(.orange)
-                        .shadow(color: Color.orange.opacity(0.35), radius: 10, y: 4)
+                    VStack(spacing: 6) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 56))
+                            .foregroundStyle(.orange)
+                            .shadow(color: Color.orange.opacity(0.35), radius: 10, y: 4)
+                        Text("キャンセル")
+                            .font(.caption.weight(.semibold))
+                    }
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("タイマーをキャンセル")

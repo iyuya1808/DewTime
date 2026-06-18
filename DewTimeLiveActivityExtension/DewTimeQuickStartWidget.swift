@@ -49,16 +49,12 @@ private struct QuickStartTimelineProvider: TimelineProvider {
 
     private var previewState: SharedTimerWidgetState {
         SharedTimerWidgetState(
-            scheduleName: "朝の準備",
+            scheduleName: "DewTime",
             startedAt: .now.addingTimeInterval(-8 * 60),
             targetDepartureTime: .now.addingTimeInterval(22 * 60),
             fishEmoji: "🐟",
             selectedSpeciesName: "メダカ",
-            segments: [
-                .init(id: "1", name: "身支度", startOffset: 0, endOffset: 10 * 60),
-                .init(id: "2", name: "朝ごはん", startOffset: 10 * 60, endOffset: 22 * 60),
-                .init(id: "3", name: "出発準備", startOffset: 22 * 60, endOffset: 30 * 60)
-            ]
+            segments: []
         )
     }
 }
@@ -264,13 +260,6 @@ private struct WidgetAquariumView: View {
     }
 
     private var waterColors: [Color] {
-        if isOverdue {
-            return [
-                Color(red: 0.94, green: 0.42, blue: 0.26),
-                Color(red: 0.72, green: 0.16, blue: 0.12)
-            ]
-        }
-
         if waterLevel > 0.55 {
             return [
                 Color(red: 0.28, green: 0.81, blue: 0.92),
@@ -298,16 +287,12 @@ private struct WidgetAquariumView: View {
     QuickStartEntry(
         date: .now,
         timerState: SharedTimerWidgetState(
-            scheduleName: "朝の準備",
+            scheduleName: "DewTime",
             startedAt: .now.addingTimeInterval(-8 * 60),
             targetDepartureTime: .now.addingTimeInterval(22 * 60),
             fishEmoji: "🐟",
             selectedSpeciesName: "メダカ",
-            segments: [
-                .init(id: "1", name: "身支度", startOffset: 0, endOffset: 10 * 60),
-                .init(id: "2", name: "朝ごはん", startOffset: 10 * 60, endOffset: 22 * 60),
-                .init(id: "3", name: "出発準備", startOffset: 22 * 60, endOffset: 30 * 60)
-            ]
+            segments: []
         )
     )
 }

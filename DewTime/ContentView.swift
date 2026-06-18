@@ -47,6 +47,7 @@ struct ContentView: View {
                     }
             }
         }
+        .environment(\.appTabSelection, $selectedTab)
         .overlay {
             if !hasCompletedTutorial {
                 TutorialOverlayView(

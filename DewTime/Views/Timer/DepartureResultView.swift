@@ -1,223 +1,166 @@
 import SwiftUI
 
 struct DepartureResultView: View {
-    let waterLevel: Double
-    let elapsedFormatted: String
-    let totalSeconds: Int
-    let delaySeconds: Int
-    let scheduleName: String
-    let selectedSpecies: FishSpecies
     let earnedDrop: Bool
-    let departuresAfter: Int
-    let requiredDepartures: Int
-    let growthStage: GrowthStage
-    let completedGrowth: Bool
+    let bonusFeedAwarded: Bool
+    let delaySeconds: Int
     let onDismiss: () -> Void
 
-    @State private var waterFill: Double = 0
+    /// sheet の高さ目安（報酬行数に応じて調整）
+    static func preferredDetentHeight(bonusFeedAwarded: Bool, hasDelay: Bool) -> CGFloat {
+        var height: CGFloat = 318
+        if bonusFeedAwarded { height += 58 }
+        if hasDelay { height += 22 }
+        return height
+    }
 
     var body: some View {
         ZStack {
-            background.ignoresSafeArea()
+            LinearGradient.dewTimeSheet
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 DragHandle()
 
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 24) {
-                        // ヘッダー：成長アイコン群（テキストなし）
-                        HStack(spacing: 20) {
-                            ForEach(GrowthStage.allCases, id: \.self) { stage in
-                                let progress = requiredDepartures > 0
-                                    ? Double(departuresAfter) / Double(requiredDepartures)
-                                    : 0
-                                let reached = stage.thresholdProgress <= progress
-                                Image(systemName: stage.icon)
-                                    .font(.title2)
-                                    .foregroundStyle(reached ? fishColor : .white.opacity(0.20))
-                                    .scaleEffect(stage == growthStage ? 1.35 : 1.0)
-                            }
-                        }
-                        .padding(.top, 24)
-
-                        // 注水演出（ビジュアルとして維持）
-                        PourTransitionView(waterLevel: waterLevel, species: selectedSpecies)
-                            .frame(height: 232)
-
-                        // 残水量ゲージ（数字あり）
-                        VStack(spacing: 10) {
-                            HStack {
-                                Image(systemName: "drop.fill")
-                                    .foregroundStyle(gaugeColors.first ?? .cyan)
-                                    .font(.caption)
-                                Spacer()
-                                Text("\(Int(waterFill * 100))%")
-                                    .font(AppFont.badgeValue)
-                                    .monospacedDigit()
-                                    .contentTransition(.numericText())
-                            }
-
-                            GeometryReader { geo in
-                                ZStack(alignment: .leading) {
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .fill(.white.opacity(0.12))
-                                        .frame(height: 14)
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .fill(
-                                            LinearGradient(
-                                                colors: gaugeColors,
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            )
-                                        )
-                                        .frame(width: geo.size.width * waterFill, height: 14)
-                                        .animation(.easeOut(duration: 1.2).delay(0.2), value: waterFill)
-                                }
-                            }
-                            .frame(height: 14)
-                        }
-                        .padding(.horizontal, 4)
-
-                        // しずく進捗
-                        dropProgressRow
-
-                        // 統計（アイコン + 数字のみ）
-                        statsGrid
-
-                        // 閉じるボタン（魚アイコン）
-                        Button {
-                            onDismiss()
-                        } label: {
-                            Image(systemName: completedGrowth ? "star.circle.fill" : "fish.fill")
-                                .font(.system(size: 52))
-                                .foregroundStyle(
-                                    LinearGradient(colors: gaugeColors, startPoint: .topLeading, endPoint: .bottomTrailing)
-                                )
-                                .shadow(color: gaugeColors.first!.opacity(0.45), radius: 12, y: 4)
-                        }
-                        .padding(.bottom, 16)
-                        .accessibilityLabel("完了")
-                    }
-                    .padding(.horizontal, 24)
+                VStack(spacing: 20) {
+                    statusSection
+                    rewardsSection
+                    doneButton
                 }
+                .padding(.horizontal, 24)
+                .padding(.top, 4)
+                .padding(.bottom, 16)
             }
             .foregroundStyle(.white)
         }
-        .onAppear {
-            if completedGrowth {
-                let generator = UINotificationFeedbackGenerator()
-                generator.prepare()
-                generator.notificationOccurred(.success)
-            } else {
-                let generator = UIImpactFeedbackGenerator(style: .medium)
-                generator.prepare()
-                generator.impactOccurred()
-            }
-
-            withAnimation(.easeOut(duration: 1.2).delay(0.15)) {
-                waterFill = waterLevel
-            }
-        }
+        .safeAreaPadding(.bottom, 8)
+        .onAppear(perform: playFeedback)
     }
 
-    // MARK: - Sub views
+    // MARK: - Sections
 
-    private var dropProgressRow: some View {
-        HStack(spacing: 8) {
-            Image(systemName: earnedDrop ? "drop.fill" : "drop")
-                .font(.title3)
-                .foregroundStyle(earnedDrop ? fishColor : .white.opacity(0.35))
+    private var statusSection: some View {
+        VStack(spacing: 10) {
+            Image(systemName: earnedDrop ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(earnedDrop ? Color.teal : Color.orange)
+                .shadow(color: (earnedDrop ? Color.teal : Color.orange).opacity(0.4), radius: 12, y: 4)
 
-            HStack(spacing: 4) {
-                ForEach(0..<max(1, requiredDepartures), id: \.self) { index in
-                    Image(systemName: index < departuresAfter ? "drop.fill" : "drop")
-                        .font(.system(size: 12))
-                        .foregroundStyle(index < departuresAfter ? fishColor : .white.opacity(0.22))
-                }
+            Text(earnedDrop ? "いってきます！" : "遅刻してしまいました")
+                .font(.title3.weight(.bold))
+
+            if delaySeconds > 0 {
+                Text("\(delayMinutesText)遅れ")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.orange)
+            }
+        }
+        .multilineTextAlignment(.center)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var rewardsSection: some View {
+        VStack(spacing: 10) {
+            rewardRow(
+                icon: earnedDrop ? "drop.fill" : "drop",
+                title: earnedDrop ? "しずく +1" : "しずくなし",
+                subtitle: earnedDrop ? "オンタイム出発" : "次回は時間内に出発しましょう",
+                tint: earnedDrop ? .cyan : .orange
+            )
+
+            if bonusFeedAwarded {
+                rewardRow(
+                    icon: FeedIcon.systemName,
+                    title: "餌 +1",
+                    subtitle: "水槽タブで使えます",
+                    tint: .yellow
+                )
+            }
+        }
+        .padding(16)
+        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    private func rewardRow(icon: String, title: String, subtitle: String, tint: Color) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(tint)
+                .frame(width: 28)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.body.weight(.semibold))
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.55))
             }
 
             Spacer()
-
-            Text("\(departuresAfter)/\(requiredDepartures)")
-                .font(AppFont.badgeValue)
-                .monospacedDigit()
-                .foregroundStyle(fishColor)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
-        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .accessibilityLabel("\(departuresAfter)/\(requiredDepartures)しずく")
-    }
-
-    private var statsGrid: some View {
-        HStack(spacing: 12) {
-            statCard(
-                icon: "clock.fill",
-                value: elapsedFormatted,
-                color: .cyan
-            )
-            statCard(
-                icon: "calendar.badge.clock",
-                value: plannedFormatted,
-                color: .indigo
-            )
-            statCard(
-                icon: delaySeconds > 0 ? "tortoise.fill" : "hare.fill",
-                value: delaySeconds > 0 ? "+\(delaySeconds / 60):\(String(format: "%02d", delaySeconds % 60))" : "✓",
-                color: delaySeconds > 0 ? .orange : .green
-            )
         }
     }
 
-    private func statCard(icon: String, value: String, color: Color) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon)
-                .foregroundStyle(color)
-                .font(.title3)
-            Text(value)
-                .font(AppFont.statValue)
-                .monospacedDigit()
-                .minimumScaleFactor(0.6)
-                .lineLimit(1)
+    private var doneButton: some View {
+        Button(action: onDismiss) {
+            Text("完了")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    LinearGradient(
+                        colors: earnedDrop ? [.teal, .cyan] : [.orange, .yellow.opacity(0.85)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .accessibilityLabel("完了")
     }
 
     // MARK: - Helpers
 
-    private var plannedFormatted: String {
-        let m = totalSeconds / 60
-        let s = totalSeconds % 60
-        return s == 0 ? "\(m)'" : String(format: "%d:%02d", m, s)
+    private var delayMinutesText: String {
+        let minutes = max(1, Int(ceil(Double(delaySeconds) / 60.0)))
+        return "\(minutes)分"
     }
 
-    private var theme: WaterLevelTheme { WaterLevelTheme(waterRatio: waterLevel) }
-    private var gaugeColors: [Color] { theme.gradientColors }
-    private var fishColor: Color { completedGrowth ? theme.tintColor : .orange }
-
-    private var background: some View { LinearGradient.dewTimeSheet }
+    private func playFeedback() {
+        guard AppPreferences.hapticsEnabled else { return }
+        if earnedDrop {
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } else {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }
+    }
 }
 
-#Preview {
+#Preview("オンタイム") {
     Color.black.ignoresSafeArea()
         .sheet(isPresented: .constant(true)) {
             DepartureResultView(
-                waterLevel: 0.72,
-                elapsedFormatted: "18:34",
-                totalSeconds: 1320,
-                delaySeconds: 0,
-                scheduleName: "平日通常モード",
-                selectedSpecies: .dolphin,
                 earnedDrop: true,
-                departuresAfter: 5,
-                requiredDepartures: 5,
-                growthStage: .adult,
-                completedGrowth: true,
+                bonusFeedAwarded: true,
+                delaySeconds: 0,
                 onDismiss: {}
             )
-            .presentationDetents([.large])
-            .presentationBackground(.clear)
+            .presentationDetents([
+                .height(DepartureResultView.preferredDetentHeight(bonusFeedAwarded: true, hasDelay: false))
+            ])
+        }
+}
+
+#Preview("遅刻") {
+    Color.black.ignoresSafeArea()
+        .sheet(isPresented: .constant(true)) {
+            DepartureResultView(
+                earnedDrop: false,
+                bonusFeedAwarded: false,
+                delaySeconds: 185,
+                onDismiss: {}
+            )
+            .presentationDetents([
+                .height(DepartureResultView.preferredDetentHeight(bonusFeedAwarded: false, hasDelay: true))
+            ])
         }
 }

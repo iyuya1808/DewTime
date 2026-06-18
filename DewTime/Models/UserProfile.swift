@@ -15,17 +15,21 @@ final class UserProfile: Identifiable {
     var avatarEmoji: String
     /// アプリを使い始めた日（「◯日目」の起点）。
     var createdAt: Date
+    /// 実績報酬（餌）を受け取り済みの実績 ID。
+    var claimedAchievementRewardIds: [String]
 
     init(
         id: UUID = UUID(),
         nickname: String = "あなた",
         avatarEmoji: String = "🐟",
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        claimedAchievementRewardIds: [String] = []
     ) {
         self.id = id
         self.nickname = nickname
         self.avatarEmoji = avatarEmoji
         self.createdAt = createdAt
+        self.claimedAchievementRewardIds = claimedAchievementRewardIds
     }
 
     /// 利用開始からの経過日数（1 始まり。初日を「1日目」とする）。

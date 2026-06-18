@@ -10,42 +10,80 @@ struct NotificationSettingsView: View {
     @State private var authorizationStatus: UNAuthorizationStatus = .notDetermined
 
     var body: some View {
-        List {
-            Section {
-                Toggle("通知を使う", isOn: $notificationsEnabled)
+        ScrollView {
+            VStack(spacing: 20) {
+                NotificationAuthorizationBanner(status: authorizationStatus)
 
-                Toggle("出発前にリマインド", isOn: $departureReminderEnabled)
-                    .disabled(!notificationsEnabled)
+                SettingsCard {
+                    VStack(alignment: .leading, spacing: 16) {
+                        SettingsSectionHeader(
+                            title: "通知",
+                            caption: "タイマー開始時に出発通知を予約します",
+                            systemImage: "bell.fill",
+                            tint: .orange
+                        )
 
-                Picker("リマインド", selection: $departureReminderMinutes) {
-                    ForEach(AppPreferences.reminderMinuteOptions, id: \.self) { minutes in
-                        Text("\(minutes)分前").tag(minutes)
+                        SettingsToggleRow(
+                            title: "通知を使う",
+                            subtitle: "オフにすると出発通知を送りません",
+                            isOn: $notificationsEnabled
+                        )
+
+                        Divider()
+
+                        SettingsToggleRow(
+                            title: "出発前にリマインド",
+                            subtitle: "出発時刻の前にもう一度お知らせします",
+                            isOn: $departureReminderEnabled,
+                            isDisabled: !notificationsEnabled
+                        )
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("リマインドのタイミング")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+
+                            Picker("リマインド", selection: $departureReminderMinutes) {
+                                ForEach(AppPreferences.reminderMinuteOptions, id: \.self) { minutes in
+                                    Text("\(minutes)分前").tag(minutes)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .disabled(!notificationsEnabled || !departureReminderEnabled)
+                        }
+
+                        SettingsPrimaryButton(
+                            title: "通知許可を確認",
+                            systemImage: "bell.badge.fill",
+                            tint: .orange
+                        ) {
+                            requestNotificationPermission()
+                        }
                     }
                 }
-                .disabled(!notificationsEnabled || !departureReminderEnabled)
 
-                Button {
-                    requestNotificationPermission()
-                } label: {
-                    Label("通知許可を確認", systemImage: "bell.badge")
+                SettingsCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        SettingsSectionHeader(
+                            title: "触覚（ハプティクス）",
+                            caption: "タスク切り替えや操作時の振動フィードバック",
+                            systemImage: "hand.tap.fill",
+                            tint: .teal
+                        )
+
+                        SettingsToggleRow(
+                            title: "ハプティクスを使う",
+                            isOn: $hapticsEnabled
+                        )
+                    }
                 }
-            } header: {
-                Text("通知")
-            } footer: {
-                Text(notificationFooterText)
             }
-            .listRowBackground(Color.dewListRowBackground)
-
-            Section {
-                Toggle("ハプティクス", isOn: $hapticsEnabled)
-            } footer: {
-                Text("タスク切り替えや遅延時の触覚フィードバックを切り替えます。")
-            }
-            .listRowBackground(Color.dewListRowBackground)
+            .padding(.horizontal)
+            .padding(.top, 12)
+            .padding(.bottom, 32)
         }
         .navigationTitle("通知と触覚")
         .navigationBarTitleDisplayMode(.inline)
-        .scrollContentBackground(.hidden)
         .dewAppBackground()
         .task {
             await refreshAuthorizationStatus()
@@ -54,19 +92,6 @@ struct NotificationSettingsView: View {
             if !AppPreferences.reminderMinuteOptions.contains(newValue) {
                 departureReminderMinutes = 5
             }
-        }
-    }
-
-    private var notificationFooterText: String {
-        switch authorizationStatus {
-        case .authorized, .provisional, .ephemeral:
-            return notificationsEnabled ? "タイマー開始時に出発通知を予約します。" : "アプリ内設定で通知がオフです。"
-        case .denied:
-            return "iOSの設定で通知が許可されていません。必要な場合は設定アプリから許可してください。"
-        case .notDetermined:
-            return "通知許可を確認すると、出発時刻の通知を使えるようになります。"
-        @unknown default:
-            return "通知状態を確認できませんでした。"
         }
     }
 

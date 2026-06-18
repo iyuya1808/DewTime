@@ -8,16 +8,21 @@ struct SluiceGateStartButton: View {
 
     var body: some View {
         Button { handleTap() } label: {
-            Image(systemName: "drop.fill")
-                .font(.system(size: 40, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 88, height: 88)
-                .background(Color.dewBlue, in: Circle())
-                .scaleEffect(isPressed ? 0.92 : 1.0)
+            VStack(spacing: 8) {
+                Image(systemName: "drop.fill")
+                    .font(.system(size: 40, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 88, height: 88)
+                    .background(Color.dewBlue, in: Circle())
+                Text("スタート")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+            .scaleEffect(isPressed ? 0.92 : 1.0)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("起きる")
-        .accessibilityHint("タップして起きる")
+        .accessibilityLabel("スタート")
+        .accessibilityHint("タップしてスタート")
         .accessibilityAddTraits(.isButton)
     }
 

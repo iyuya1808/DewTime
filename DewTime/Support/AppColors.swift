@@ -46,13 +46,6 @@ extension Color {
         light: UIColor(white: 1, alpha: 0.60),
         dark: UIColor(red: 0.08, green: 0.16, blue: 0.20, alpha: 0.72)
     )
-
-    // MARK: - Routine task color palette
-    static let routinePalette: [Color] = [
-        Color(hex: "#4FC3F7"), Color(hex: "#81D4FA"), Color(hex: "#FFB74D"),
-        Color(hex: "#FFCC80"), Color(hex: "#A5D6A7"), Color(hex: "#CE93D8"),
-        Color(hex: "#F48FB1"), Color(hex: "#9FA8DA")
-    ]
 }
 
 struct DewAppBackgroundModifier: ViewModifier {

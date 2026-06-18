@@ -3,6 +3,9 @@ import Observation
 
 @Observable
 final class FishCareRecord: Identifiable {
+    /// 旧魚育成ログと区別するマーカー（新システムの出発記録）。
+    static let departureLogMarker = "departure"
+
     var id: UUID
     var speciesId: String
     var recordedAt: Date
@@ -31,6 +34,15 @@ final class FishCareRecord: Identifiable {
 
     var species: FishSpecies {
         FishSpecies(rawValue: speciesId) ?? .medaka
+    }
+
+    var isDepartureLog: Bool {
+        speciesId == Self.departureLogMarker
+    }
+
+    /// オンタイム出発時の餌付与フラグとして使う。
+    var bonusFeedAwarded: Bool {
+        completedGrowth
     }
 
     var growthStage: GrowthStage {

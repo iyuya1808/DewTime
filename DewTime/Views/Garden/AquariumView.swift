@@ -4,7 +4,9 @@ struct FishCareDetailSheet: View {
     let record: FishCareRecord
     @Environment(\.colorScheme) private var colorScheme
 
-    private var requiredDepartures: Int { record.species.requiredDepartures }
+    private var aquarium: Aquarium {
+        Aquarium(totalDepartures: record.departuresAfter)
+    }
 
     var body: some View {
         ZStack {
@@ -23,19 +25,23 @@ struct FishCareDetailSheet: View {
                         Circle()
                             .fill(recordColor.opacity(0.16))
                             .frame(width: 112, height: 112)
-                        if record.completedGrowth {
-                            FishArtworkView(species: record.species)
-                                .frame(width: 82, height: 76)
-                        } else {
-                            Image(systemName: record.growthStage.icon)
-                                .font(.system(size: 58, weight: .semibold))
-                                .foregroundStyle(recordColor)
-                                .symbolRenderingMode(.hierarchical)
-                        }
+                        Image(systemName: record.earnedDrop ? "drop.fill" : "exclamationmark.triangle.fill")
+                            .font(.system(size: 52, weight: .semibold))
+                            .foregroundStyle(recordColor)
                     }
-                    .accessibilityHidden(true)
 
-                    growthTimeline
+                    Text(record.earnedDrop ? "オンタイム出発" : "遅延あり")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(recordColor)
+
+                    HStack(spacing: 12) {
+                        Image(systemName: aquarium.isMaxTier ? "sparkles" : "drop.fill")
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(aquarium.isMaxTier ? .yellow : .cyan)
+                        Text("Lv.\(aquarium.sizeTier + 1)")
+                            .font(.title2.weight(.bold))
+                            .monospacedDigit()
+                    }
 
                     Text(record.recordedAt, format: .dateTime.year().month().day().hour().minute())
                         .font(.caption)
@@ -44,19 +50,21 @@ struct FishCareDetailSheet: View {
 
                     HStack(spacing: 10) {
                         metric(
-                            icon: "drop.fill",
+                            icon: record.earnedDrop ? "drop.fill" : "drop",
                             value: record.earnedDrop ? "+1" : "0",
                             caption: "しずく",
                             tint: .cyan,
                             accessibilityLabel: record.earnedDrop ? "今回 しずく1" : "今回 しずく0"
                         )
-                        metric(
-                            icon: "drop.fill",
-                            value: "\(record.departuresAfter)/\(requiredDepartures)",
-                            caption: "ごうけい",
-                            tint: recordColor,
-                            accessibilityLabel: "合計 \(record.departuresAfter)しずく、必要 \(requiredDepartures)しずく"
-                        )
+                        if record.bonusFeedAwarded {
+                            metric(
+                                icon: FeedIcon.systemName,
+                                value: "+1",
+                                caption: "餌",
+                                tint: .orange,
+                                accessibilityLabel: "餌を1個獲得"
+                            )
+                        }
                     }
                     .padding(.bottom, 24)
                 }
@@ -66,46 +74,6 @@ struct FishCareDetailSheet: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(detailAccessibilityLabel)
-    }
-
-    private var growthTimeline: some View {
-        HStack(spacing: 0) {
-            ForEach(Array(GrowthStage.allCases.enumerated()), id: \.element) { index, stage in
-                let progress = requiredDepartures > 0
-                    ? Double(record.departuresAfter) / Double(requiredDepartures)
-                    : 0
-                let reached = stage.thresholdProgress <= progress
-
-                if index > 0 {
-                    Rectangle()
-                        .fill(reached ? recordColor.opacity(0.7) : Color.secondary.opacity(0.2))
-                        .frame(height: 3)
-                        .frame(maxWidth: .infinity)
-                }
-
-                VStack(spacing: 2) {
-                    Image(systemName: stage.icon)
-                        .font(.system(size: stage == record.growthStage ? 24 : 20, weight: .semibold))
-                        .foregroundStyle(reached ? recordColor : Color.secondary.opacity(0.35))
-                        .scaleEffect(stage == record.growthStage ? 1.12 : 1.0)
-                        .frame(width: 40, height: 40)
-                        .background(
-                            Circle()
-                                .fill(stage == record.growthStage ? recordColor.opacity(0.16) : Color.secondary.opacity(0.08))
-                        )
-
-                    if stage == record.growthStage {
-                        Text(stage.displayNameHiragana)
-                            .font(.system(size: 9, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .accessibilityLabel(stage.displayName)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 12)
-        .background(Color.dewSurface.opacity(0.65), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func metric(icon: String, value: String, caption: String, tint: Color, accessibilityLabel: String) -> some View {
@@ -131,12 +99,12 @@ struct FishCareDetailSheet: View {
 
     private var detailAccessibilityLabel: String {
         let dateText = record.recordedAt.formatted(.dateTime.year().month().day().hour().minute())
-        let stageText = record.completedGrowth ? "\(record.species.displayName)が成魚" : record.growthStage.displayName
         let dropText = record.earnedDrop ? "しずく1獲得" : "しずくなし"
-        return "\(dateText)、\(stageText)、\(dropText)、\(record.departuresAfter)/\(requiredDepartures)しずく"
+        let bonusText = record.bonusFeedAwarded ? "餌1個" : ""
+        return "\(dateText)、\(dropText)\(bonusText.isEmpty ? "" : "、\(bonusText)")"
     }
 
     private var recordColor: Color {
-        record.completedGrowth ? WaterLevelTheme(waterRatio: 1).tintColor : .orange
+        record.earnedDrop ? WaterLevelTheme(waterRatio: 1).tintColor : .orange
     }
 }

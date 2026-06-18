@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## プロジェクト概要
 
-**DewTime** は iOS 17+ 向けの朝タイマーアプリ。出発時刻までの時間を「水タンク」で可視化し、出発時に残った水が水槽へ注がれて魚が成長する。詳細な UX 仕様は `SPEC.md`・`wireframe.html` を参照。ただし `SPEC.md` は SwiftData と記載しているが**実装は Supabase Auth + Database に移行済み**。仕様書と実装が食い違う場合はコードを正とする。
+**DewTime** は iOS 17+ 向けの朝タイマーアプリ。出発時刻までの時間を「水タンク」で可視化し、出発時に残った水が水槽へ注がれて魚が成長する。詳細な UX 仕様は `SPEC.md`・`wireframe.html` を参照。ただし `SPEC.md` は SwiftData と記載しているが**実装は Supabase Auth + Database に移行済み**。`wireframe.html` には旧「出発スケジュール」「ルーティン編集」「StartSheet」の画面が残っているが**実装からは削除済み**。仕様書と実装が食い違う場合はコードを正とする。
 
 ## ビルド・実行
 
@@ -28,26 +28,26 @@ LSP は `buildServer.json`（xcode-build-server）が提供。ローカル絶対
 `Support/AppDataStore.swift` の `@Observable @MainActor final class AppDataStore` が唯一の真実。
 
 - `DewTimeApp` が `@State` で生成し `.environment(dataStore)` で全画面注入、起動時に `dataStore.load()`。
-- 全データはメモリ上の配列（`schedules`, `activeFishes`, `collectedFishes`, `careRecords`, `aquariums`, `profiles`）。`@Model` は一切使わない。
+- 全データはメモリ上の配列（`activeFishes`, `collectedFishes`, `careRecords`, `aquariums`, `profiles`）。`@Model` は一切使わない。
 - 変更操作は必ず最後に `saveAll()` を呼ぶ。Supabase への保存は差分でなく**全置換**。
 - クラウド ↔ モデル変換は `CloudSnapshot` 系 DTO と `makeCloudSnapshot/applyCloudSnapshot` で行う。**モデルにフィールドを追加したら DTO・SQL・変換・ローカル encode/decode の4箇所を更新する。**
-- Supabase マイグレーション: `supabase/migrations/202606040001_create_cloud_data_tables.sql` を Supabase 側で実行済みが前提。全テーブルに `user_id = auth.uid()` の RLS あり。
+- Supabase マイグレーション: `supabase/migrations/202606040001_create_cloud_data_tables.sql` を Supabase 側で実行済みが前提。`user_schedules` / `routine_items` は `202606210001_drop_schedule_tables.sql` で削除済み。全テーブルに `user_id = auth.uid()` の RLS あり。
 
 ### 画面構成
 
 ```
 ContentView（TabView: timer / collection / aquarium / profile）
-├── TimerView — WaterTankView、StartSheet、DepartureConfirmView、DepartureResultView
+├── TimerView — WaterTankView（スワイプで時間設定）、DepartureResultView
 ├── CollectionView（Views/Garden/）— 図鑑、FishDetailSheet
 ├── LiveAquariumView（Views/Garden/）— 育成中の魚が泳ぐライブシーン
-└── ProfileView（Views/Settings/）— スケジュール・ルーティン編集
+└── ProfileView（Views/Settings/）— プロフィール・設定（SettingsView）
 ```
 
 > `Views/Garden/` というディレクトリ名は旧「ガーデン」由来で、魚・水槽系ビューが入っている。
 
 ### TimerViewModel
 
-`AppDataStore` を保持せず、`depart(store:)` などメソッド引数で受け取り委譲する。タイマー状態は `UserDefaults`（`PKey` enum）に保存してアプリ再起動時に `restoreState()` で復元。`WaterTankView` は `TimelineView` + `Canvas` で60fps描画。
+`AppDataStore` を保持せず、`depart(store:)` などメソッド引数で受け取り委譲する。出発時刻はセッション内の `targetDepartureTime` で管理（設定画面での事前登録はなし）。タイマー状態は `UserDefaults`（`PKey` enum）に保存してアプリ再起動時に `restoreState()` で復元。`WaterTankView` は `TimelineView` + `Canvas` で60fps描画。
 
 ### Live Activity / Widget
 

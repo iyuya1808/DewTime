@@ -22,7 +22,7 @@ struct DewTimeLiveActivity: Widget {
                     ExpandedTankView(context: context)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    ExpandedFishView(state: context.state)
+                    ExpandedAquariumView(state: context.state)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     ExpandedTaskView(context: context)
@@ -62,8 +62,7 @@ private struct LockScreenLiveActivityView: View {
         HStack(spacing: 14) {
             TankPreviewView(
                 waterLevel: isDeparted ? 0 : context.state.waterLevel,
-                segments: context.attributes.segments,
-                fishEmoji: context.state.fishEmoji
+                segments: context.attributes.segments
             )
             .frame(width: 82, height: 92)
 
@@ -107,23 +106,29 @@ private struct LockScreenLiveActivityView: View {
 
                 WaterMeterView(
                     waterLevel: isDeparted ? 0 : context.state.waterLevel,
-                    projectedDepartures: context.state.projectedDepartures,
-                    requiredDepartures: context.state.requiredDepartures
+                    aquariumDepartures: context.state.aquariumDepartures,
+                    aquariumTier: context.state.aquariumTier
                 )
 
                 HStack(spacing: 10) {
-                    FishPreviewBadge(state: context.state)
+                    AquariumPreviewBadge(state: context.state)
                         .scaleEffect(isDeparted ? 1.18 : 1.0)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("\(context.state.selectedSpeciesName) / \(context.state.growthStageName)")
+                        Text("Lv.\(context.state.tierDisplayNumber) \(context.state.aquariumTierName)")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.white)
                             .lineLimit(1)
                             .minimumScaleFactor(0.78)
-                        Text("\(context.state.projectedDepartures) / \(context.state.requiredDepartures) 💧")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.white.opacity(0.64))
+                        HStack(spacing: 6) {
+                            Text("\(context.state.aquariumDepartures) 💧")
+                                .font(.caption.monospacedDigit())
+                            if context.state.bonusFeedStock > 0 {
+                                Text("●\(context.state.bonusFeedStock)")
+                                    .font(.caption.monospacedDigit())
+                            }
+                        }
+                        .foregroundStyle(.white.opacity(0.64))
                     }
 
                     Spacer()
@@ -146,8 +151,7 @@ private struct ExpandedTankView: View {
         VStack(alignment: .leading, spacing: 6) {
             TankPreviewView(
                 waterLevel: isDeparted ? 0 : context.state.waterLevel,
-                segments: context.attributes.segments,
-                fishEmoji: context.state.fishEmoji
+                segments: context.attributes.segments
             )
             .frame(width: 66, height: 72)
             Text(isDeparted ? "注水完了" : "\(context.state.waterPercent)%")
@@ -158,22 +162,23 @@ private struct ExpandedTankView: View {
     }
 }
 
-private struct ExpandedFishView: View {
+private struct ExpandedAquariumView: View {
     let state: DewTimerActivityAttributes.ContentState
 
     private var isDeparted: Bool { state.status == .departed }
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 5) {
-            Text(state.fishEmoji)
+            Image(systemName: state.aquariumTier >= 6 ? "sparkles" : "drop.fill")
                 .font(.title)
+                .foregroundStyle(state.aquariumTier >= 6 ? .yellow : .cyan)
                 .scaleEffect(isDeparted ? 1.3 : 1.0)
-            Text(state.growthStageName)
+            Text("Lv.\(state.tierDisplayNumber)")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.82))
-            ProgressView(value: state.growthProgress)
-                .tint(.mint)
-                .frame(width: 78)
+            Text("\(state.aquariumDepartures)💧")
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.white.opacity(0.7))
         }
         .animation(.spring(response: 0.5, dampingFraction: 0.6), value: state.status)
     }
@@ -205,8 +210,8 @@ private struct ExpandedTaskView: View {
 
             WaterMeterView(
                 waterLevel: isDeparted ? 0 : context.state.waterLevel,
-                projectedDepartures: context.state.projectedDepartures,
-                requiredDepartures: context.state.requiredDepartures,
+                aquariumDepartures: context.state.aquariumDepartures,
+                aquariumTier: context.state.aquariumTier,
                 isCompact: true
             )
 
@@ -225,7 +230,6 @@ private struct ExpandedTaskView: View {
 private struct TankPreviewView: View {
     var waterLevel: Double
     var segments: [DewTimerActivityAttributes.RoutineSegment]
-    var fishEmoji: String
 
     var body: some View {
         GeometryReader { proxy in
@@ -268,9 +272,11 @@ private struct TankPreviewView: View {
                 TaskStripeView(segments: segments)
                     .padding(.horizontal, 8)
                     .padding(.bottom, 7)
+                    .opacity(segments.isEmpty ? 0 : 1)
 
-                Text(fishEmoji)
-                    .font(.system(size: min(size.width, size.height) * 0.26))
+                Image(systemName: "drop.fill")
+                    .font(.system(size: min(size.width, size.height) * 0.22))
+                    .foregroundStyle(.cyan.opacity(0.8))
                     .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
                     .offset(y: -max(12, waterHeight * 0.46))
 
@@ -284,8 +290,8 @@ private struct TankPreviewView: View {
 
 private struct WaterMeterView: View {
     var waterLevel: Double
-    var projectedDepartures: Int
-    var requiredDepartures: Int
+    var aquariumDepartures: Int
+    var aquariumTier: Int
     var isCompact: Bool = false
 
     var body: some View {
@@ -297,7 +303,7 @@ private struct WaterMeterView: View {
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(.white.opacity(0.58))
                 Spacer(minLength: 8)
-                Text("\(projectedDepartures)/\(requiredDepartures)")
+                Text("Lv.\(aquariumTier + 1) · \(aquariumDepartures)")
                     .font(.caption2.monospacedDigit().weight(.semibold))
                     .foregroundStyle(.white.opacity(0.74))
                     .lineLimit(1)
@@ -322,33 +328,33 @@ private struct TaskStripeView: View {
     var segments: [DewTimerActivityAttributes.RoutineSegment]
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(segments.prefix(5)) { segment in
-                Capsule()
-                    .fill(Color(hex: segment.colorHex).opacity(0.9))
+        if segments.isEmpty {
+            EmptyView()
+        } else {
+            HStack(spacing: 2) {
+                ForEach(segments.prefix(5)) { segment in
+                    Capsule()
+                        .fill(Color(hex: segment.colorHex).opacity(0.9))
+                }
             }
+            .frame(height: 5)
         }
-        .frame(height: 5)
     }
 }
 
-private struct FishPreviewBadge: View {
+private struct AquariumPreviewBadge: View {
     let state: DewTimerActivityAttributes.ContentState
 
     var body: some View {
         ZStack {
             Circle()
                 .fill(.white.opacity(0.12))
-            Text(state.fishEmoji)
-                .font(.title2)
+            Image(systemName: state.aquariumTier >= 6 ? "sparkles" : "drop.fill")
+                .font(.title3.weight(.bold))
+                .foregroundStyle(state.aquariumTier >= 6 ? .yellow : .cyan)
         }
         .frame(width: 46, height: 46)
     }
-}
-
-private func shortTaskName(_ name: String) -> String {
-    guard name.count > 3 else { return name }
-    return String(name.prefix(3))
 }
 
 private func compactStatusText(_ state: DewTimerActivityAttributes.ContentState) -> String {
@@ -360,8 +366,7 @@ private func compactStatusText(_ state: DewTimerActivityAttributes.ContentState)
     case .cancelled:
         return "💧"
     case .running:
-        // 現時点の予測で成魚に届くなら ✨、それ以外は順調を表す 🐟。
-        return state.growthProgress >= 1.0 ? "✨" : "🐟"
+        return state.bonusFeedStock > 0 ? "●" : "💧"
     }
 }
 

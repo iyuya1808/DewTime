@@ -23,8 +23,6 @@ protocol CloudDataServicing {
 }
 
 struct CloudSnapshot: Equatable {
-    var schedules: [CloudSchedule]
-    var routineItems: [CloudRoutineItem]
     var activeFishes: [CloudActiveFish]
     var collectedFishes: [CloudCollectedFish]
     var careRecords: [CloudCareRecord]
@@ -32,16 +30,12 @@ struct CloudSnapshot: Equatable {
     var profiles: [CloudProfile]
 
     init(
-        schedules: [CloudSchedule] = [],
-        routineItems: [CloudRoutineItem] = [],
         activeFishes: [CloudActiveFish] = [],
         collectedFishes: [CloudCollectedFish] = [],
         careRecords: [CloudCareRecord] = [],
         aquariums: [CloudAquarium] = [],
         profiles: [CloudProfile] = []
     ) {
-        self.schedules = schedules
-        self.routineItems = routineItems
         self.activeFishes = activeFishes
         self.collectedFishes = collectedFishes
         self.careRecords = careRecords
@@ -50,57 +44,11 @@ struct CloudSnapshot: Equatable {
     }
 
     var isEmpty: Bool {
-        schedules.isEmpty
-            && routineItems.isEmpty
-            && activeFishes.isEmpty
+        activeFishes.isEmpty
             && collectedFishes.isEmpty
             && careRecords.isEmpty
             && aquariums.isEmpty
             && profiles.isEmpty
-    }
-}
-
-struct CloudSchedule: Codable, Equatable, Identifiable {
-    var id: UUID
-    var userId: UUID
-    var name: String
-    var targetDepartureTime: Date
-    var isActive: Bool
-    var createdAt: Date
-    var updatedAt: Date
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case userId = "user_id"
-        case name
-        case targetDepartureTime = "target_departure_time"
-        case isActive = "is_active"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
-    }
-}
-
-struct CloudRoutineItem: Codable, Equatable, Identifiable {
-    var id: UUID
-    var userId: UUID
-    var scheduleId: UUID
-    var name: String
-    var durationSeconds: Int
-    var colorHex: String
-    var orderIndex: Int
-    var createdAt: Date
-    var updatedAt: Date
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case userId = "user_id"
-        case scheduleId = "schedule_id"
-        case name
-        case durationSeconds = "duration_seconds"
-        case colorHex = "color_hex"
-        case orderIndex = "order_index"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
     }
 }
 
@@ -184,6 +132,7 @@ struct CloudAquarium: Codable, Equatable, Identifiable {
     var id: UUID
     var userId: UUID
     var totalDepartures: Int
+    var bonusFeedStock: Int
     var createdAt: Date
     var updatedAt: Date
 
@@ -191,6 +140,7 @@ struct CloudAquarium: Codable, Equatable, Identifiable {
         case id
         case userId = "user_id"
         case totalDepartures = "total_departures"
+        case bonusFeedStock = "bonus_feed_stock"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -201,6 +151,7 @@ struct CloudProfile: Codable, Equatable, Identifiable {
     var userId: UUID
     var nickname: String
     var avatarEmoji: String
+    var claimedAchievementRewardIds: [String]
     var createdAt: Date
     var updatedAt: Date
 
@@ -209,8 +160,38 @@ struct CloudProfile: Codable, Equatable, Identifiable {
         case userId = "user_id"
         case nickname
         case avatarEmoji = "avatar_emoji"
+        case claimedAchievementRewardIds = "claimed_achievement_reward_ids"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+    }
+
+    init(
+        id: UUID,
+        userId: UUID,
+        nickname: String,
+        avatarEmoji: String,
+        claimedAchievementRewardIds: [String] = [],
+        createdAt: Date,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.userId = userId
+        self.nickname = nickname
+        self.avatarEmoji = avatarEmoji
+        self.claimedAchievementRewardIds = claimedAchievementRewardIds
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        userId = try container.decode(UUID.self, forKey: .userId)
+        nickname = try container.decode(String.self, forKey: .nickname)
+        avatarEmoji = try container.decode(String.self, forKey: .avatarEmoji)
+        claimedAchievementRewardIds = try container.decodeIfPresent([String].self, forKey: .claimedAchievementRewardIds) ?? []
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
     }
 }
 
@@ -243,8 +224,6 @@ final class SupabaseDataService: CloudDataServicing {
     }
 
     func loadAll(userId: UUID) async throws -> CloudSnapshot {
-        let schedules: [CloudSchedule] = try await select("user_schedules", userId: userId)
-        let routineItems: [CloudRoutineItem] = try await select("routine_items", userId: userId)
         let activeFishes: [CloudActiveFish] = try await select("active_fishes", userId: userId)
         let collectedFishes: [CloudCollectedFish] = try await select("collected_fishes", userId: userId)
         let careRecords: [CloudCareRecord] = try await select("fish_care_records", userId: userId)
@@ -252,8 +231,6 @@ final class SupabaseDataService: CloudDataServicing {
         let profiles: [CloudProfile] = try await select("user_profiles", userId: userId)
 
         return CloudSnapshot(
-            schedules: schedules.sorted { $0.name < $1.name },
-            routineItems: routineItems.sorted { $0.orderIndex < $1.orderIndex },
             activeFishes: activeFishes.sorted { $0.startedAt > $1.startedAt },
             collectedFishes: collectedFishes.sorted { $0.recordedAt > $1.recordedAt },
             careRecords: careRecords.sorted { $0.recordedAt > $1.recordedAt },
@@ -264,8 +241,6 @@ final class SupabaseDataService: CloudDataServicing {
 
     func saveAll(snapshot: CloudSnapshot, userId: UUID) async throws {
         try await deleteAll(userId: userId)
-        try await upsert("user_schedules", values: snapshot.schedules)
-        try await upsert("routine_items", values: snapshot.routineItems)
         try await upsert("active_fishes", values: snapshot.activeFishes)
         try await upsert("collected_fishes", values: snapshot.collectedFishes)
         try await upsert("fish_care_records", values: snapshot.careRecords)
@@ -281,13 +256,11 @@ final class SupabaseDataService: CloudDataServicing {
     }
 
     func deleteAll(userId: UUID) async throws {
-        try await delete("routine_items", userId: userId)
         try await delete("fish_care_records", userId: userId)
         try await delete("collected_fishes", userId: userId)
         try await delete("active_fishes", userId: userId)
         try await delete("aquariums", userId: userId)
         try await delete("user_profiles", userId: userId)
-        try await delete("user_schedules", userId: userId)
     }
 
     func loadPurchases(userId: UUID) async throws -> [CloudPurchase] {

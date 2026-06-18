@@ -5,7 +5,7 @@ import WidgetKit
 @Observable
 @MainActor
 final class TimerViewModel {
-    private(set) var schedule: UserSchedule
+    private(set) var targetDepartureTime: Date
     private(set) var startedAt: Date?
     private(set) var now: Date = .now
     private(set) var departed: Bool = false
@@ -13,37 +13,37 @@ final class TimerViewModel {
     private(set) var finalWaterLevel: Double = 1.0
     private(set) var finalDelaySeconds: Int = 0
     private(set) var saveError: String?
-    private(set) var selectedSpecies: FishSpecies
-    private(set) var activeFish: ActiveFish?
     private(set) var finalEarnedDrop: Bool = false
-    private(set) var finalDeparturesAfter: Int = 0
-    private(set) var finalGrowthStage: GrowthStage = .egg
-    private(set) var finalCompletedGrowth: Bool = false
+    private(set) var finalBonusFeedAwarded: Bool = false
+    private(set) var finalAquariumTier: Int = 0
+    private(set) var finalAquariumDepartures: Int = 0
+    private(set) var departurePersisted: Bool = false
 
     private var timer: Timer?
-    private var lastRoutineItemID: UUID?
     private var lastLiveActivityUpdate: Date?
     private var didPlayOverdueWarning = false
+    private weak var activityStore: AppDataStore?
 
-    init(schedule: UserSchedule) {
-        self.schedule = schedule
-        self.selectedSpecies = Self.restoreSelectedSpecies()
+    init(targetDepartureTime: Date = .now.addingTimeInterval(15 * 60)) {
+        self.targetDepartureTime = targetDepartureTime
         restoreState()
-        lastRoutineItemID = currentRoutineItem?.id
         didPlayOverdueWarning = isOverdue
+    }
+
+    func bindStore(_ store: AppDataStore) {
+        activityStore = store
     }
 
     // MARK: - Derived state
 
     var remainingSeconds: Int {
-        let target = schedule.targetDepartureTime
         let base: Date = startedAt != nil ? now : .now
-        return max(0, Int(target.timeIntervalSince(base)))
+        return max(0, Int(targetDepartureTime.timeIntervalSince(base)))
     }
 
     var overdueSeconds: Int {
         guard startedAt != nil else { return 0 }
-        return max(0, Int(now.timeIntervalSince(schedule.targetDepartureTime)))
+        return max(0, Int(now.timeIntervalSince(targetDepartureTime)))
     }
 
     var isOverdue: Bool { overdueSeconds > 0 }
@@ -51,9 +51,9 @@ final class TimerViewModel {
     var waterLevel: Double {
         if departed { return finalWaterLevel }
         guard let startedAt else { return 1.0 }
-        let total = schedule.targetDepartureTime.timeIntervalSince(startedAt)
+        let total = targetDepartureTime.timeIntervalSince(startedAt)
         guard total > 0 else { return 0.0 }
-        let remaining = schedule.targetDepartureTime.timeIntervalSince(now)
+        let remaining = targetDepartureTime.timeIntervalSince(now)
         return min(initialWaterLevel, max(0.0, remaining / total * initialWaterLevel))
     }
 
@@ -64,88 +64,13 @@ final class TimerViewModel {
         return max(0, Int(now.timeIntervalSince(startedAt)))
     }
 
-    var currentRoutineItem: RoutineItem? {
-        guard startedAt != nil, !departed, !schedule.orderedItems.isEmpty else { return nil }
-
-        var accumulated = 0
-        for item in schedule.orderedItems {
-            accumulated += item.durationSeconds
-            if elapsedSeconds < accumulated {
-                return item
-            }
-        }
-        return schedule.orderedItems.last
+    func aquariumSnapshot(from store: AppDataStore) -> Aquarium {
+        store.aquarium()
     }
 
-    var nextRoutineItem: RoutineItem? {
-        guard let currentRoutineItem else { return nil }
-        let items = schedule.orderedItems
-        guard let index = items.firstIndex(where: { $0.id == currentRoutineItem.id }),
-              items.indices.contains(index + 1) else { return nil }
-        return items[index + 1]
-    }
-
-    /// 現在のルーティン項目の orderedItems 内インデックス。Live Activity の境界演出トリガーに使う。
-    var currentPhaseIndex: Int {
-        guard let currentRoutineItem else { return -1 }
-        return schedule.orderedItems.firstIndex(where: { $0.id == currentRoutineItem.id }) ?? -1
-    }
-
-    var currentRoutineProgress: Double {
-        guard let currentRoutineItem else { return 0 }
-        var elapsedBeforeCurrent = 0
-        for item in schedule.orderedItems {
-            if item.id == currentRoutineItem.id { break }
-            elapsedBeforeCurrent += item.durationSeconds
-        }
-        let elapsedInCurrent = elapsedSeconds - elapsedBeforeCurrent
-        return min(1.0, max(0.0, Double(elapsedInCurrent) / Double(currentRoutineItem.durationSeconds)))
-    }
-
-    var meetsSelectedRequirement: Bool {
-        projectedDepartures >= currentRequiredDepartures
-    }
-
-    var growthProgress: Double {
-        let required = currentRequiredDepartures
-        guard required > 0 else { return 0 }
-        return min(1.0, max(0.0, Double(currentDepartures) / Double(required)))
-    }
-
-    var currentDepartures: Int {
-        activeFish?.departures ?? 0
-    }
-
-    var currentRequiredDepartures: Int {
-        selectedSpecies.requiredDepartures
-    }
-
-    var projectedDepartures: Int {
-        currentDepartures + (isOverdue ? 0 : 1)
-    }
-
-    var currentGrowthProgress: Double { growthProgress }
-
-    var projectedGrowthProgress: Double {
-        let required = currentRequiredDepartures
-        guard required > 0 else { return 0 }
-        return min(1.0, max(0.0, Double(projectedDepartures) / Double(required)))
-    }
-
-    var currentGrowthStage: GrowthStage {
-        GrowthStage.stage(for: currentGrowthProgress)
-    }
-
-    var projectedGrowthStage: GrowthStage {
-        GrowthStage.stage(for: projectedGrowthProgress)
-    }
-
-    var hasActiveFish: Bool {
-        activeFish != nil
-    }
-
-    var currentFishName: String {
-        activeFish?.name ?? selectedSpecies.displayName
+    func projectedAquariumDepartures(from store: AppDataStore) -> Int {
+        let aquarium = store.aquarium()
+        return aquarium.totalDepartures + (isOverdue ? 0 : 1)
     }
 
     // MARK: - Formatted strings
@@ -157,12 +82,6 @@ final class TimerViewModel {
 
     var elapsedFormatted: String {
         formatSeconds(elapsedSeconds)
-    }
-
-    var currentRoutineRemainingText: String {
-        guard let currentRoutineItem else { return "00:00" }
-        let remaining = Int(Double(currentRoutineItem.durationSeconds) * (1 - currentRoutineProgress))
-        return formatSeconds(max(0, remaining))
     }
 
     private func formatSeconds(_ s: Int) -> String {
@@ -179,13 +98,12 @@ final class TimerViewModel {
         initialWaterLevel = max(0.01, min(1.0, initialLevel))
         startedAt = .now
         now = .now
-        lastRoutineItemID = currentRoutineItem?.id
         didPlayOverdueWarning = isOverdue
         ScheduleHaptics.prepare()
         startTicker()
         saveState()
-        NotificationScheduler.schedule(departureAt: schedule.targetDepartureTime, scheduleName: schedule.name)
-        syncLiveActivity(force: true)
+        NotificationScheduler.schedule(departureAt: targetDepartureTime)
+        syncLiveActivity(store: activityStore, force: true)
     }
 
     func depart(store: AppDataStore) async {
@@ -193,46 +111,59 @@ final class TimerViewModel {
         finalWaterLevel = waterLevel
         finalDelaySeconds = overdueSeconds
         finalEarnedDrop = !isOverdue
-        let fish = activeFish ?? createActiveFish(for: selectedSpecies, in: store)
-        let species = fish.species
-        let earnedDrop = finalEarnedDrop
-        let departuresAfter = fish.departures + (earnedDrop ? 1 : 0)
-        let required = species.requiredDepartures
-        let growthStage = GrowthStage.stage(for: required > 0 ? Double(departuresAfter) / Double(required) : 0)
-        let completedGrowth = departuresAfter >= required
-        finalDeparturesAfter = departuresAfter
-        finalGrowthStage = growthStage
-        finalCompletedGrowth = completedGrowth
+        finalBonusFeedAwarded = finalEarnedDrop
+
+        let aquariumBefore = store.aquarium()
+        finalAquariumDepartures = aquariumBefore.totalDepartures + (finalEarnedDrop ? 1 : 0)
+        finalAquariumTier = Aquarium(totalDepartures: finalAquariumDepartures).sizeTier
 
         departed = true
+        departurePersisted = false
         timer?.invalidate()
         timer = nil
         NotificationScheduler.cancelAll()
         saveState()
-        endLiveActivity(status: .departed)
+        endLiveActivity(store: activityStore, status: .departed)
 
-        await store.recordDeparture(
-            species: species,
-            fish: fish,
-            earnedDrop: earnedDrop,
-            departuresAfter: departuresAfter,
-            growthStage: growthStage,
-            completedGrowth: completedGrowth,
-            waterRatio: finalWaterLevel,
-            succeeded: earnedDrop
-        )
+        await store.recordDeparture(earnedDrop: finalEarnedDrop)
+        departurePersisted = store.errorMessage == nil
+        saveState()
 
         if let error = store.errorMessage {
             saveError = "記録の保存に失敗しました"
-            print("[DewTime] 水やり記録の保存に失敗しました: \(error)")
-        } else {
-            activeFish = completedGrowth ? nil : fish
+            print("[DewTime] 出発記録の保存に失敗しました: \(error)")
         }
+    }
+
+    /// 前回セッションで出発済みのまま結果画面を閉じられなかった場合の復旧。
+    func recoverDepartedSession(store: AppDataStore) async {
+        guard departed else { return }
+
+        finalEarnedDrop = finalDelaySeconds == 0
+        finalBonusFeedAwarded = finalEarnedDrop
+
+        if !isDepartureRecorded(in: store) {
+            await store.recordDeparture(earnedDrop: finalEarnedDrop)
+            departurePersisted = store.errorMessage == nil
+            saveState()
+
+            if let error = store.errorMessage {
+                saveError = "記録の保存に失敗しました"
+                print("[DewTime] 出発記録の再保存に失敗しました: \(error)")
+            }
+        } else {
+            departurePersisted = true
+            saveState()
+        }
+
+        let aquarium = store.aquarium()
+        finalAquariumDepartures = aquarium.totalDepartures
+        finalAquariumTier = aquarium.sizeTier
     }
 
     func reset() {
         if isRunning || departed {
-            endLiveActivity(status: .cancelled)
+            endLiveActivity(store: activityStore, status: .cancelled)
         }
         timer?.invalidate()
         timer = nil
@@ -242,11 +173,11 @@ final class TimerViewModel {
         finalWaterLevel = 1.0
         finalDelaySeconds = 0
         finalEarnedDrop = false
-        finalDeparturesAfter = activeFish?.departures ?? 0
-        finalGrowthStage = activeFish?.growthStage ?? .egg
-        finalCompletedGrowth = false
+        finalBonusFeedAwarded = false
+        finalAquariumTier = 0
+        finalAquariumDepartures = 0
+        departurePersisted = false
         now = .now
-        lastRoutineItemID = nil
         didPlayOverdueWarning = false
         clearState()
         NotificationScheduler.cancelAll()
@@ -254,55 +185,20 @@ final class TimerViewModel {
 
     func clearError() { saveError = nil }
 
-    func selectSpecies(_ species: FishSpecies, store: AppDataStore) async {
-        guard !isRunning, !departed else { return }
-        selectedSpecies = species
-        UserDefaults.standard.set(species.rawValue, forKey: PKey.selectedSpecies.rawValue)
-        activeFish = createActiveFish(for: species, in: store)
-        await store.saveAll()
-        if let error = store.errorMessage {
-            saveError = "魚の準備に失敗しました"
-            print("[DewTime] ActiveFish の保存に失敗しました: \(error)")
-        }
-    }
-
-    func renameActiveFish(_ name: String, store: AppDataStore) async {
-        let activeFish = activeFish ?? createActiveFish(for: selectedSpecies, in: store)
-        await store.renameActiveFish(activeFish, name: name)
-        if let error = store.errorMessage {
-            saveError = "魚の名前を保存できませんでした"
-            print("[DewTime] ActiveFish の名前保存に失敗しました: \(error)")
-        }
-    }
-
-    func syncActiveFish(_ fishes: [ActiveFish]) {
-        if let fish = fishes
-            .filter({ !$0.isCompleted })
-            .sorted(by: { $0.startedAt > $1.startedAt })
-            .first {
-            activeFish = fish
-            selectedSpecies = fish.species
-            return
-        }
-        activeFish = nil
-    }
-
     func updateDepartureTime(_ newTime: Date) {
-        schedule.targetDepartureTime = newTime
+        targetDepartureTime = newTime
     }
 
     // MARK: - Background / Foreground
 
-    /// フォアグラウンド復帰時に呼ぶ。now を即時更新してティッカーを再開する。
-    func resume() {
+    func resume(store: AppDataStore) {
         guard startedAt != nil, !departed else { return }
         now = .now
-        handleScheduleKnocks()
+        handleTimerKnocks()
         if timer == nil { startTicker() }
-        syncLiveActivity(force: true)
+        syncLiveActivity(store: store, force: true)
     }
 
-    /// バックグラウンド移行時に呼ぶ。ティッカーを止めてバッテリーを節約する。
     func pause() {
         timer?.invalidate()
         timer = nil
@@ -311,30 +207,35 @@ final class TimerViewModel {
     // MARK: - State persistence
 
     private enum PKey: String {
-        case scheduleId       = "dew.timer.scheduleId"
-        case startedAt        = "dew.timer.startedAt"
-        case departed         = "dew.timer.departed"
-        case finalWaterLevel  = "dew.timer.finalWaterLevel"
+        case legacyScheduleId     = "dew.timer.scheduleId"
+        case targetDepartureTime  = "dew.timer.targetDepartureTime"
+        case startedAt            = "dew.timer.startedAt"
+        case departed             = "dew.timer.departed"
+        case finalWaterLevel      = "dew.timer.finalWaterLevel"
         case finalDelaySeconds    = "dew.timer.finalDelaySeconds"
         case initialWaterLevel    = "dew.timer.initialWaterLevel"
-        case selectedSpecies      = "dew.timer.selectedSpecies"
+        case departurePersisted   = "dew.timer.departurePersisted"
     }
 
     private func saveState() {
         let ud = UserDefaults.standard
-        ud.set(schedule.id.uuidString,  forKey: PKey.scheduleId.rawValue)
-        ud.set(startedAt,               forKey: PKey.startedAt.rawValue)
-        ud.set(departed,                forKey: PKey.departed.rawValue)
-        ud.set(initialWaterLevel,       forKey: PKey.initialWaterLevel.rawValue)
-        ud.set(finalWaterLevel,         forKey: PKey.finalWaterLevel.rawValue)
-        ud.set(finalDelaySeconds,       forKey: PKey.finalDelaySeconds.rawValue)
+        ud.set(targetDepartureTime, forKey: PKey.targetDepartureTime.rawValue)
+        ud.set(startedAt,          forKey: PKey.startedAt.rawValue)
+        ud.set(departed,           forKey: PKey.departed.rawValue)
+        ud.set(initialWaterLevel,  forKey: PKey.initialWaterLevel.rawValue)
+        ud.set(finalWaterLevel,    forKey: PKey.finalWaterLevel.rawValue)
+        ud.set(finalDelaySeconds,  forKey: PKey.finalDelaySeconds.rawValue)
+        ud.set(departurePersisted, forKey: PKey.departurePersisted.rawValue)
         saveWidgetStateIfNeeded()
     }
 
     private func restoreState() {
         let ud = UserDefaults.standard
-        guard let savedId = ud.string(forKey: PKey.scheduleId.rawValue),
-              savedId == schedule.id.uuidString else { return }
+        ud.removeObject(forKey: PKey.legacyScheduleId.rawValue)
+
+        if let savedTarget = ud.object(forKey: PKey.targetDepartureTime.rawValue) as? Date {
+            targetDepartureTime = savedTarget
+        }
 
         departed          = ud.bool(forKey: PKey.departed.rawValue)
         startedAt         = ud.object(forKey: PKey.startedAt.rawValue) as? Date
@@ -344,6 +245,9 @@ final class TimerViewModel {
         if departed {
             finalWaterLevel   = ud.double(forKey: PKey.finalWaterLevel.rawValue)
             finalDelaySeconds = ud.integer(forKey: PKey.finalDelaySeconds.rawValue)
+            departurePersisted = ud.bool(forKey: PKey.departurePersisted.rawValue)
+            finalEarnedDrop = finalDelaySeconds == 0
+            finalBonusFeedAwarded = finalEarnedDrop
         } else if startedAt != nil {
             now = .now
             startTicker()
@@ -351,30 +255,18 @@ final class TimerViewModel {
     }
 
     private func clearState() {
-        [PKey.scheduleId, .startedAt, .departed, .initialWaterLevel, .finalWaterLevel, .finalDelaySeconds]
-            .forEach { UserDefaults.standard.removeObject(forKey: $0.rawValue) }
+        [
+            PKey.legacyScheduleId,
+            .targetDepartureTime,
+            .startedAt,
+            .departed,
+            .initialWaterLevel,
+            .finalWaterLevel,
+            .finalDelaySeconds,
+            .departurePersisted
+        ].forEach { UserDefaults.standard.removeObject(forKey: $0.rawValue) }
         SharedTimerWidgetState.clear()
         WidgetCenter.shared.reloadTimelines(ofKind: SharedTimerWidgetState.widgetKind)
-    }
-
-    // MARK: - Private helpers
-
-    private static func restoreSelectedSpecies() -> FishSpecies {
-        guard let rawValue = UserDefaults.standard.string(forKey: PKey.selectedSpecies.rawValue),
-              let species = FishSpecies(rawValue: rawValue) else {
-            return .medaka
-        }
-        return species
-    }
-
-    private func createActiveFish(for species: FishSpecies, in store: AppDataStore) -> ActiveFish {
-        if let activeFish, !activeFish.isCompleted, activeFish.species == species {
-            return activeFish
-        }
-
-        let fish = store.createActiveFish(for: species)
-        activeFish = fish
-        return fish
     }
 
     private func startTicker() {
@@ -383,31 +275,31 @@ final class TimerViewModel {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.now = .now
-                self.handleScheduleKnocks()
-                self.syncLiveActivity(force: false)
+                self.handleTimerKnocks()
+                self.syncLiveActivity(store: self.activityStore, force: false)
             }
         }
         RunLoop.main.add(timer!, forMode: .common)
     }
 
-    private func handleScheduleKnocks() {
-        guard isRunning else { return }
-
-        let currentID = currentRoutineItem?.id
-        if let currentID, let lastRoutineItemID, currentID != lastRoutineItemID {
-            if AppPreferences.hapticsEnabled {
-                ScheduleHaptics.playPhaseKnock()
-            }
-            syncLiveActivity(force: true)
+    private func isDepartureRecorded(in store: AppDataStore) -> Bool {
+        if UserDefaults.standard.object(forKey: PKey.departurePersisted.rawValue) != nil {
+            return departurePersisted
         }
-        lastRoutineItemID = currentID
+        guard let startedAt else { return false }
+        return store.careRecords.contains { record in
+            record.isDepartureLog && record.recordedAt >= startedAt.addingTimeInterval(-60)
+        }
+    }
+
+    private func handleTimerKnocks() {
+        guard isRunning else { return }
 
         if isOverdue, !didPlayOverdueWarning {
             didPlayOverdueWarning = true
             if AppPreferences.hapticsEnabled {
                 ScheduleHaptics.playOverdueWarning()
             }
-            syncLiveActivity(force: true)
         }
     }
 }
@@ -416,44 +308,33 @@ extension TimerViewModel {
     func liveActivityAttributes() -> DewTimerActivityAttributes? {
         guard let startedAt else { return nil }
 
-        var elapsed: TimeInterval = 0
-        let segments = schedule.orderedItems.map { item in
-            let start = elapsed
-            elapsed += TimeInterval(item.durationSeconds)
-            return DewTimerActivityAttributes.RoutineSegment(
-                id: item.id.uuidString,
-                name: item.name,
-                colorHex: item.colorHex,
-                startOffset: start,
-                endOffset: elapsed
-            )
-        }
-
         return DewTimerActivityAttributes(
-            scheduleName: schedule.name,
+            scheduleName: "DewTime",
             startedAt: startedAt,
-            targetDepartureTime: schedule.targetDepartureTime,
-            segments: segments
+            targetDepartureTime: targetDepartureTime,
+            segments: []
         )
     }
 
     func liveActivityContentState(
+        store: AppDataStore?,
         status explicitStatus: DewTimerActivityAttributes.TimerStatus? = nil
     ) -> DewTimerActivityAttributes.ContentState {
         let status = explicitStatus ?? defaultLiveActivityStatus
+        let aquarium = store?.aquarium() ?? Aquarium()
+        let projectedDepartures = store.map { projectedAquariumDepartures(from: $0) } ?? aquarium.totalDepartures
+        let projectedTier = Aquarium(totalDepartures: projectedDepartures).sizeTier
+
         return DewTimerActivityAttributes.ContentState(
             currentTaskName: liveActivityCurrentTaskName(status: status),
-            nextTaskName: status.isFinished ? nil : nextRoutineItem?.name,
-            selectedSpeciesName: selectedSpecies.displayName,
-            fishEmoji: selectedSpecies.emoji,
-            growthStageName: projectedGrowthStage.displayName,
-            growthStageIconName: projectedGrowthStage.icon,
-            currentDepartures: currentDepartures,
-            requiredDepartures: currentRequiredDepartures,
-            projectedDepartures: projectedDepartures,
+            nextTaskName: nil,
+            aquariumTier: projectedTier,
+            aquariumTierName: Aquarium.sizeName(for: projectedTier),
+            aquariumDepartures: projectedDepartures,
+            bonusFeedStock: aquarium.bonusFeedStock,
             waterLevel: waterLevel,
             status: status,
-            phaseIndex: currentPhaseIndex,
+            phaseIndex: -1,
             lastUpdatedAt: now
         )
     }
@@ -470,12 +351,14 @@ extension TimerViewModel {
             return "出発完了"
         case .cancelled:
             return "キャンセル"
-        case .running, .overdue:
-            return currentRoutineItem?.name ?? "準備中"
+        case .running:
+            return "残り \(countdownText)"
+        case .overdue:
+            return "遅刻 \(countdownText)"
         }
     }
 
-    private func syncLiveActivity(force: Bool) {
+    private func syncLiveActivity(store: AppDataStore?, force: Bool) {
         guard isRunning else { return }
 
         let shouldUpdate: Bool
@@ -491,7 +374,7 @@ extension TimerViewModel {
         lastLiveActivityUpdate = now
 
         guard let attributes = liveActivityAttributes() else { return }
-        let state = liveActivityContentState()
+        let state = liveActivityContentState(store: store)
         Task {
             await DewTimerLiveActivityController.start(attributes: attributes, state: state)
         }
@@ -504,37 +387,24 @@ extension TimerViewModel {
             return
         }
 
-        var elapsed: TimeInterval = 0
-        let segments = schedule.orderedItems.map { item in
-            let start = elapsed
-            elapsed += TimeInterval(item.durationSeconds)
-            return SharedTimerWidgetState.RoutineSegment(
-                id: item.id.uuidString,
-                name: item.name,
-                startOffset: start,
-                endOffset: elapsed
-            )
-        }
-
         SharedTimerWidgetState.save(
             SharedTimerWidgetState(
-                scheduleName: schedule.name,
+                scheduleName: "DewTime",
                 startedAt: startedAt,
-                targetDepartureTime: schedule.targetDepartureTime,
-                fishEmoji: selectedSpecies.emoji,
-                selectedSpeciesName: selectedSpecies.displayName,
-                segments: segments
+                targetDepartureTime: targetDepartureTime,
+                fishEmoji: "🐟",
+                selectedSpeciesName: "水槽",
+                segments: []
             )
         )
         WidgetCenter.shared.reloadTimelines(ofKind: SharedTimerWidgetState.widgetKind)
     }
 
-    private func endLiveActivity(status: DewTimerActivityAttributes.TimerStatus) {
-        let state = liveActivityContentState(status: status)
+    private func endLiveActivity(store: AppDataStore?, status: DewTimerActivityAttributes.TimerStatus) {
+        let state = liveActivityContentState(store: store, status: status)
         lastLiveActivityUpdate = nil
         Task {
             if status == .departed {
-                // 出発時は即消去せず、注水演出を見せてから自動で消す。
                 await DewTimerLiveActivityController.finishWithPour(state: state)
             } else {
                 await DewTimerLiveActivityController.end(state: state)

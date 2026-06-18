@@ -3,16 +3,15 @@ import SwiftUI
 struct DepartureConfirmView: View {
     let waterLevel: Double
     let isOnTime: Bool
-    let selectedSpecies: FishSpecies
     let departuresBefore: Int
     let departuresAfter: Int
-    let requiredDepartures: Int
-    let growthStage: GrowthStage
-    let completesGrowth: Bool
+    let aquariumTierBefore: Int
+    let aquariumTierAfter: Int
+    let bonusFeedWillAward: Bool
     let onConfirm: () -> Void
     let onCancel: () -> Void
 
-    @State private var fishScale: CGFloat = 0.85
+    @State private var bowlScale: CGFloat = 0.85
 
     var body: some View {
         ZStack {
@@ -29,9 +28,13 @@ struct DepartureConfirmView: View {
 
                         heroSection
 
-                        growthTimeline
+                        tierTimeline
 
                         dropGainSection
+
+                        if bonusFeedWillAward {
+                            bonusFeedBadge
+                        }
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 16)
@@ -48,29 +51,33 @@ struct DepartureConfirmView: View {
     // MARK: - Sections
 
     private var statusBadge: some View {
-        Image(systemName: isOnTime ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-            .font(.system(size: 52))
-            .foregroundStyle(isOnTime ? Color.teal : Color.orange)
-            .shadow(color: (isOnTime ? Color.teal : Color.orange).opacity(0.45), radius: 14, y: 4)
-            .accessibilityLabel(isOnTime ? "オンタイム" : "遅延あり")
+        VStack(spacing: 8) {
+            Image(systemName: isOnTime ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                .font(.system(size: 52))
+                .foregroundStyle(isOnTime ? Color.teal : Color.orange)
+                .shadow(color: (isOnTime ? Color.teal : Color.orange).opacity(0.45), radius: 14, y: 4)
+            Text(isOnTime ? "オンタイム" : "遅刻")
+                .font(.headline.weight(.bold))
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(isOnTime ? "オンタイム" : "遅刻")
     }
 
     private var heroSection: some View {
         HStack(alignment: .center, spacing: 20) {
             ZStack {
-                if completesGrowth {
+                if aquariumTierAfter > aquariumTierBefore {
                     Circle()
                         .fill(waterLevelColor.opacity(0.22))
                         .frame(width: 118, height: 118)
                         .blur(radius: 16)
                 }
-                FishArtworkView(species: selectedSpecies)
-                    .frame(width: 96, height: 90)
-                    .scaleEffect(fishScale)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.5), value: fishScale)
+                aquariumBowlIcon(tier: aquariumTierAfter)
+                    .scaleEffect(bowlScale)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.5), value: bowlScale)
             }
             .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { fishScale = 1.0 }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { bowlScale = 1.0 }
             }
 
             VStack(spacing: 10) {
@@ -95,50 +102,47 @@ struct DepartureConfirmView: View {
         .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
-    private var growthTimeline: some View {
+    private var tierTimeline: some View {
         HStack(spacing: 0) {
-            ForEach(Array(GrowthStage.allCases.enumerated()), id: \.element) { index, stage in
-                let progress = requiredDepartures > 0
-                    ? Double(departuresAfter) / Double(requiredDepartures)
-                    : 0
-                let reached = stage.thresholdProgress <= progress
+            ForEach(0...Aquarium.maxTier, id: \.self) { tier in
+                let reached = tier <= aquariumTierAfter
 
-                if index > 0 {
+                if tier > 0 {
                     Rectangle()
-                        .fill(reached ? stageColor.opacity(0.7) : .white.opacity(0.15))
+                        .fill(reached ? Color.teal.opacity(0.7) : .white.opacity(0.15))
                         .frame(height: 3)
                         .frame(maxWidth: .infinity)
                 }
 
                 VStack(spacing: 8) {
-                    Image(systemName: stage.icon)
-                        .font(.system(size: stage == growthStage ? 28 : 22, weight: .semibold))
-                        .foregroundStyle(reached ? stageColor : .white.opacity(0.22))
-                        .scaleEffect(stage == growthStage ? 1.15 : 1.0)
-                        .frame(width: 44, height: 44)
+                    Image(systemName: tier == aquariumTierAfter ? "drop.fill" : "circle.fill")
+                        .font(.system(size: tier == aquariumTierAfter ? 22 : 14, weight: .semibold))
+                        .foregroundStyle(reached ? Color.teal : .white.opacity(0.22))
+                        .scaleEffect(tier == aquariumTierAfter ? 1.15 : 1.0)
+                        .frame(width: 36, height: 36)
                         .background(
                             Circle()
-                                .fill(stage == growthStage ? stageColor.opacity(0.18) : .white.opacity(0.06))
+                                .fill(tier == aquariumTierAfter ? Color.teal.opacity(0.18) : .white.opacity(0.06))
                         )
                 }
-                .accessibilityLabel(stage.displayName)
+                .accessibilityLabel("水槽レベル\(tier + 1)")
             }
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 4)
         .padding(.vertical, 16)
         .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private var dropGainSection: some View {
         HStack(spacing: 16) {
-            dropCluster(count: departuresBefore, highlightUpTo: departuresBefore)
+            shizukuCluster(count: departuresBefore, emphasizeNewFrom: 0)
                 .accessibilityLabel("現在 \(departuresBefore)しずく")
 
             Image(systemName: "arrow.right")
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(.white.opacity(0.45))
 
-            dropCluster(count: departuresAfter, highlightUpTo: departuresAfter, emphasizeNewFrom: departuresBefore)
+            shizukuCluster(count: departuresAfter, emphasizeNewFrom: departuresBefore)
                 .accessibilityLabel("あと \(departuresAfter)しずく")
         }
         .frame(maxWidth: .infinity)
@@ -147,38 +151,71 @@ struct DepartureConfirmView: View {
         .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
-    private func dropCluster(count: Int, highlightUpTo: Int, emphasizeNewFrom: Int = 0) -> some View {
-        HStack(spacing: 5) {
-            ForEach(0..<max(1, requiredDepartures), id: \.self) { index in
-                let filled = index < highlightUpTo
-                let isNew = index >= emphasizeNewFrom && index < highlightUpTo
+    private var bonusFeedBadge: some View {
+        HStack(spacing: 10) {
+            Image(systemName: FeedIcon.systemName)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(.yellow)
+                .scaleEffect(0.72)
+            Image(systemName: "plus")
+                .font(.caption.weight(.bold))
+            Text("1")
+                .font(.title3.weight(.bold))
+                .monospacedDigit()
+        }
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(Color.orange.opacity(0.22), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.yellow.opacity(0.4), lineWidth: 1)
+        }
+        .accessibilityLabel("餌を1個獲得")
+    }
 
-                Image(systemName: filled ? "drop.fill" : "drop")
-                    .font(.system(size: isNew ? 18 : 14, weight: .semibold))
-                    .foregroundStyle(
-                        filled
-                            ? (isNew ? stageColor : stageColor.opacity(0.75))
-                            : .white.opacity(0.22)
-                    )
-                    .scaleEffect(isNew ? 1.2 : 1.0)
-            }
+    private func shizukuCluster(count: Int, emphasizeNewFrom: Int) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "drop.fill")
+                .font(.system(size: count > emphasizeNewFrom ? 22 : 18, weight: .semibold))
+                .foregroundStyle(count > emphasizeNewFrom ? waterLevelColor : waterLevelColor.opacity(0.75))
+            Text("\(count)")
+                .font(.title2.weight(.bold))
+                .monospacedDigit()
+                .foregroundStyle(.white)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private func aquariumBowlIcon(tier: Int) -> some View {
+        let diameter = 14 + CGFloat(tier) * 4
+        return ZStack {
+            Circle()
+                .strokeBorder(.teal.opacity(0.8), lineWidth: 2)
+                .frame(width: diameter + 40, height: diameter + 40)
+            Image(systemName: tier >= Aquarium.maxTier ? "sparkles" : "drop.fill")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(tier >= Aquarium.maxTier ? .yellow : .cyan)
+        }
+        .frame(width: 96, height: 96)
     }
 
     private var actionButtons: some View {
         HStack(spacing: 16) {
             Button(action: onCancel) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 52))
-                    .foregroundStyle(.white.opacity(0.40))
+                Label("戻る", systemImage: "xmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .labelStyle(.titleAndIcon)
+                    .foregroundStyle(.white.opacity(0.55))
+                    .frame(width: 100)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("戻る")
 
             Button(action: onConfirm) {
-                Image(systemName: "figure.walk.departure")
-                    .font(.system(size: 32, weight: .semibold))
+                Label("いってきます！", systemImage: "figure.walk.departure")
+                    .font(.headline.weight(.semibold))
+                    .labelStyle(.titleAndIcon)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 18)
                     .background(
@@ -197,10 +234,6 @@ struct DepartureConfirmView: View {
     private var theme: WaterLevelTheme { WaterLevelTheme(waterRatio: waterLevel) }
     private var waterLevelColor: Color { theme.tintColor }
     private var confirmColors: [Color] { theme.gradientColors }
-
-    private var stageColor: Color {
-        completesGrowth ? theme.tintColor : .orange
-    }
 }
 
 #Preview {
@@ -209,12 +242,11 @@ struct DepartureConfirmView: View {
             DepartureConfirmView(
                 waterLevel: 0.72,
                 isOnTime: true,
-                selectedSpecies: .dolphin,
-                departuresBefore: 2,
-                departuresAfter: 3,
-                requiredDepartures: 5,
-                growthStage: .juvenile,
-                completesGrowth: false,
+                departuresBefore: 29,
+                departuresAfter: 30,
+                aquariumTierBefore: 1,
+                aquariumTierAfter: 2,
+                bonusFeedWillAward: true,
                 onConfirm: {},
                 onCancel: {}
             )

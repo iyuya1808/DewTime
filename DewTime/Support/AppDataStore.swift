@@ -15,7 +15,6 @@ enum AppDataStoreError: LocalizedError {
 @Observable
 @MainActor
 final class AppDataStore {
-    var schedules: [UserSchedule] = []
     var activeFishes: [ActiveFish] = []
     var collectedFishes: [CollectedFish] = []
     var careRecords: [FishCareRecord] = []
@@ -27,6 +26,7 @@ final class AppDataStore {
     var isCloudSyncing = false
     var errorMessage: String?
 
+    private var isFeedGachaInFlight = false
     private let schemaVersion = 1
     private let cloudDataService: CloudDataServicing?
     private let enableCloudSync: Bool
@@ -48,10 +48,6 @@ final class AppDataStore {
         return true
     }
 
-    var activeSchedule: UserSchedule? {
-        UserSchedule.active(in: schedules)
-    }
-
     /// 起動直後に端末内キャッシュだけ読み込む（ネットワーク待ちなし）。
     func loadLocalCache() async {
         guard !isLoading else { return }
@@ -64,9 +60,6 @@ final class AppDataStore {
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? "ローカルデータの読み込みに失敗しました"
             print("[DewTime] Local load failed: \(error)")
-            if schedules.isEmpty {
-                seedSampleDataLocally()
-            }
         }
     }
 
@@ -89,9 +82,6 @@ final class AppDataStore {
 
             let snapshot = try await cloudDataService.loadAll(userId: userId)
             if snapshot.isEmpty {
-                if schedules.isEmpty {
-                    seedSampleSchedules()
-                }
                 try saveToLocal()
                 try await cloudDataService.saveAll(
                     snapshot: makeCloudSnapshot(userId: userId),
@@ -133,54 +123,6 @@ final class AppDataStore {
         }
     }
 
-    func addSchedule(name: String, targetDepartureTime: Date) async {
-        let schedule = UserSchedule(
-            name: name,
-            targetDepartureTime: targetDepartureTime,
-            isActive: schedules.isEmpty
-        )
-        schedules.append(schedule)
-        await saveAll()
-    }
-
-    func deleteSchedules(_ deleting: [UserSchedule]) async {
-        let deletingIds = Set(deleting.map(\.id))
-        let shouldPickNextActive = deleting.contains(where: \.isActive)
-        schedules.removeAll { deletingIds.contains($0.id) }
-
-        if shouldPickNextActive, let next = schedules.first {
-            UserSchedule.setActive(next, in: schedules)
-        }
-        await saveAll()
-    }
-
-    func addRoutineItem(to schedule: UserSchedule, item: RoutineItem) async {
-        item.schedule = schedule
-        schedule.items.append(item)
-        await saveAll()
-    }
-
-    func deleteRoutineItems(from schedule: UserSchedule, at offsets: IndexSet) async {
-        let items = schedule.orderedItems
-        let deletingIds = Set(offsets.compactMap { items.indices.contains($0) ? items[$0].id : nil })
-        schedule.items.removeAll { deletingIds.contains($0.id) }
-        reorderItems(in: schedule)
-        await saveAll()
-    }
-
-    func reorderItems(in schedule: UserSchedule) {
-        let items = schedule.orderedItems
-        for (index, item) in items.enumerated() {
-            item.orderIndex = index
-        }
-    }
-
-    func resetSchedules() async {
-        schedules.removeAll()
-        seedSampleSchedules()
-        await saveAll()
-    }
-
     func resetAquarium() async {
         activeFishes.removeAll()
         collectedFishes.removeAll()
@@ -198,7 +140,6 @@ final class AppDataStore {
     }
 
     func resetAll() async {
-        schedules.removeAll()
         activeFishes.removeAll()
         collectedFishes.removeAll()
         careRecords.removeAll()
@@ -213,7 +154,6 @@ final class AppDataStore {
                 print("[DewTime] Cloud reset failed: \(error)")
             }
         }
-        seedSampleSchedules()
         await saveAll()
     }
 
@@ -257,6 +197,75 @@ final class AppDataStore {
         return aquarium
     }
 
+    func aquariumFish() -> [CollectedFish] {
+        let capacity = aquarium().fishCapacity
+        return Array(
+            collectedFishes
+                .sorted { $0.recordedAt > $1.recordedAt }
+                .prefix(capacity)
+        )
+    }
+
+    func discoveredSpeciesIds() -> Set<String> {
+        Set(collectedFishes.map(\.speciesId))
+    }
+
+    @discardableResult
+    func consumeBonusFeedIfAvailable() -> Bool {
+        let aquarium = aquarium()
+        guard aquarium.bonusFeedStock > 0 else { return false }
+        aquarium.bonusFeedStock -= 1
+        aquarium.updatedAt = .now
+        return true
+    }
+
+    /// 新規解除された実績の餌報酬を水槽へ付与する（二重付与なし）。
+    @discardableResult
+    func syncAchievementFeedRewards() -> Int {
+        let profile = profile()
+        var claimed = Set(profile.claimedAchievementRewardIds)
+        var granted = 0
+
+        for achievement in Achievement.allCases {
+            guard achievement.isUnlocked(in: self) else { continue }
+            guard !claimed.contains(achievement.id) else { continue }
+            let reward = achievement.feedReward
+            guard reward > 0 else { continue }
+
+            aquarium().bonusFeedStock += reward
+            claimed.insert(achievement.id)
+            granted += reward
+        }
+
+        guard granted > 0 else { return 0 }
+
+        profile.claimedAchievementRewardIds = Array(claimed).sorted()
+        aquarium().updatedAt = .now
+        return granted
+    }
+
+    func spawnFishFromFeed() async -> CollectedFish? {
+        guard !isFeedGachaInFlight else { return nil }
+        let aquarium = aquarium()
+        guard aquariumFish().count < aquarium.fishCapacity else { return nil }
+
+        isFeedGachaInFlight = true
+        defer { isFeedGachaInFlight = false }
+
+        let species = FishGachaService.rollSpecies(tier: aquarium.sizeTier)
+        let fish = CollectedFish(
+            name: species.displayName,
+            speciesId: species.rawValue,
+            recordedAt: .now,
+            succeeded: true,
+            waterRatio: 1.0
+        )
+        collectedFishes.append(fish)
+        aquarium.updatedAt = .now
+        await saveAll()
+        return fish
+    }
+
     func profile() -> UserProfile {
         if let existing = profiles.first {
             return existing
@@ -287,46 +296,23 @@ final class AppDataStore {
         await saveAll()
     }
 
-    func recordDeparture(
-        species: FishSpecies,
-        fish: ActiveFish,
-        earnedDrop: Bool,
-        departuresAfter: Int,
-        growthStage: GrowthStage,
-        completedGrowth: Bool,
-        waterRatio: Double,
-        succeeded: Bool
-    ) async {
-        fish.departures = departuresAfter
-        fish.lastWateredAt = .now
-        fish.isCompleted = completedGrowth
+    func recordDeparture(earnedDrop: Bool) async {
+        let aquarium = aquarium()
+        if earnedDrop {
+            aquarium.totalDepartures += 1
+            aquarium.bonusFeedStock += 1
+        }
+        aquarium.updatedAt = .now
 
         careRecords.append(
             FishCareRecord(
-                speciesId: species.rawValue,
-                recordedAt: .now,
-                departuresAfter: departuresAfter,
+                speciesId: FishCareRecord.departureLogMarker,
+                departuresAfter: aquarium.totalDepartures,
                 earnedDrop: earnedDrop,
-                growthStage: growthStage,
-                completedGrowth: completedGrowth
+                growthStage: .egg,
+                completedGrowth: earnedDrop
             )
         )
-
-        let aquarium = aquarium()
-        if earnedDrop { aquarium.totalDepartures += 1 }
-        aquarium.updatedAt = .now
-
-        if completedGrowth {
-            collectedFishes.append(
-                CollectedFish(
-                    name: fish.name,
-                    speciesId: species.rawValue,
-                    recordedAt: .now,
-                    succeeded: succeeded,
-                    waterRatio: waterRatio
-                )
-            )
-        }
 
         await saveAll()
     }
@@ -335,31 +321,6 @@ final class AppDataStore {
 
     func makeCloudSnapshot(userId: UUID, now: Date = .now) -> CloudSnapshot {
         CloudSnapshot(
-            schedules: schedules.map { schedule in
-                CloudSchedule(
-                    id: schedule.id,
-                    userId: userId,
-                    name: schedule.name,
-                    targetDepartureTime: schedule.targetDepartureTime,
-                    isActive: schedule.isActive,
-                    createdAt: now,
-                    updatedAt: now
-                )
-            },
-            routineItems: schedules.flatMap(\.items).compactMap { item in
-                guard let scheduleId = item.schedule?.id else { return nil }
-                return CloudRoutineItem(
-                    id: item.id,
-                    userId: userId,
-                    scheduleId: scheduleId,
-                    name: item.name,
-                    durationSeconds: item.durationSeconds,
-                    colorHex: item.colorHex,
-                    orderIndex: item.orderIndex,
-                    createdAt: now,
-                    updatedAt: now
-                )
-            },
             activeFishes: activeFishes.map { fish in
                 CloudActiveFish(
                     id: fish.id,
@@ -406,6 +367,7 @@ final class AppDataStore {
                     id: aquarium.id,
                     userId: userId,
                     totalDepartures: aquarium.totalDepartures,
+                    bonusFeedStock: aquarium.bonusFeedStock,
                     createdAt: aquarium.createdAt,
                     updatedAt: aquarium.updatedAt
                 )
@@ -416,6 +378,7 @@ final class AppDataStore {
                     userId: userId,
                     nickname: profile.nickname,
                     avatarEmoji: profile.avatarEmoji,
+                    claimedAchievementRewardIds: profile.claimedAchievementRewardIds,
                     createdAt: profile.createdAt,
                     updatedAt: now
                 )
@@ -424,33 +387,6 @@ final class AppDataStore {
     }
 
     func applyCloudSnapshot(_ snapshot: CloudSnapshot) {
-        let decodedSchedules = snapshot.schedules.map { row in
-            UserSchedule(
-                id: row.id,
-                name: row.name,
-                targetDepartureTime: row.targetDepartureTime,
-                isActive: row.isActive
-            )
-        }
-        let schedulesById = Dictionary(uniqueKeysWithValues: decodedSchedules.map { ($0.id, $0) })
-        let decodedRoutineItems = snapshot.routineItems.map { row in
-            RoutineItem(
-                id: row.id,
-                name: row.name,
-                durationSeconds: row.durationSeconds,
-                colorHex: row.colorHex,
-                orderIndex: row.orderIndex,
-                schedule: schedulesById[row.scheduleId]
-            )
-        }
-
-        for schedule in decodedSchedules {
-            schedule.items = decodedRoutineItems.filter { $0.schedule?.id == schedule.id }
-        }
-
-        schedules = decodedSchedules.sorted { $0.name < $1.name }
-        UserSchedule.ensureSingleActive(in: schedules)
-
         activeFishes = snapshot.activeFishes.map { row in
             ActiveFish(
                 id: row.id,
@@ -490,6 +426,7 @@ final class AppDataStore {
             Aquarium(
                 id: row.id,
                 totalDepartures: row.totalDepartures,
+                bonusFeedStock: row.bonusFeedStock,
                 createdAt: row.createdAt,
                 updatedAt: row.updatedAt
             )
@@ -500,9 +437,11 @@ final class AppDataStore {
                 id: row.id,
                 nickname: row.nickname,
                 avatarEmoji: row.avatarEmoji,
-                createdAt: row.createdAt
+                createdAt: row.createdAt,
+                claimedAchievementRewardIds: row.claimedAchievementRewardIds
             )
         }
+        syncAchievementFeedRewards()
     }
 
     // MARK: - Local Save / Load
@@ -510,30 +449,8 @@ final class AppDataStore {
     private func loadFromLocal() throws {
         let defaults = UserDefaults.standard
         self.isDeveloperSupported = defaults.bool(forKey: "local_is_developer_supported")
-
-        // schedules
-        if let schedulesData = defaults.array(forKey: "local_schedules") as? [[String: Any]] {
-            var schedulesById: [String: UserSchedule] = [:]
-            let decodedSchedules = try schedulesData.map { data in
-                let id = data["id"] as? String ?? UUID().uuidString
-                let schedule = try decodeSchedule(id: id, data: data)
-                schedulesById[schedule.id.uuidString] = schedule
-                return schedule
-            }
-
-            // routineItems
-            if let routineData = defaults.array(forKey: "local_routine_items") as? [[String: Any]] {
-                let decodedRoutineItems = try routineData.map { data in
-                    let id = data["id"] as? String ?? UUID().uuidString
-                    return try decodeRoutineItem(id: id, data: data, schedulesById: schedulesById)
-                }
-                for schedule in decodedSchedules {
-                    schedule.items = decodedRoutineItems.filter { $0.schedule?.id == schedule.id }
-                }
-            }
-
-            schedules = decodedSchedules.sorted { $0.name < $1.name }
-        }
+        defaults.removeObject(forKey: "local_schedules")
+        defaults.removeObject(forKey: "local_routine_items")
 
         // activeFishes
         if let activeFishesData = defaults.array(forKey: "local_active_fishes") as? [[String: Any]] {
@@ -575,39 +492,21 @@ final class AppDataStore {
             }
         }
 
-        if schedules.isEmpty {
-            seedSampleSchedules()
-            try saveToLocal()
-        } else {
-            UserSchedule.ensureSingleActive(in: schedules)
-        }
+        syncAchievementFeedRewards()
     }
 
     private func saveToLocal() throws {
+        syncAchievementFeedRewards()
         let defaults = UserDefaults.standard
         defaults.set(isDeveloperSupported, forKey: "local_is_developer_supported")
-
-        defaults.set(schedules.map { encode(schedule: $0) }, forKey: "local_schedules")
-
-        let routineItems = schedules.flatMap(\.items)
-        defaults.set(routineItems.map { encode(routineItem: $0) }, forKey: "local_routine_items")
+        defaults.removeObject(forKey: "local_schedules")
+        defaults.removeObject(forKey: "local_routine_items")
 
         defaults.set(activeFishes.map { encode(activeFish: $0) }, forKey: "local_active_fishes")
         defaults.set(collectedFishes.map { encode(collectedFish: $0) }, forKey: "local_collected_fishes")
         defaults.set(careRecords.map { encode(careRecord: $0) }, forKey: "local_care_records")
         defaults.set(aquariums.map { encode(aquarium: $0) }, forKey: "local_aquariums")
         defaults.set(profiles.map { encode(profile: $0) }, forKey: "local_profiles")
-    }
-
-    // MARK: - Seed
-
-    private func seedSampleDataLocally() {
-        schedules.removeAll()
-        activeFishes.removeAll()
-        collectedFishes.removeAll()
-        careRecords.removeAll()
-        aquariums.removeAll()
-        seedSampleSchedules()
     }
 
     // MARK: - Developer Support
@@ -633,54 +532,7 @@ final class AppDataStore {
         }
     }
 
-    private func seedSampleSchedules() {
-        let schedule = UserSchedule(
-            name: "平日モード",
-            targetDepartureTime: DepartureTimeDefaults.fifteenMinutesFromNow(),
-            isActive: true
-        )
-
-        let definitions: [(String, Int, String)] = [
-            ("ハミガキ", 180, "#4FC3F7"),
-            ("洗顔", 120, "#81D4FA"),
-            ("着替え", 300, "#FFB74D"),
-            ("食事", 600, "#FFCC80"),
-            ("持ち物確認", 120, "#A5D6A7")
-        ]
-
-        schedule.items = definitions.enumerated().map { index, def in
-            RoutineItem(
-                name: def.0,
-                durationSeconds: def.1,
-                colorHex: def.2,
-                orderIndex: index,
-                schedule: schedule
-            )
-        }
-        schedules = [schedule]
-    }
-
     // MARK: - Encoders
-
-    private func encode(schedule: UserSchedule) -> [String: Any] {
-        [
-            "id": schedule.id.uuidString,
-            "name": schedule.name,
-            "targetDepartureTime": schedule.targetDepartureTime,
-            "isActive": schedule.isActive
-        ]
-    }
-
-    private func encode(routineItem: RoutineItem) -> [String: Any] {
-        [
-            "id": routineItem.id.uuidString,
-            "name": routineItem.name,
-            "durationSeconds": routineItem.durationSeconds,
-            "colorHex": routineItem.colorHex,
-            "orderIndex": routineItem.orderIndex,
-            "scheduleId": routineItem.schedule?.id.uuidString ?? ""
-        ]
-    }
 
     private func encode(activeFish: ActiveFish) -> [String: Any] {
         var data: [String: Any] = [
@@ -724,6 +576,7 @@ final class AppDataStore {
         [
             "id": aquarium.id.uuidString,
             "totalDepartures": aquarium.totalDepartures,
+            "bonusFeedStock": aquarium.bonusFeedStock,
             "createdAt": aquarium.createdAt,
             "updatedAt": aquarium.updatedAt
         ]
@@ -734,36 +587,12 @@ final class AppDataStore {
             "id": profile.id.uuidString,
             "nickname": profile.nickname,
             "avatarEmoji": profile.avatarEmoji,
-            "createdAt": profile.createdAt
+            "createdAt": profile.createdAt,
+            "claimedAchievementRewardIds": profile.claimedAchievementRewardIds
         ]
     }
 
     // MARK: - Decoders
-
-    private func decodeSchedule(id: String, data: [String: Any]) throws -> UserSchedule {
-        UserSchedule(
-            id: try uuid(id, label: "schedule.id"),
-            name: string(data["name"], default: "スケジュール"),
-            targetDepartureTime: try date(data["targetDepartureTime"], label: "schedule.targetDepartureTime"),
-            isActive: bool(data["isActive"], default: false)
-        )
-    }
-
-    private func decodeRoutineItem(
-        id: String,
-        data: [String: Any],
-        schedulesById: [String: UserSchedule]
-    ) throws -> RoutineItem {
-        let scheduleId = string(data["scheduleId"], default: "")
-        return RoutineItem(
-            id: try uuid(id, label: "routineItem.id"),
-            name: string(data["name"], default: "ルーティン"),
-            durationSeconds: int(data["durationSeconds"], default: 0),
-            colorHex: string(data["colorHex"], default: "#4FC3F7"),
-            orderIndex: int(data["orderIndex"], default: 0),
-            schedule: schedulesById[scheduleId]
-        )
-    }
 
     private func decodeActiveFish(id: String, data: [String: Any]) throws -> ActiveFish {
         ActiveFish(
@@ -804,6 +633,7 @@ final class AppDataStore {
         Aquarium(
             id: try uuid(id, label: "aquarium.id"),
             totalDepartures: int(data["totalDepartures"], default: 0),
+            bonusFeedStock: int(data["bonusFeedStock"], default: 0),
             createdAt: try date(data["createdAt"], label: "aquarium.createdAt"),
             updatedAt: try date(data["updatedAt"], label: "aquarium.updatedAt")
         )
@@ -814,7 +644,8 @@ final class AppDataStore {
             id: try uuid(id, label: "profile.id"),
             nickname: string(data["nickname"], default: "あなた"),
             avatarEmoji: string(data["avatarEmoji"], default: "🐟"),
-            createdAt: try date(data["createdAt"], label: "profile.createdAt")
+            createdAt: try date(data["createdAt"], label: "profile.createdAt"),
+            claimedAchievementRewardIds: stringArray(data["claimedAchievementRewardIds"])
         )
     }
 
@@ -829,6 +660,10 @@ final class AppDataStore {
 
     private func string(_ value: Any?, default defaultValue: String) -> String {
         value as? String ?? defaultValue
+    }
+
+    private func stringArray(_ value: Any?) -> [String] {
+        value as? [String] ?? []
     }
 
     private func bool(_ value: Any?, default defaultValue: Bool) -> Bool {

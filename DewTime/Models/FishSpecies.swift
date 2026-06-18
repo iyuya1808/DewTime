@@ -145,10 +145,10 @@ enum FishSpecies: String, CaseIterable, Identifiable {
     var difficultyLabel: String {
         switch requiredWaterRatio {
         case ..<0.25: return "かんたん"
-        case ..<0.50: return "やさしい"
-        case ..<0.70: return "ふつう"
-        case ..<0.85: return "むずかしい"
-        default: return "超むずかしい"
+        case ..<0.50: return "易しい"
+        case ..<0.70: return "普通"
+        case ..<0.85: return "難しい"
+        default: return "超難しい"
         }
     }
 

@@ -22,8 +22,6 @@ private struct SwimmingFish: Identifiable {
     var bobPhase: CGFloat
     /// ヒレのはためき位相。
     var finPhase: CGFloat
-    /// タップされて喜んでいる残り時間。
-    var happy: CGFloat = 0
     /// 進行方向が右向きか。
     var facingRight: Bool = true
 }
@@ -47,15 +45,6 @@ private struct FoodPellet: Identifiable {
     var wobblePhase: CGFloat
 }
 
-/// 魚タップ時に立ち上るハート。
-private struct Heart: Identifiable {
-    let id = UUID()
-    var x: CGFloat
-    var y: CGFloat
-    var life: CGFloat
-    var drift: CGFloat
-}
-
 /// 投入する魚の仕様（ビュー側で `FishSpecies` から生成）。
 private struct FishSpec {
     var id: UUID
@@ -72,7 +61,7 @@ private final class AquariumEngine {
     var fish: [SwimmingFish] = []
     var bubbles: [Bubble] = []
     var food: [FoodPellet] = []
-    var hearts: [Heart] = []
+    var onFoodEaten: (() -> Void)?
 
     private var lastTime: TimeInterval?
     private var bubbleTimer: CGFloat = 0
@@ -111,7 +100,6 @@ private final class AquariumEngine {
         stepFish(dt: dt)
         stepBubbles(dt: dt)
         stepFood(dt: dt)
-        stepHearts(dt: dt)
     }
 
     private func stepFish(dt: CGFloat) {
@@ -119,8 +107,7 @@ private final class AquariumEngine {
         for index in fish.indices {
             var f = fish[index]
             f.bobPhase += dt * 2.2
-            f.finPhase += dt * (f.happy > 0 ? 16 : 8)
-            if f.happy > 0 { f.happy = max(0, f.happy - dt) }
+            f.finPhase += dt * 8
 
             // 最寄りのエサへ向かう。なければ緩やかにさまよう。
             var speed = f.speed
@@ -131,8 +118,7 @@ private final class AquariumEngine {
                 // 口元まで来たら食べる。
                 if hypot(target.x - f.x, target.y - f.y) < 0.04 {
                     food.removeAll { $0.id == target.id }
-                    f.happy = 1.1
-                    spawnBubbles(at: CGPoint(x: f.x, y: f.y), count: 3)
+                    onFoodEaten?()
                 }
             } else {
                 f.heading += .random(in: -1...1) * dt * 1.4
@@ -184,46 +170,28 @@ private final class AquariumEngine {
         food.removeAll { $0.y > 0.9 }
     }
 
-    private func stepHearts(dt: CGFloat) {
-        for index in hearts.indices {
-            hearts[index].y -= dt * 0.18
-            hearts[index].life -= dt
-            hearts[index].x += sin(hearts[index].life * 6 + hearts[index].drift) * dt * 0.05
-        }
-        hearts.removeAll { $0.life <= 0 }
+    /// タップ位置付近の魚 ID。詳細表示用。
+    func fishId(at p: CGPoint, within radius: CGFloat = 0.09) -> UUID? {
+        guard let index = nearestFishIndex(to: p, within: radius) else { return nil }
+        return fish[index].id
     }
 
-    // MARK: 操作
-
-    /// タップ位置に最寄りの魚がいれば喜ばせ、いなければエサを落とす。
-    func tap(at p: CGPoint) -> UUID? {
-        if let index = nearestFishIndex(to: p, within: 0.09) {
-            fish[index].happy = 1.4
-            hearts.append(Heart(x: p.x, y: p.y - 0.02, life: 1.3, drift: .random(in: 0...3)))
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.prepare()
-            generator.impactOccurred()
-            return fish[index].id
-        } else {
-            guard food.count < 12 else { return nil }
-            food.append(FoodPellet(x: p.x, y: max(0.06, p.y), sink: .random(in: 0.06...0.1), wobblePhase: 0))
-            let generator = UIImpactFeedbackGenerator(style: .light)
-            generator.prepare()
-            generator.impactOccurred()
-            return nil
-        }
-    }
-
-    private func spawnBubbles(at p: CGPoint, count: Int) {
-        for _ in 0..<count where bubbles.count < 40 {
-            bubbles.append(Bubble(
-                x: p.x + .random(in: -0.02...0.02),
-                y: p.y,
-                size: .random(in: 2...5),
-                rise: .random(in: 0.1...0.18),
-                wobblePhase: .random(in: 0...(2 * .pi))
-            ))
-        }
+    /// タップ位置にエサを落とす。
+    @discardableResult
+    func dropFood(at p: CGPoint) -> Bool {
+        guard food.count < 10 else { return false }
+        food.append(
+            FoodPellet(
+                x: p.x,
+                y: max(0.06, p.y),
+                sink: .random(in: 0.06...0.1),
+                wobblePhase: 0
+            )
+        )
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.prepare()
+        generator.impactOccurred()
+        return true
     }
 
     private func nearestFood(to f: SwimmingFish) -> FoodPellet? {
@@ -253,26 +221,25 @@ private final class AquariumEngine {
 struct LiveAquariumView: View {
     @Environment(AppDataStore.self) private var store
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.appTabSelection) private var appTabSelection
     @AppStorage(AppPreferences.Key.aquariumTheme.rawValue) private var aquariumTheme = AquariumTheme.dewBlue.rawValue
 
     @State private var engine = AquariumEngine()
     @State private var showRecords = false
-    @State private var showUpgrade = false
+    @State private var statusGuide: AquariumStatusGuideKind?
     @State private var selectedFish: CollectedFish?
     @State private var canvasSize: CGSize = .zero
+    @State private var gachaReveal: FishGachaReveal?
+    @State private var lastFeedTapAt: Date = .distantPast
+    @State private var showsCapacityFullNotice = false
+    @State private var capacityFullNoticeTask: Task<Void, Never>?
 
-    private static let ghostMedakaIDs: [UUID] = [
-        UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-000000000001")!,
-        UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-000000000002")!,
-        UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-000000000003")!
-    ]
-
-    private var collected: [CollectedFish] {
-        store.collectedFishes.sorted { $0.recordedAt > $1.recordedAt }
+    private var isAtFishCapacity: Bool {
+        swimmingFishCount >= fishCapacity
     }
 
-    private var swimmableFish: [CollectedFish] {
-        collected.filter(\.succeeded)
+    private var aquariumFish: [CollectedFish] {
+        store.aquariumFish()
     }
 
     private var aquarium: Aquarium { store.aquarium() }
@@ -282,36 +249,22 @@ struct LiveAquariumView: View {
     }
 
     private var specs: [FishSpec] {
-        var result: [FishSpec] = []
-
-        for fish in swimmableFish {
-            guard let species = FishSpecies(rawValue: fish.speciesId) else { continue }
-            result.append(spec(for: fish, species: species, ghost: false))
-            if result.count >= fishCapacity { break }
+        aquariumFish.compactMap { fish in
+            guard let species = FishSpecies(rawValue: fish.speciesId) else { return nil }
+            return spec(for: fish, species: species, ghost: false)
         }
+    }
 
-        if result.isEmpty {
-            return Self.ghostMedakaIDs.map { id in
-                FishSpec(
-                    id: id,
-                    name: FishSpecies.medaka.displayName,
-                    species: .medaka,
-                    size: FishSpecies.medaka.displaySize(for: .aquarium),
-                    speed: FishSpecies.medaka.aquariumSwimSpeed,
-                    ghost: true
-                )
-            }
-        }
-
-        return result
+    private var showsEmptyAquariumHint: Bool {
+        aquariumFish.isEmpty
     }
 
     private var swimmingFishCount: Int {
-        min(swimmableFish.count, fishCapacity)
+        aquariumFish.count
     }
 
     private var aquariumSignature: String {
-        "\(aquarium.totalDepartures)-\(aquarium.sizeTier)-\(fishCapacity)-\(swimmableFish.map(\.id.uuidString).joined())"
+        "\(aquarium.totalDepartures)-\(aquarium.sizeTier)-\(fishCapacity)-\(aquarium.bonusFeedStock)-\(store.collectedFishes.map(\.id.uuidString).joined())"
     }
 
     private func spec(for fish: CollectedFish, species: FishSpecies, ghost: Bool) -> FishSpec {
@@ -329,11 +282,17 @@ struct LiveAquariumView: View {
         NavigationStack {
             ZStack {
                 aquariumScene
-                if swimmableFish.isEmpty {
+                if showsEmptyAquariumHint {
                     emptyAquariumHint
                 }
                 topBar
+
+                if showsCapacityFullNotice {
+                    capacityFullNotice
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
+            .animation(.easeOut(duration: 0.25), value: showsCapacityFullNotice)
             .navigationBarHidden(true)
         }
         .sheet(isPresented: $showRecords) {
@@ -342,12 +301,12 @@ struct LiveAquariumView: View {
             }
             .dewAppBackground()
         }
-        .sheet(isPresented: $showUpgrade) {
-            AquariumUpgradeSheet(
+        .sheet(item: $statusGuide) { guide in
+            AquariumStatusGuideSheet(
+                kind: guide,
                 aquarium: aquarium,
                 swimmingCount: swimmingFishCount,
-                totalSwimmableCount: swimmableFish.count,
-                onDismiss: { showUpgrade = false }
+                onDismiss: { statusGuide = nil }
             )
         }
         .sheet(item: $selectedFish) { fish in
@@ -356,9 +315,24 @@ struct LiveAquariumView: View {
                 .presentationBackground(.clear)
                 .presentationDragIndicator(.hidden)
         }
-        .onAppear { engine.populate(specs) }
+        .sheet(item: $gachaReveal) { reveal in
+            FishGachaResultSheet(reveal: reveal) {
+                gachaReveal = nil
+            }
+            .presentationDetents([.height(420)])
+            .presentationDragIndicator(.visible)
+        }
+        .onAppear {
+            engine.onFoodEaten = {
+                Task { await handleFoodEaten() }
+            }
+            engine.populate(specs)
+        }
         .onChange(of: aquariumSignature) { _, _ in
             engine.populate(specs)
+        }
+        .onDisappear {
+            capacityFullNoticeTask?.cancel()
         }
     }
 
@@ -375,17 +349,29 @@ struct LiveAquariumView: View {
                 drawFood(context: context, size: size)
                 drawBubbles(context: context, size: size)
                 drawFish(context: context, size: size)
-                drawHearts(context: context, size: size)
             }
             .ignoresSafeArea()
         }
         .contentShape(Rectangle())
         .onTapGesture(coordinateSpace: .local) { location in
             guard canvasSize.width > 0 else { return }
-            if let fishId = engine.tap(at: CGPoint(x: location.x / canvasSize.width, y: location.y / canvasSize.height)),
-               let fish = collected.first(where: { $0.id == fishId }) {
+            let point = CGPoint(x: location.x / canvasSize.width, y: location.y / canvasSize.height)
+
+            if let fishId = engine.fishId(at: point),
+               let fish = aquariumFish.first(where: { $0.id == fishId }) {
                 selectedFish = fish
+                return
             }
+
+            guard aquarium.bonusFeedStock > 0 else { return }
+
+            let now = Date.now
+            if isAtFishCapacity, now.timeIntervalSince(lastFeedTapAt) < 1.5 { return }
+            lastFeedTapAt = now
+
+            guard store.consumeBonusFeedIfAvailable() else { return }
+            Task { await store.saveAll() }
+            _ = engine.dropFood(at: point)
         }
     }
 
@@ -393,92 +379,172 @@ struct LiveAquariumView: View {
 
     private var topBar: some View {
         VStack {
-            HStack(alignment: .top, spacing: 8) {
-                Button {
-                    showUpgrade = true
-                } label: {
-                    HStack(spacing: 6) {
-                        ZStack {
-                            let bowl = 14 + CGFloat(aquarium.sizeTier) * 2
-                            Circle()
-                                .strokeBorder(.teal.opacity(0.8), lineWidth: 1.5)
-                                .frame(width: bowl, height: bowl)
-                            Image(systemName: aquarium.isMaxTier ? "sparkles" : "drop.fill")
-                                .font(.system(size: aquarium.isMaxTier ? 9 : 8, weight: .bold))
-                                .foregroundStyle(aquarium.isMaxTier ? .yellow : .cyan)
-                        }
-                        .frame(width: 28, height: 28)
+            HStack(alignment: .top, spacing: 10) {
+                aquariumStatusBar
 
-                        Text("\(aquarium.sizeTier + 1)")
-                            .font(.subheadline.weight(.bold))
-                            .monospacedDigit()
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(.black.opacity(0.22), in: Capsule())
-                    .overlay(Capsule().strokeBorder(.teal.opacity(0.45), lineWidth: 1))
-                    .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("水槽レベル\(aquarium.sizeTier + 1)。タップで成長を確認")
-
-                HStack(spacing: 5) {
-                    Image(systemName: "fish.fill")
-                        .font(.subheadline.weight(.bold))
-                    Text("\(swimmingFishCount)")
-                        .font(.subheadline.weight(.bold))
-                        .monospacedDigit()
-                    Text("/")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.white.opacity(0.55))
-                    Text("\(fishCapacity)")
-                        .font(.subheadline.weight(.bold))
-                        .monospacedDigit()
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(.black.opacity(0.22), in: Capsule())
-                .overlay(
-                    Capsule().strokeBorder(
-                        swimmableFish.count > fishCapacity ? Color.orange.opacity(0.55) : Color.white.opacity(0.25),
-                        lineWidth: 1
-                    )
-                )
-                .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
-                .accessibilityLabel("\(swimmingFishCount)匹が泳いでいます。収容上限は\(fishCapacity)匹")
-
-                Spacer()
+                Spacer(minLength: 0)
 
                 Button {
                     showRecords = true
                 } label: {
-                    Image(systemName: "calendar")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .frame(width: 40, height: 40)
-                        .background(.white.opacity(0.22), in: Circle())
-                        .overlay(Circle().strokeBorder(.white.opacity(0.4), lineWidth: 1))
+                    VStack(spacing: 3) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 17, weight: .semibold))
+                        Text("出発")
+                            .font(.system(size: 9, weight: .semibold))
+                        Text("記録")
+                            .font(.system(size: 9, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(width: 52, height: 52)
+                    .background(.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(.white.opacity(0.22), lineWidth: 1)
+                    )
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("育成記録")
+                .buttonStyle(AquariumStatusButtonStyle())
+                .accessibilityLabel("出発記録")
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 16)
             .padding(.top, 8)
 
             Spacer()
         }
     }
 
+    private var aquariumStatusBar: some View {
+        HStack(spacing: 0) {
+            statusSegment(
+                title: "レベル",
+                value: "\(aquarium.sizeTier + 1)",
+                accent: .cyan,
+                isHighlighted: aquarium.isMaxTier,
+                accessibilityLabel: "水槽レベル\(aquarium.sizeTier + 1)。タップで説明を表示"
+            ) {
+                levelSegmentIcon
+            } action: {
+                statusGuide = .level
+            }
+
+            statusDivider
+
+            statusSegment(
+                title: "魚",
+                value: "\(swimmingFishCount)/\(fishCapacity)",
+                accent: swimmingFishCount >= fishCapacity ? .orange : .white,
+                isHighlighted: swimmingFishCount >= fishCapacity,
+                accessibilityLabel: "\(swimmingFishCount)匹が泳いでいます。タップで図鑑へ"
+            ) {
+                Image(systemName: "fish.fill")
+                    .font(.system(size: 15, weight: .bold))
+            } action: {
+                appTabSelection?.wrappedValue = .collection
+            }
+
+            statusDivider
+
+            statusSegment(
+                title: "餌",
+                value: "\(aquarium.bonusFeedStock)",
+                accent: .orange,
+                isHighlighted: aquarium.bonusFeedStock > 0,
+                accessibilityLabel: "餌\(aquarium.bonusFeedStock)個。タップで説明を表示"
+            ) {
+                FeedPelletGlyph(size: 13)
+            } action: {
+                statusGuide = .feed
+            }
+        }
+        .padding(4)
+        .background(.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(.white.opacity(0.2), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+    }
+
+    private var levelSegmentIcon: some View {
+        ZStack {
+            let bowl = 12 + CGFloat(aquarium.sizeTier) * 1.5
+            Circle()
+                .strokeBorder(.teal.opacity(0.85), lineWidth: 1.5)
+                .frame(width: bowl, height: bowl)
+            Image(systemName: aquarium.isMaxTier ? "sparkles" : "drop.fill")
+                .font(.system(size: aquarium.isMaxTier ? 8 : 7, weight: .bold))
+                .foregroundStyle(aquarium.isMaxTier ? .yellow : .cyan)
+        }
+        .frame(width: 22, height: 16)
+    }
+
+    private var statusDivider: some View {
+        Rectangle()
+            .fill(.white.opacity(0.16))
+            .frame(width: 1, height: 40)
+            .padding(.vertical, 2)
+    }
+
+    private func statusSegment<Icon: View>(
+        title: String,
+        value: String,
+        accent: Color,
+        isHighlighted: Bool,
+        accessibilityLabel: String,
+        @ViewBuilder icon: () -> Icon,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .lineLimit(1)
+
+                HStack(spacing: 5) {
+                    icon()
+                        .foregroundStyle(accent.opacity(isHighlighted ? 1 : 0.85))
+
+                    Text(value)
+                        .font(.system(size: 15, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
+            .frame(minWidth: 60)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(AquariumStatusButtonStyle())
+        .accessibilityLabel(accessibilityLabel)
+    }
+
     private var emptyAquariumHint: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "fish")
-                .font(.system(size: 44, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.7))
-            Image(systemName: "arrow.up")
-                .font(.title3)
-                .foregroundStyle(.white.opacity(0.4))
+        VStack(spacing: 10) {
+            if aquarium.bonusFeedStock > 0 {
+                FeedPelletGlyph(size: 28)
+                Text("餌")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+                Text("タップして餌をあげる")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.65))
+                    .multilineTextAlignment(.center)
+            } else {
+                Image(systemName: "fish")
+                    .font(.system(size: 44, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.7))
+                Text("餌")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+                Text("オンタイム出発か実績解除で獲得できます")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.55))
+                    .multilineTextAlignment(.center)
+            }
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 20)
@@ -487,7 +553,86 @@ struct LiveAquariumView: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(.white.opacity(0.22), lineWidth: 1)
         }
-        .accessibilityLabel("成魚になった魚がここで泳ぎます")
+        .accessibilityLabel(
+            aquarium.bonusFeedStock > 0
+                ? "タップして餌をあげると魚が増えます"
+                : "餌がありません。オンタイム出発か実績解除で獲得できます"
+        )
+    }
+
+    private func handleFoodEaten() async {
+        guard let fish = await store.spawnFishFromFeed() else {
+            if isAtFishCapacity {
+                showCapacityFullFeedback()
+            }
+            return
+        }
+        guard let species = FishSpecies(rawValue: fish.speciesId) else { return }
+        if AppPreferences.hapticsEnabled {
+            ScheduleHaptics.playPhaseKnock()
+        }
+        let isNewSpecies = store.collectedFishes.filter { $0.speciesId == species.rawValue }.count == 1
+        gachaReveal = FishGachaReveal(
+            id: fish.id,
+            fish: fish,
+            isNewSpecies: isNewSpecies
+        )
+    }
+
+    private var capacityFullNotice: some View {
+        VStack {
+            Spacer()
+            VStack(spacing: 5) {
+                HStack(spacing: 8) {
+                    Image(systemName: "fish.fill")
+                        .font(.subheadline.weight(.bold))
+                    Text("水槽がいっぱいです")
+                        .font(.subheadline.weight(.semibold))
+                }
+                Text(capacityFullHint)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.88))
+                    .multilineTextAlignment(.center)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            .background(.black.opacity(0.42), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(.orange.opacity(0.55), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 28)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("水槽がいっぱいです。\(capacityFullHint)")
+        }
+        .allowsHitTesting(false)
+    }
+
+    private var capacityFullHint: String {
+        if aquarium.isMaxTier {
+            return "これ以上泳がせることはできません"
+        }
+        if let remaining = aquarium.departuresUntilNextTier, remaining > 0 {
+            return "あと\(remaining)しずくで収容上限が増えます"
+        }
+        return "オンタイム出発で水槽を大きくしよう"
+    }
+
+    private func showCapacityFullFeedback() {
+        showsCapacityFullNotice = true
+        if AppPreferences.hapticsEnabled {
+            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        }
+
+        capacityFullNoticeTask?.cancel()
+        capacityFullNoticeTask = Task {
+            try? await Task.sleep(for: .seconds(2.8))
+            guard !Task.isCancelled else { return }
+            showsCapacityFullNotice = false
+        }
     }
 
     // MARK: 描画ヘルパー
@@ -604,54 +749,30 @@ struct LiveAquariumView: View {
             let bob = sin(f.bobPhase) * (f.size * 0.06)
             let x = f.x * size.width
             let y = f.y * size.height + bob
-            let wiggle = sin(f.finPhase) * (f.happy > 0 ? 12 : 6)
-            let pop: CGFloat = f.happy > 0 ? 1.0 + sin(f.finPhase) * 0.06 : 1.0
+            let wiggle = sin(f.finPhase) * 6
 
             var ctx = context
             ctx.translateBy(x: x, y: y)
             ctx.rotate(by: .degrees(Double(wiggle)))
-            ctx.scaleBy(x: f.facingRight ? pop : -pop, y: pop)
+            ctx.scaleBy(x: f.facingRight ? 1 : -1, y: 1)
             ctx.opacity = f.ghost ? 0.4 : 1.0
             FishArtworkRenderer.draw(
                 f.species,
                 in: CGRect(x: -f.size / 2, y: -f.size / 2, width: f.size, height: f.size),
                 context: &ctx
             )
-
-            if f.happy > 0, !f.ghost {
-                let labelOpacity = min(1, f.happy)
-                let labelWidth = min(max(CGFloat(f.name.count) * 9 + 18, 44), 120)
-                let labelRect = CGRect(
-                    x: min(max(x - labelWidth / 2, 10), size.width - labelWidth - 10),
-                    y: max(y - f.size * 0.85 - 26, 60),
-                    width: labelWidth,
-                    height: 24
-                )
-                context.fill(
-                    Path(roundedRect: labelRect, cornerRadius: 12),
-                    with: .color(.black.opacity(0.34 * labelOpacity))
-                )
-                context.draw(
-                    Text(f.name)
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(.white),
-                    at: CGPoint(x: labelRect.midX, y: labelRect.midY),
-                    anchor: .center
-                )
-            }
         }
     }
+}
 
-    private func drawHearts(context: GraphicsContext, size: CGSize) {
-        for heart in engine.hearts {
-            var ctx = context
-            ctx.opacity = min(1, heart.life)
-            ctx.draw(
-                Text("💕").font(.system(size: 20)),
-                at: CGPoint(x: heart.x * size.width, y: heart.y * size.height),
-                anchor: .center
-            )
-        }
+// MARK: - ステータスバー部品
+
+private struct AquariumStatusButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.72 : 1)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 

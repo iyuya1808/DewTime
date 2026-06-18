@@ -1,21 +1,19 @@
 import SwiftUI
 
 /// 出発結果シートの先頭で再生する「タンクの水が水槽へ注ぎ込む」演出。
-/// 上のタンクが空になりながら、下の水槽に水が満ち、魚がスケールアップする。
 struct PourTransitionView: View {
-    let waterLevel: Double          // 0.0 - 1.0（注ぎ込む残水量）
-    let species: FishSpecies
+    let waterLevel: Double
+    let aquariumTier: Int
 
     @State private var tankLevel: Double = 0
     @State private var bowlFill: Double = 0
-    @State private var fishScale: CGFloat = 0
+    @State private var iconScale: CGFloat = 0
     @State private var streamOpacity: Double = 0
 
     private var theme: WaterLevelTheme { WaterLevelTheme(waterRatio: waterLevel) }
 
     var body: some View {
         VStack(spacing: 0) {
-            // 上：水が抜けていくタンク
             WaterTankView(
                 waterLevel: tankLevel,
                 cornerRadius: 14,
@@ -23,17 +21,15 @@ struct PourTransitionView: View {
             )
             .frame(width: 60, height: 66)
 
-            // 中：流れ落ちる水流
             PourStreamView(colors: theme.gradientColors)
                 .frame(width: 14, height: 26)
                 .opacity(streamOpacity)
 
-            // 下：水が満ちる水槽と育つ魚
             AquariumBowlView(
                 fill: bowlFill,
                 colors: theme.gradientColors,
-                species: species,
-                fishScale: fishScale
+                aquariumTier: aquariumTier,
+                iconScale: iconScale
             )
             .frame(width: 132, height: 132)
         }
@@ -53,7 +49,6 @@ struct PourTransitionView: View {
             bowlFill = waterLevel
         }
 
-        // 着水のハプティクス
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             let generator = UIImpactFeedbackGenerator(style: .light)
             generator.prepare()
@@ -61,7 +56,7 @@ struct PourTransitionView: View {
         }
 
         withAnimation(.spring(response: 0.5, dampingFraction: 0.55).delay(1.05)) {
-            fishScale = 1.0
+            iconScale = 1.0
         }
         withAnimation(.easeOut(duration: 0.4).delay(1.1)) {
             streamOpacity = 0
@@ -69,23 +64,21 @@ struct PourTransitionView: View {
     }
 }
 
-/// タンクと水槽の間を流れ落ちる水の柱。きらめきを重ねる。
-private struct PourStreamView: View {
+struct PourStreamView: View {
     let colors: [Color]
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 45.0)) { timeline in
             Canvas { context, size in
                 let t = timeline.date.timeIntervalSinceReferenceDate
-                // 水の柱
-                let column = Path(roundedRect: CGRect(x: size.width * 0.32, y: 0, width: size.width * 0.36, height: size.height), cornerRadius: size.width * 0.18)
+                let column = Path(roundedRect: CGRect(x: size.width * 0.2, y: 0, width: size.width * 0.6, height: size.height), cornerRadius: size.width * 0.3)
                 context.fill(column, with: .linearGradient(
                     Gradient(colors: colors),
                     startPoint: CGPoint(x: 0, y: 0),
                     endPoint: CGPoint(x: 0, y: size.height)
                 ))
-                // 流れるきらめき
-                for i in 0..<3 {
+                context.fill(column, with: .color(.white.opacity(0.12)))
+                for i in 0..<5 {
                     let phase = (t * 1.6 + Double(i) * 0.4).truncatingRemainder(dividingBy: 1)
                     let y = CGFloat(phase) * size.height
                     let r = size.width * 0.12
@@ -97,12 +90,11 @@ private struct PourStreamView: View {
     }
 }
 
-/// 水が下から満ちていく丸い水槽。中で魚が育つ。
 private struct AquariumBowlView: View {
     let fill: Double
     let colors: [Color]
-    let species: FishSpecies
-    var fishScale: CGFloat
+    let aquariumTier: Int
+    var iconScale: CGFloat
 
     var body: some View {
         GeometryReader { geo in
@@ -111,7 +103,6 @@ private struct AquariumBowlView: View {
                 Circle()
                     .fill(Color.white.opacity(0.06))
 
-                // 水（下から満ちる）
                 Rectangle()
                     .fill(
                         LinearGradient(colors: colors.map { $0.opacity(0.55) }, startPoint: .top, endPoint: .bottom)
@@ -120,10 +111,10 @@ private struct AquariumBowlView: View {
                     .frame(maxHeight: .infinity, alignment: .bottom)
                     .clipShape(Circle())
 
-                // 魚
-                FishArtworkView(species: species)
-                    .frame(width: diameter * 0.62, height: diameter * 0.58)
-                    .scaleEffect(fishScale)
+                Image(systemName: aquariumTier >= Aquarium.maxTier ? "sparkles" : "drop.fill")
+                    .font(.system(size: diameter * 0.28, weight: .bold))
+                    .foregroundStyle(aquariumTier >= Aquarium.maxTier ? .yellow : .cyan)
+                    .scaleEffect(iconScale)
 
                 Circle()
                     .strokeBorder(.white.opacity(0.18), lineWidth: 1.5)

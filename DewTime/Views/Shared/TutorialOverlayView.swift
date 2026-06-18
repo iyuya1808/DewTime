@@ -158,81 +158,90 @@ struct TutorialOverlayView: View {
 }
 
 private enum TutorialStep: CaseIterable {
-    case timerOverview
-    case timerFlow
+    case timerWater
+    case timerDepart
+    case rewards
+    case aquariumGacha
     case collection
-    case aquarium
-    case profile
+    case profileRecords
 
     var tab: AppTab {
         switch self {
-        case .timerOverview, .timerFlow:
+        case .timerWater, .timerDepart, .rewards:
             return .timer
+        case .aquariumGacha:
+            return .aquarium
         case .collection:
             return .collection
-        case .aquarium:
-            return .aquarium
-        case .profile:
+        case .profileRecords:
             return .profile
         }
     }
 
     var icon: String {
         switch self {
-        case .timerOverview:
+        case .timerWater:
             return "drop.fill"
-        case .timerFlow:
+        case .timerDepart:
             return "figure.walk.departure"
+        case .rewards:
+            return "gift.fill"
+        case .aquariumGacha:
+            return FeedIcon.systemName
         case .collection:
             return "book.closed.fill"
-        case .aquarium:
-            return "fish.fill"
-        case .profile:
-            return "person.crop.circle.fill"
+        case .profileRecords:
+            return "calendar"
         }
     }
 
     var title: String {
         switch self {
-        case .timerOverview:
-            return "水を残すタイマー"
-        case .timerFlow:
-            return "出発すると魚が育ちます"
+        case .timerWater:
+            return "水で時間がわかる"
+        case .timerDepart:
+            return "出発で水槽へ届ける"
+        case .rewards:
+            return "しずくと餌"
+        case .aquariumGacha:
+            return "餌で仲間を増やす"
         case .collection:
-            return "育った魚は図鑑へ"
-        case .aquarium:
-            return "水槽で魚を眺める"
-        case .profile:
-            return "記録と設定をあとから確認"
+            return "図鑑を埋めよう"
+        case .profileRecords:
+            return "記録と実績"
         }
     }
 
     var message: String {
         switch self {
-        case .timerOverview:
-            return "出発時刻までの余裕が水量として表示されます。準備が順調なほど水が残り、魚にあげられる水も増えます。"
-        case .timerFlow:
-            return "「スタート」で準備を始めます。出発できたら「いってきます！」を押して、残った水を今日の魚に届けましょう。"
+        case .timerWater:
+            return "タンクをスワイプして出発までの時間を設定します。水が多いほど余裕があり、準備が順調なほど水が残ります。"
+        case .timerDepart:
+            return "「スタート」で準備を始めます。時間内に「いってきます」を押すと、残った水を水槽へ届けられます。"
+        case .rewards:
+            return "オンタイム出発で「しずく +1」と「餌 +1」を獲得できます。しずくは水槽の成長に、餌は水槽タブで魚を呼び寄せるのに使います。遅刻すると報酬はありません。"
+        case .aquariumGacha:
+            return "水槽をタップして餌を落としましょう。魚が食べたタイミングで新しい仲間が誕生し、図鑑に登録されます。"
         case .collection:
-            return "魚が成魚まで育つと図鑑に登録されます。育成中の進み具合や、まだ出会っていない魚の目安もここで確認できます。"
-        case .aquarium:
-            return "成魚になった魚は水槽で泳ぎます。水槽は毎日の水やりで少しずつ育ち、より大きな魚にも出会えるようになります。"
-        case .profile:
-            return "直近7日の水やりをアイコンと数字で確認できます。スケジュールや通知の変更は右上の歯車から。"
+            return "獲得した魚種は図鑑に記録されます。まだ出会っていない魚はシルエットで表示されます。水槽レベルが上がると、より珍しい魚が出現します。"
+        case .profileRecords:
+            return "出発記録をカレンダーで確認できます。実績を達成すると餌がもらえます。通知の変更は右上の歯車から行えます。"
         }
     }
 
     var tint: Color {
         switch self {
-        case .timerOverview:
+        case .timerWater:
             return Color.dewBlue
-        case .timerFlow:
+        case .timerDepart:
             return .cyan
+        case .rewards:
+            return .teal
+        case .aquariumGacha:
+            return .yellow
         case .collection:
             return .purple
-        case .aquarium:
-            return .teal
-        case .profile:
+        case .profileRecords:
             return .orange
         }
     }
