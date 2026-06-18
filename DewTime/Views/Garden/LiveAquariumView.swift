@@ -170,10 +170,24 @@ private final class AquariumEngine {
         food.removeAll { $0.y > 0.9 }
     }
 
-    /// タップ位置付近の魚 ID。詳細表示用。
-    func fishId(at p: CGPoint, within radius: CGFloat = 0.09) -> UUID? {
-        guard let index = nearestFishIndex(to: p, within: radius) else { return nil }
-        return fish[index].id
+    /// タップ位置付近の魚 ID。詳細表示用。当たり判定は描画サイズに合わせる。
+    func fishId(at p: CGPoint, canvasSize: CGSize) -> UUID? {
+        guard canvasSize.width > 0, canvasSize.height > 0 else { return nil }
+        let scale = min(canvasSize.width, canvasSize.height)
+
+        var best: Int?
+        var bestDist = CGFloat.greatestFiniteMagnitude
+        for index in fish.indices {
+            let f = fish[index]
+            let hitRadiusPt = f.size * 0.40 + 8
+            let hitRadius = hitRadiusPt / scale
+            let d = hypot(f.x - p.x, f.y - p.y)
+            if d <= hitRadius, d < bestDist {
+                bestDist = d
+                best = index
+            }
+        }
+        return best.map { fish[$0].id }
     }
 
     /// タップ位置にエサを落とす。
@@ -196,16 +210,6 @@ private final class AquariumEngine {
 
     private func nearestFood(to f: SwimmingFish) -> FoodPellet? {
         food.min { hypot($0.x - f.x, $0.y - f.y) < hypot($1.x - f.x, $1.y - f.y) }
-    }
-
-    private func nearestFishIndex(to p: CGPoint, within radius: CGFloat) -> Int? {
-        var best: Int?
-        var bestDist = radius
-        for index in fish.indices {
-            let d = hypot(fish[index].x - p.x, fish[index].y - p.y)
-            if d < bestDist { bestDist = d; best = index }
-        }
-        return best
     }
 
     private func lerpAngle(_ a: CGFloat, _ b: CGFloat, _ t: CGFloat) -> CGFloat {
@@ -233,6 +237,8 @@ struct LiveAquariumView: View {
     @State private var lastFeedTapAt: Date = .distantPast
     @State private var showsCapacityFullNotice = false
     @State private var capacityFullNoticeTask: Task<Void, Never>?
+    @State private var showsNoFeedNotice = false
+    @State private var noFeedNoticeTask: Task<Void, Never>?
 
     private var isAtFishCapacity: Bool {
         swimmingFishCount >= fishCapacity
@@ -291,8 +297,14 @@ struct LiveAquariumView: View {
                     capacityFullNotice
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
+
+                if showsNoFeedNotice {
+                    noFeedNotice
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
             .animation(.easeOut(duration: 0.25), value: showsCapacityFullNotice)
+            .animation(.easeOut(duration: 0.25), value: showsNoFeedNotice)
             .navigationBarHidden(true)
         }
         .sheet(isPresented: $showRecords) {
@@ -333,6 +345,7 @@ struct LiveAquariumView: View {
         }
         .onDisappear {
             capacityFullNoticeTask?.cancel()
+            noFeedNoticeTask?.cancel()
         }
     }
 
@@ -357,13 +370,16 @@ struct LiveAquariumView: View {
             guard canvasSize.width > 0 else { return }
             let point = CGPoint(x: location.x / canvasSize.width, y: location.y / canvasSize.height)
 
-            if let fishId = engine.fishId(at: point),
+            if let fishId = engine.fishId(at: point, canvasSize: canvasSize),
                let fish = aquariumFish.first(where: { $0.id == fishId }) {
                 selectedFish = fish
                 return
             }
 
-            guard aquarium.bonusFeedStock > 0 else { return }
+            guard aquarium.bonusFeedStock > 0 else {
+                showNoFeedFeedback()
+                return
+            }
 
             let now = Date.now
             if isAtFishCapacity, now.timeIntervalSince(lastFeedTapAt) < 1.5 { return }
@@ -387,16 +403,10 @@ struct LiveAquariumView: View {
                 Button {
                     showRecords = true
                 } label: {
-                    VStack(spacing: 3) {
-                        Image(systemName: "calendar")
-                            .font(.system(size: 17, weight: .semibold))
-                        Text("出発")
-                            .font(.system(size: 9, weight: .semibold))
-                        Text("記録")
-                            .font(.system(size: 9, weight: .semibold))
-                    }
-                    .foregroundStyle(.white)
-                    .frame(width: 52, height: 52)
+                    Image(systemName: "calendar")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
                     .background(.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -632,6 +642,44 @@ struct LiveAquariumView: View {
             try? await Task.sleep(for: .seconds(2.8))
             guard !Task.isCancelled else { return }
             showsCapacityFullNotice = false
+        }
+    }
+
+    private var noFeedNotice: some View {
+        VStack {
+            Spacer()
+            HStack(spacing: 8) {
+                FeedPelletGlyph(size: 14)
+                Text("餌がありません")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.black.opacity(0.38), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(.white.opacity(0.2), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 28)
+            .accessibilityLabel("餌がありません")
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func showNoFeedFeedback() {
+        showsNoFeedNotice = true
+        if AppPreferences.hapticsEnabled {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
+
+        noFeedNoticeTask?.cancel()
+        noFeedNoticeTask = Task {
+            try? await Task.sleep(for: .seconds(1.6))
+            guard !Task.isCancelled else { return }
+            showsNoFeedNotice = false
         }
     }
 
