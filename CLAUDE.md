@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## プロジェクト概要
 
-**DewTime** は iOS 17+ 向けの朝タイマーアプリ。出発時刻までの時間を「水タンク」で可視化し、オンタイム出発でしずく・餌を獲得して水槽を育てる。詳細な UX 仕様は `SPEC.md`・`wireframe.html` を参照。`wireframe.html` には旧「出発スケジュール」「ルーティン編集」「StartSheet」の画面が残っているが**実装からは削除済み**。仕様書と実装が食い違う場合はコードを正とする。
+**DewTime** は iOS 17+ 向けの朝タイマーアプリ。出発時刻までの時間を「水タンク」で可視化し、オンタイム出発でしずく・餌を獲得して水槽を育てる。`SPEC.md` はユーザー向け機能紹介（マーケティング文書）であり技術仕様ではない。`wireframe.html` には旧「出発スケジュール」「ルーティン編集」「StartSheet」の画面が残っているが**実装からは削除済み**。ドキュメントと実装が食い違う場合はコードを正とする。
 
 ## ビルド・実行
 
@@ -20,6 +20,8 @@ xcodebuild test -project DewTime.xcodeproj -scheme DewTime -destination 'platfor
 ```
 
 LSP は `buildServer.json`（xcode-build-server）が提供。ローカル絶対パスを含むため `.gitignore` 済み。
+
+ネイティブ iOS アプリ（iOS 17+）のため、ビルド・実行・テストには macOS + Xcode が必須。Linux 環境（Cursor Cloud 等）ではビルド/シミュレータ実行不可。詳細は [AGENTS.md](AGENTS.md) 参照。
 
 ## アーキテクチャ
 
