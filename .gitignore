@@ -59,4 +59,8 @@ graphify-out/
 
 # Local presentation / pitch notes (not project docs)
 PRESENTATION.md
+presentation.html
+presentation_script.md
+presentation-pdf/
+scripts/export-presentation-pdf.mjs
 
