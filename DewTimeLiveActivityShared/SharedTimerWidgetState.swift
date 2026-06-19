@@ -16,6 +16,9 @@ struct SharedTimerWidgetState: Codable, Equatable {
     var startedAt: Date
     var targetDepartureTime: Date
     var fishEmoji: String
+    /// 実写魚画像のアセット名を決めるための `FishSpecies.rawValue`（例: "medaka"）。
+    /// 旧バージョンの保存データには存在しないため optional。
+    var speciesRawValue: String?
     var selectedSpeciesName: String
     var segments: [RoutineSegment]
 

@@ -461,6 +461,7 @@ extension TimerViewModel {
                 startedAt: startedAt,
                 targetDepartureTime: targetDepartureTime,
                 fishEmoji: fishEmoji,
+                speciesRawValue: species?.rawValue,
                 selectedSpeciesName: speciesName,
                 segments: []
             )

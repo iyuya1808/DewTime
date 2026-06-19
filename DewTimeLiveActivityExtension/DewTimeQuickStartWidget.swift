@@ -53,6 +53,7 @@ private struct QuickStartTimelineProvider: TimelineProvider {
             startedAt: .now.addingTimeInterval(-8 * 60),
             targetDepartureTime: .now.addingTimeInterval(22 * 60),
             fishEmoji: "🐟",
+            speciesRawValue: "medaka",
             selectedSpeciesName: L10n.Widget.previewSpeciesName,
             segments: []
         )
@@ -69,7 +70,7 @@ private struct QuickStartWidgetView: View {
         case .systemSmall:
             return [("+15", 15), ("+30", 30)]
         default:
-            return [("+15", 15), ("+30", 30), ("+45", 45), ("+60", 60)]
+            return [("+10", 10), ("+15", 15), ("+20", 20), ("+30", 30)]
         }
     }
 
@@ -78,29 +79,26 @@ private struct QuickStartWidgetView: View {
         let waterLevel = state?.waterLevel(at: entry.date) ?? 0.86
         let isOverdue = state?.isOverdue(at: entry.date) ?? false
 
-        ZStack {
-            WidgetAquariumView(
-                waterLevel: waterLevel,
-                isOverdue: isOverdue,
-                fishEmoji: state?.fishEmoji ?? "🐟"
-            )
+        VStack(alignment: .leading, spacing: 8) {
+            header(state: state, isOverdue: isOverdue)
 
-            VStack(alignment: .leading, spacing: 8) {
-                header(state: state, isOverdue: isOverdue)
+            Spacer(minLength: 8)
 
-                Spacer()
-
-                if let state {
-                    runningFooter(state: state, isOverdue: isOverdue)
-                } else {
-                    startControls
-                }
+            if let state {
+                runningFooter(state: state, isOverdue: isOverdue)
+            } else {
+                startControls
             }
-            .padding(family == .systemSmall ? 14 : 16)
         }
         .widgetURL(URL(string: "dewtime://timer"))
         .containerBackground(for: .widget) {
-            Color(red: 0.04, green: 0.18, blue: 0.24)
+            WidgetAquariumView(
+                waterLevel: waterLevel,
+                isOverdue: isOverdue,
+                fishEmoji: state?.fishEmoji ?? "🐟",
+                speciesRawValue: state?.speciesRawValue,
+                phase: wavePhase(at: entry.date)
+            )
         }
     }
 
@@ -188,6 +186,14 @@ private struct QuickStartWidgetView: View {
         URL(string: "dewtime://start-timer?minutes=\(minutes)")!
     }
 
+    /// ウィジェットは連続アニメ不可。タイムラインの各エントリ（毎分）で
+    /// 位相をずらし、更新ごとに波がゆっくり流れて見えるようにする。
+    private func wavePhase(at date: Date) -> CGFloat {
+        let period: Double = 600 // 10分で一巡
+        let t = date.timeIntervalSince1970.truncatingRemainder(dividingBy: period) / period
+        return CGFloat(t) * 2 * .pi
+    }
+
     private func timeText(for state: SharedTimerWidgetState, isOverdue: Bool) -> String {
         let seconds = isOverdue
             ? max(0, Int(entry.date.timeIntervalSince(state.targetDepartureTime)))
@@ -204,12 +210,16 @@ private struct WidgetAquariumView: View {
     let waterLevel: Double
     let isOverdue: Bool
     let fishEmoji: String
+    var speciesRawValue: String?
+    var phase: CGFloat = 0
 
     var body: some View {
         GeometryReader { proxy in
             let size = proxy.size
             let clampedLevel = min(1, max(0, waterLevel))
             let waterHeight = size.height * max(0.18, clampedLevel)
+            // 波の振幅は水面の余裕に合わせて控えめに。
+            let amplitude = max(3, min(8, size.height * 0.03))
 
             ZStack(alignment: .bottom) {
                 LinearGradient(
@@ -222,7 +232,13 @@ private struct WidgetAquariumView: View {
                     endPoint: .bottom
                 )
 
-                RoundedRectangle(cornerRadius: 0)
+                // 奥の波（薄く、位相をずらして奥行きを出す）
+                WaterWaveShape(phase: phase + .pi * 0.6, amplitude: amplitude * 0.7, waterHeight: waterHeight + amplitude)
+                    .fill(waterColors.last!.opacity(0.45))
+                    .frame(height: waterHeight + amplitude)
+
+                // 手前の波（本体）
+                WaterWaveShape(phase: phase, amplitude: amplitude, waterHeight: waterHeight + amplitude)
                     .fill(
                         LinearGradient(
                             colors: waterColors,
@@ -230,13 +246,12 @@ private struct WidgetAquariumView: View {
                             endPoint: .bottom
                         )
                     )
-                    .frame(height: waterHeight)
-                    .overlay(alignment: .top) {
-                        Capsule()
-                            .fill(.white.opacity(0.36))
-                            .frame(height: 4)
-                            .padding(.horizontal, 18)
-                            .offset(y: -2)
+                    .frame(height: waterHeight + amplitude)
+                    .overlay {
+                        WaterWaveShape(phase: phase, amplitude: amplitude, waterHeight: waterHeight + amplitude)
+                            .stroke(.white.opacity(0.4), lineWidth: 1.5)
+                            .frame(height: waterHeight + amplitude)
+                            .blendMode(.softLight)
                     }
 
                 ForEach(0..<5) { index in
@@ -249,12 +264,11 @@ private struct WidgetAquariumView: View {
                         )
                 }
 
-                Text(fishEmoji)
-                    .font(.system(size: min(size.width, size.height) * 0.24))
-                    .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
+                fishView(maxDimension: min(size.width, size.height))
+                    .shadow(color: .black.opacity(0.22), radius: 4, y: 2)
                     .position(
-                        x: size.width * 0.66,
-                        y: size.height - waterHeight * 0.46
+                        x: size.width * 0.64,
+                        y: size.height - waterHeight * 0.5
                     )
 
                 LinearGradient(
@@ -263,6 +277,22 @@ private struct WidgetAquariumView: View {
                     endPoint: .bottom
                 )
             }
+        }
+    }
+
+    /// 実写の魚画像（拡張バンドルの `fish_<species>` アセット）。
+    /// 画像が無い種類・旧データでは絵文字にフォールバック。
+    @ViewBuilder
+    private func fishView(maxDimension: CGFloat) -> some View {
+        if let raw = speciesRawValue,
+           UIImage(named: "fish_\(raw)") != nil {
+            Image("fish_\(raw)")
+                .resizable()
+                .scaledToFit()
+                .frame(width: maxDimension * 0.42, height: maxDimension * 0.42)
+        } else {
+            Text(fishEmoji)
+                .font(.system(size: maxDimension * 0.24))
         }
     }
 
@@ -288,6 +318,40 @@ private struct WidgetAquariumView: View {
     }
 }
 
+/// 水面を正弦波で描く。`waterHeight + amplitude` の高さのフレームに
+/// 下端詰めで配置し、上端から `amplitude` 下を平均水面とする。
+private struct WaterWaveShape: Shape {
+    var phase: CGFloat
+    var amplitude: CGFloat
+    var waterHeight: CGFloat
+
+    var animatableData: CGFloat {
+        get { phase }
+        set { phase = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let surfaceY = rect.minY + amplitude
+        let waves: CGFloat = 1.8
+
+        path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+        var x = rect.minX
+        let step: CGFloat = 3
+        while x <= rect.maxX {
+            let rel = (x - rect.minX) / max(1, rect.width)
+            let y = surfaceY + sin(rel * .pi * 2 * waves + phase) * amplitude
+            path.addLine(to: CGPoint(x: x, y: y))
+            x += step
+        }
+        let yEnd = surfaceY + sin(.pi * 2 * waves + phase) * amplitude
+        path.addLine(to: CGPoint(x: rect.maxX, y: yEnd))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.closeSubpath()
+        return path
+    }
+}
+
 #Preview(as: .systemMedium) {
     DewTimeQuickStartWidget()
 } timeline: {
@@ -298,6 +362,7 @@ private struct WidgetAquariumView: View {
             startedAt: .now.addingTimeInterval(-8 * 60),
             targetDepartureTime: .now.addingTimeInterval(22 * 60),
             fishEmoji: "🐟",
+            speciesRawValue: "medaka",
             selectedSpeciesName: L10n.Widget.previewSpeciesName,
             segments: []
         )
