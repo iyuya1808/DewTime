@@ -361,7 +361,13 @@ struct LiveAquariumView: View {
 
             guard store.consumeBonusFeedIfAvailable() else { return }
             Task { await store.saveAll() }
-            _ = engine.dropFood(at: point)
+
+            if aquariumFish.isEmpty {
+                // 食べる魚が1匹もいないと餌が永遠に食べられないため、最初の1匹は即時付与する。
+                Task { await handleFoodEaten() }
+            } else {
+                _ = engine.dropFood(at: point)
+            }
         }
     }
 
